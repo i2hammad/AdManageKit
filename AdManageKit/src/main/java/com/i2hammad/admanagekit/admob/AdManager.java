@@ -32,7 +32,8 @@ public class AdManager {
     /**
      * Private constructor to enforce singleton usage.
      */
-    private AdManager() {}
+    private AdManager() {
+    }
 
     /**
      * Returns the singleton instance of AdManager.
@@ -49,8 +50,8 @@ public class AdManager {
     /**
      * Loads an interstitial ad using the specified ad unit ID.
      *
-     * @param context   The context used for loading the ad.
-     * @param adUnitId  The ad unit ID used to load the interstitial ad.
+     * @param context  The context used for loading the ad.
+     * @param adUnitId The ad unit ID used to load the interstitial ad.
      */
     public void loadInterstitialAd(Context context, String adUnitId) {
         this.adUnitId = adUnitId;
@@ -77,8 +78,8 @@ public class AdManager {
     /**
      * Shows an interstitial ad immediately, regardless of the time interval.
      *
-     * @param activity  The activity used to display the ad.
-     * @param callback  The callback to handle actions after the ad is closed.
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
      */
     public void forceShowInterstitial(Activity activity, AdManagerCallback callback) {
         showAd(activity, callback, true);
@@ -87,8 +88,8 @@ public class AdManager {
     /**
      * Shows an interstitial ad based on the specified time interval criteria.
      *
-     * @param activity  The activity used to display the ad.
-     * @param callback  The callback to handle actions after the ad is closed.
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
      */
     public void showInterstitialAdByTimes(Activity activity, AdManagerCallback callback) {
         if (canShowAd()) {
@@ -117,7 +118,7 @@ public class AdManager {
     }
 
     /**
-     * Sets the custom time interval for displaying interstitial ads.
+     * Sets the custom time interval for displaying interstitial ads. default is 15 secs
      *
      * @param intervalMillis The time interval in milliseconds.
      */
@@ -139,9 +140,9 @@ public class AdManager {
     /**
      * Handles the display of interstitial ads, setting callbacks for ad events.
      *
-     * @param activity  The activity used to display the ad.
-     * @param callback  The callback to handle actions after the ad is closed.
-     * @param reloadAd  Indicates if the ad should be reloaded after being shown.
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param reloadAd Indicates if the ad should be reloaded after being shown.
      */
     private void showAd(Activity activity, AdManagerCallback callback, boolean reloadAd) {
         if (isReady()) {

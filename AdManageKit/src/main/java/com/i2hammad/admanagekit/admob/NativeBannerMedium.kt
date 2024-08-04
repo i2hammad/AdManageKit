@@ -1,4 +1,4 @@
-package com.ads.control.ads.nativeads
+package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
 import android.content.Context

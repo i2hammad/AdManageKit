@@ -8,17 +8,64 @@
     tools:context=".MainActivity">
 
 
+
+
     <TextView
-        android:id="@+id/sampleBanner"
+        android:id="@+id/sampleNativeBannerSmall"
         android:layout_width="wrap_content"
+        android:text="Native Banner Small"
+        android:padding="16dp"
         android:layout_height="wrap_content">
 
     </TextView>
 
-    <com.i2hammad.admanagekit.admob.BannerAdView
-        android:id="@+id/bannerAdView"
+
+    <com.i2hammad.admanagekit.admob.NativeBannerSmall
+        android:id="@+id/nativeBannerSmall"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/sampleBanner" />
+        android:layout_below="@+id/sampleNativeBannerSmall">
 
+    </com.i2hammad.admanagekit.admob.NativeBannerSmall>
+
+
+
+
+    <TextView
+        android:id="@+id/sampleNativeBannerMedium"
+        android:layout_width="wrap_content"
+        android:layout_below="@+id/nativeBannerSmall"
+        android:text="Native Banner Medium"
+        android:padding="16dp"
+        android:layout_height="wrap_content">
+
+    </TextView>
+
+
+    <com.i2hammad.admanagekit.admob.NativeBannerMedium
+        android:id="@+id/nativeBannerMedium"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sampleNativeBannerMedium">
+
+    </com.i2hammad.admanagekit.admob.NativeBannerMedium>
+
+    <TextView
+        android:id="@+id/sampleNativeBannerLarge"
+        android:layout_width="wrap_content"
+        android:layout_below="@+id/nativeBannerMedium"
+        android:text="Native Banner Medium"
+        android:padding="16dp"
+        android:layout_height="wrap_content">
+
+    </TextView>
+
+
+    <com.i2hammad.admanagekit.admob.NativeLarge
+        android:id="@+id/nativeLarge"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/sampleNativeBannerLarge">
+
+    </com.i2hammad.admanagekit.admob.NativeLarge>
 </RelativeLayout>
