@@ -22,6 +22,9 @@ android {
             )
         }
     }
+    buildFeatures {
+        viewBinding = true
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -36,7 +39,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation (libs.billing)
+    implementation(libs.billing)
     implementation(libs.user.messaging.platform)
+    implementation(libs.play.services.ads)
+    implementation(libs.shimmer)
 
 }

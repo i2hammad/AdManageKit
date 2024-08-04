@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="lightTransparent">#16000000</color>
+    <color name="colorWhite">#ffffffff</color>
+    <color name="dn_card_background">#FFFFFFFF</color>
+    <color name="dn_card_stroke">#5E58595A</color>
+
+</resources>

@@ -24,10 +24,10 @@
         android:layout_height="wrap_content"
         android:layout_marginStart="32dp"
         android:layout_marginTop="32dp"
-        android:textStyle="bold"
         android:text="Id Purchase"
         android:textColor="#000000"
         android:textSize="16sp"
+        android:textStyle="bold"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/textView4" />
 
@@ -74,11 +74,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:background="#F1F1F1"
+        android:background="?attr/colorPrimary"
         android:paddingVertical="16dp"
         android:text="Purchase"
         android:textAlignment="center"
-        android:textColor="#F1F1F1"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/txtPrice" />

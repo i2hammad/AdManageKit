@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace = "com.i2hammad.admanagekit"
+    namespace = "com.i2hammad.admanagekit.sample"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.i2hammad.admanagekit"
+        applicationId = "com.i2hammad.admanagekit.sample"
         minSdk = 21
         targetSdk = 34
         versionCode = 1
@@ -21,8 +21,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             )
         }
     }
@@ -45,4 +44,6 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(project(":AdManageKit"))
+    implementation(libs.play.services.ads)
 }
