@@ -29,7 +29,20 @@ while also offering a sample project to demonstrate its usage.
 
 1. **Add the library to your project**:
 
+   Add it in your root build.gradle at the end of repositories:
+
+   ```groovy
+  	dependencyResolutionManagement {
+		repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+		repositories {
+			mavenCentral()
+			maven { url 'https://jitpack.io' }
+		}
+	}
+   ```
+
    Add the following to your `build.gradle` file in the `dependencies` section:
+
 
    ```groovy
    implementation 'com.github.i2hammad:admanagekit:1.0.1-beta'
