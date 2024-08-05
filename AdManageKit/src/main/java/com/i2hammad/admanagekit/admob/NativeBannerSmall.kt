@@ -9,13 +9,14 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
+import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.i2hammad.admanagekit.R
+import com.i2hammad.admanagekit.billing.AppPurchase
 import com.i2hammad.admanagekit.databinding.LayoutNativeBannerSmallPreviewBinding
 
 class NativeBannerSmall @JvmOverloads constructor(
@@ -29,6 +30,10 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     fun loadNativeBannerAd(activity: Activity, adNativeBanner: String) {
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
+        if (AppPurchase.getInstance().isPurchased) {
+            shimmerFrameLayout.visibility = GONE
+            return
+        }
         val nativeAdView = LayoutInflater.from(activity)
             .inflate(R.layout.layout_native_banner_small, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdplaceholder

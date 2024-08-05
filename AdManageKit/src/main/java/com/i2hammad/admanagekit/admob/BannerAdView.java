@@ -24,6 +24,7 @@ import com.google.android.gms.ads.AdSize;
 import com.google.android.gms.ads.AdView;
 import com.google.android.gms.ads.LoadAdError;
 import com.i2hammad.admanagekit.R;
+import com.i2hammad.admanagekit.billing.AppPurchase;
 
 public class BannerAdView extends RelativeLayout {
 
@@ -59,13 +60,17 @@ public class BannerAdView extends RelativeLayout {
     }
 
 
-    public void loadBanner(Activity context, String adUnitId){
+    public void loadBanner(Activity context, String adUnitId) {
+
         loadCollapsibleBanner(context, adUnitId, false);
     }
 
     public void loadCollapsibleBanner(Activity context, String adUnitId, Boolean collapsible) {
         this.context = context;
-
+        if (AppPurchase.getInstance().isPurchased()) {
+            shimmerFrameLayout.setVisibility(View.GONE);
+            return;
+        }
         adView.setAdUnitId(adUnitId);
         adView.setAdSize(getAdSize());
 

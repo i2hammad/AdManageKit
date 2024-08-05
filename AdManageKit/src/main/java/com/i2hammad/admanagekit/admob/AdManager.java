@@ -75,6 +75,39 @@ public class AdManager {
         });
     }
 
+
+    /**
+     * Loads an interstitial ad using the specified ad unit ID.
+     *
+     * @param context  The context used for loading the ad.
+     * @param adUnitId The ad unit ID used to load the interstitial ad.
+     * @param interstitialAdLoadCallback The callback used to inform user about the load status of the interstitial ad.
+     */
+    public void loadInterstitialAd(Context context, String adUnitId, InterstitialAdLoadCallback interstitialAdLoadCallback) {
+        this.adUnitId = adUnitId;
+        AdRequest adRequest = new AdRequest.Builder().build();
+
+        isAdLoading = true;
+        InterstitialAd.load(context, adUnitId, adRequest, new InterstitialAdLoadCallback() {
+            @Override
+            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
+                mInterstitialAd = interstitialAd;
+                isAdLoading = false;
+                Log.d("AdManager", "Interstitial ad loaded");
+                interstitialAdLoadCallback.onAdLoaded(mInterstitialAd);
+            }
+
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                Log.e("AdManager", "Failed to load interstitial ad: " + loadAdError.getMessage());
+                isAdLoading = false;
+                mInterstitialAd = null;
+                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError);
+            }
+
+        });
+    }
+
     /**
      * Shows an interstitial ad immediately, regardless of the time interval.
      *

@@ -1,13 +1,15 @@
 package com.i2hammad.admanagekit.admob
+
 import android.app.Activity
 import android.content.Context
 import android.util.Log
+import android.view.View
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.i2hammad.admanagekit.billing.AppPurchase
 
 object RewardedAdManager {
     private var rewardedAd: RewardedAd? = null
@@ -86,6 +88,6 @@ object RewardedAdManager {
     }
 
     fun isAdLoaded(): Boolean {
-        return rewardedAd != null
+        return rewardedAd != null && !AppPurchase.getInstance().isPurchased
     }
 }

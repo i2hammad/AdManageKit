@@ -34,11 +34,6 @@ class MainActivity : AppCompatActivity() {
     fun loadAds() {
 
 
-        var bannerAdView: BannerAdView = findViewById(R.id.bannerAdView)
-        bannerAdView.loadBanner(this, "ca-app-pub-3940256099942544/9214589741")
-
-        // for Collapsible Banner Ad
-//        bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617", true)
 
         var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
         nativeBannerSmall.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/2247696110")

@@ -3,15 +3,9 @@ package com.i2hammad.admanagekit.sample
 import android.app.Application
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
+import com.i2hammad.admanagekit.admob.AppOpenManager
 
 class MyApplication : Application() {
-
-
-    override fun onCreate() {
-        super.onCreate()
-
-
-    }
 
 
     fun initAds() {
@@ -23,7 +17,18 @@ class MyApplication : Application() {
             RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
         MobileAds.setRequestConfiguration(configuration)
         MobileAds.initialize(this)
+
+        AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
     }
 
+    companion object {
+        lateinit var instance: MyApplication
+            private set
+    }
+
+
+    init {
+        instance = this
+    }
 
 }
