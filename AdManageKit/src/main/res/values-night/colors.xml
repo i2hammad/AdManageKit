@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="lightTransparent">#16000000</color>
+    <color name="lightTransparent">#FFFFFFFF</color>
     <color name="colorWhite">#ffffffff</color>
-    <color name="dn_card_background">#F1F1F1</color>
-    <color name="dn_card_stroke">#F1F1F1</color>
+    <color name="dn_card_background">#22303C</color>
+    <color name="dn_card_stroke">#5E58595A</color>
     <color name="dn_shimmer_base_color">#ccc</color>
+
+
 
 </resources>

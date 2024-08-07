@@ -167,4 +167,14 @@ public class BannerAdView extends RelativeLayout {
 
         return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, adWidth);
     }
+
+    public void hideAd(){
+        adView.setVisibility(View.GONE);
+        shimmerFrameLayout.setVisibility(View.GONE);
+    }
+
+    public void showAd(){
+        adView.setVisibility(View.VISIBLE);
+        shimmerFrameLayout.setVisibility(View.VISIBLE);
+    }
 }

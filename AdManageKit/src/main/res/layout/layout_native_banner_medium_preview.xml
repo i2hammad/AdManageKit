@@ -15,7 +15,8 @@
             android:layout_height="110dp"
             android:background="@drawable/bg_card_ads"
             app:shimmer_auto_start="true"
-            app:shimmer_base_color="#ccc">
+
+            app:shimmer_base_color="@color/dn_shimmer_base_color">
 
             <RelativeLayout
                 android:layout_width="fill_parent"
@@ -55,6 +56,12 @@
                             android:clickable="false"
                             android:orientation="vertical"
                             android:paddingLeft="5.0dip">
+
+                            <TextView
+                                android:id="@+id/textView"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                 />
 
                             <TextView
                                 android:id="@+id/native_ad_title"

@@ -123,4 +123,14 @@ class NativeLarge @JvmOverloads constructor(
 
         nativeAdView.setNativeAd(nativeAd)
     }
+
+    public fun hideAd() {
+        binding.root.visibility = GONE
+
+    }
+
+    public fun showAd() {
+        binding.root.visibility = VISIBLE
+
+    }
 }

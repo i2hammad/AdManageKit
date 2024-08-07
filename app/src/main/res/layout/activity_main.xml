@@ -8,14 +8,12 @@
     tools:context=".MainActivity">
 
 
-
-
     <TextView
         android:id="@+id/sampleNativeBannerSmall"
         android:layout_width="wrap_content"
-        android:text="Native Banner Small"
+        android:layout_height="wrap_content"
         android:padding="16dp"
-        android:layout_height="wrap_content">
+        android:text="Native Banner Small">
 
     </TextView>
 
@@ -29,15 +27,13 @@
     </com.i2hammad.admanagekit.admob.NativeBannerSmall>
 
 
-
-
     <TextView
         android:id="@+id/sampleNativeBannerMedium"
         android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_below="@+id/nativeBannerSmall"
-        android:text="Native Banner Medium"
         android:padding="16dp"
-        android:layout_height="wrap_content">
+        android:text="Native Banner Medium">
 
     </TextView>
 
@@ -53,10 +49,10 @@
     <TextView
         android:id="@+id/sampleNativeBannerLarge"
         android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_below="@+id/nativeBannerMedium"
-        android:text="Native Banner Medium"
         android:padding="16dp"
-        android:layout_height="wrap_content">
+        android:text="Native Banner Medium">
 
     </TextView>
 
