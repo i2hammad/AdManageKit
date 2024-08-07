@@ -16,7 +16,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -63,7 +63,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "1.0.3-beta"
+                version = "1.0.1"
             }
         }
     }
