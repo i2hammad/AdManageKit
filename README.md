@@ -9,6 +9,8 @@ while also offering a sample project to demonstrate its usage.
 
 - **AdMob Ads Management**: Easily integrate and manage AdMob ads in your Android applications,
   including banner, interstitial, and native ads.
+- **Firebase auto log tracking event, tROAS**: This app can track tROAS,
+  including banner, interstitial, and native ads.
 - **Billing Management**: Seamless integration with the Google Play Billing Library to handle in-app
   purchases and subscriptions.
 - **UMP Consent Management**: Manage user consent using Google's User Messaging Platform (UMP) to
@@ -45,7 +47,7 @@ while also offering a sample project to demonstrate its usage.
 
 
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.0.2-beta'
+   implementation 'com.github.i2hammad:admanagekit:1.0.3-beta'
    ```
 
 2. **Sync your project** with Gradle files.

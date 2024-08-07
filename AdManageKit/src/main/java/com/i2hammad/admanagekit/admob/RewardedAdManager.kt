@@ -2,13 +2,15 @@ package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
 import android.content.Context
+import android.os.Bundle
 import android.util.Log
-import android.view.View
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.OnPaidEventListener
 import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.billing.AppPurchase
 
 object RewardedAdManager {
@@ -17,6 +19,7 @@ object RewardedAdManager {
     private lateinit var adUnitId: String
     private const val TAG = "RewardedAdManager"
 
+    private var firebaseAnalytics: FirebaseAnalytics? = null
 
     public interface OnAdDismissedListener {
         fun onAdDismissed()
@@ -25,6 +28,8 @@ object RewardedAdManager {
 
     fun initialize(context: Context, adUnitId: String) {
         this.adUnitId = adUnitId
+        // Initialize Firebase Analytics
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
         loadRewardedAd(context)
     }
 
@@ -39,6 +44,14 @@ object RewardedAdManager {
                 isLoading = false
                 rewardedAd = null
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
+
+
+                // Log Firebase event for ad failed to load
+                val params = Bundle()
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                params.putString("ad_error_code", "${adError.code}")
+                firebaseAnalytics!!.logEvent("ad_failed_to_load", params)
+
             }
 
             override fun onAdLoaded(ad: RewardedAd) {
@@ -70,16 +83,34 @@ object RewardedAdManager {
                 Log.e(TAG, "Ad failed to show fullscreen content.")
                 rewardedAd = null
                 onAdDismissedListener.onAdDismissed()
+
+
             }
 
             override fun onAdImpression() {
                 Log.d(TAG, "Ad recorded an impression.")
+
+                val params = Bundle()
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                firebaseAnalytics!!.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+
             }
 
             override fun onAdShowedFullScreenContent() {
                 Log.d(TAG, "Ad showed fullscreen content.")
             }
         }
+
+        rewardedAd?.setOnPaidEventListener(OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
+            val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+
+            // Log Firebase event for paid event
+            val params = Bundle()
+            params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+            params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+            firebaseAnalytics?.logEvent("ad_paid_event", params)
+        })
 
         rewardedAd?.let {
             it.show(activity, onUserEarnedRewardListener)

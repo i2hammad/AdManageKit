@@ -2,9 +2,12 @@ package com.i2hammad.admanagekit.admob;
 
 import android.app.Activity;
 import android.content.Context;
+import android.os.Bundle;
+import android.os.Handler;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
+import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.gms.ads.AdError;
 import com.google.android.gms.ads.AdRequest;
@@ -12,6 +15,8 @@ import com.google.android.gms.ads.FullScreenContentCallback;
 import com.google.android.gms.ads.LoadAdError;
 import com.google.android.gms.ads.interstitial.InterstitialAd;
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.firebase.analytics.FirebaseAnalytics;
 import com.i2hammad.admanagekit.billing.AppPurchase;
 
 /**
@@ -28,18 +33,12 @@ public class AdManager {
     private boolean isDisplayingAd = false;
     private long lastAdShowTime = 0;
     private long adIntervalMillis = 15 * 1000; // Default to 15 seconds
+    private int adDisplayCount = 0; // Track the number of times ads have been displayed
+    private FirebaseAnalytics firebaseAnalytics;
 
-    /**
-     * Private constructor to enforce singleton usage.
-     */
     private AdManager() {
     }
 
-    /**
-     * Returns the singleton instance of AdManager.
-     *
-     * @return The singleton instance of AdManager.
-     */
     public static AdManager getInstance() {
         if (instance == null) {
             instance = new AdManager();
@@ -47,14 +46,33 @@ public class AdManager {
         return instance;
     }
 
-    /**
-     * Loads an interstitial ad using the specified ad unit ID.
-     *
-     * @param context  The context used for loading the ad.
-     * @param adUnitId The ad unit ID used to load the interstitial ad.
-     */
+    public void initializeFirebase(Context context) {
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
+    }
+
+    private void showLoadingDialog(Activity activity, AdManagerCallback callback, boolean isReload) {
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
+        builder.setTitle("Please Wait");
+        builder.setMessage("Loading ad, please wait a moment...");
+        builder.setCancelable(false);
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Delay to dismiss the dialog and show the ad
+        new Handler().postDelayed(() -> {
+            dialog.dismiss();
+            if (isReady()) {
+                showAd(activity, callback, isReload);
+            } else {
+                callback.onNextAction();
+            }
+        }, 1000); // Delay time (e.g., 1 seconds)
+    }
+
     public void loadInterstitialAd(Context context, String adUnitId) {
         this.adUnitId = adUnitId;
+        initializeFirebase(context);
         AdRequest adRequest = new AdRequest.Builder().build();
 
         isAdLoading = true;
@@ -71,20 +89,19 @@ public class AdManager {
                 Log.e("AdManager", "Failed to load interstitial ad: " + loadAdError.getMessage());
                 isAdLoading = false;
                 mInterstitialAd = null;
+
+                // Log Firebase event for ad failed to load
+                Bundle params = new Bundle();
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                params.putString("ad_error_code", loadAdError.getCode() + "");
+                firebaseAnalytics.logEvent("ad_failed_to_load", params);
             }
         });
     }
 
-
-    /**
-     * Loads an interstitial ad using the specified ad unit ID.
-     *
-     * @param context  The context used for loading the ad.
-     * @param adUnitId The ad unit ID used to load the interstitial ad.
-     * @param interstitialAdLoadCallback The callback used to inform user about the load status of the interstitial ad.
-     */
     public void loadInterstitialAd(Context context, String adUnitId, InterstitialAdLoadCallback interstitialAdLoadCallback) {
         this.adUnitId = adUnitId;
+        initializeFirebase(context);
         AdRequest adRequest = new AdRequest.Builder().build();
 
         isAdLoading = true;
@@ -103,8 +120,13 @@ public class AdManager {
                 isAdLoading = false;
                 mInterstitialAd = null;
                 interstitialAdLoadCallback.onAdFailedToLoad(loadAdError);
-            }
 
+                // Log Firebase event for ad failed to load
+                Bundle params = new Bundle();
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                params.putString("ad_error_code", loadAdError.getCode() + "");
+                firebaseAnalytics.logEvent("ad_failed_to_load", params);
+            }
         });
     }
 
@@ -115,7 +137,7 @@ public class AdManager {
      * @param callback The callback to handle actions after the ad is closed.
      */
     public void forceShowInterstitial(Activity activity, AdManagerCallback callback) {
-        showAd(activity, callback, true);
+        showLoadingDialog(activity,callback,true);
     }
 
     /**
@@ -124,59 +146,55 @@ public class AdManager {
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
-    public void showInterstitialAdByTimes(Activity activity, AdManagerCallback callback) {
+    public void showInterstitialAdByTime(Activity activity, AdManagerCallback callback) {
         if (canShowAd()) {
-            showAd(activity, callback, false);
+            showLoadingDialog(activity,callback,true);
         } else {
             callback.onNextAction();
         }
     }
 
     /**
-     * Checks if an interstitial ad is ready to be shown.
+     * Shows an interstitial ad based on the specified number of times it has been displayed.
      *
-     * @return True if an ad is ready and no purchase is detected, otherwise false.
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param maxDisplayCount The maximum number of times the ad can be displayed.
      */
+    public void showInterstitialAdByCount(Activity activity, AdManagerCallback callback, int maxDisplayCount) {
+        if (adDisplayCount < maxDisplayCount) {
+            showLoadingDialog(activity,callback,true);
+        } else {
+            callback.onNextAction();
+        }
+    }
+
     public boolean isReady() {
         return mInterstitialAd != null && !AppPurchase.getInstance().isPurchased();
     }
 
-    /**
-     * Checks if an interstitial ad is currently being displayed.
-     *
-     * @return True if an ad is being displayed, otherwise false.
-     */
     public boolean isDisplayingAd() {
         return isDisplayingAd;
     }
 
-    /**
-     * Sets the custom time interval for displaying interstitial ads. default is 15 secs
-     *
-     * @param intervalMillis The time interval in milliseconds.
-     */
     public void setAdInterval(long intervalMillis) {
         this.adIntervalMillis = intervalMillis;
     }
 
-    /**
-     * Checks if enough time has passed since the last ad was shown.
-     *
-     * @return True if the time elapsed since the last ad is greater than the set interval.
-     */
+    public int getAdDisplayCount() {
+        return adDisplayCount;
+    }
+
+    public void setAdDisplayCount(int count) {
+        this.adDisplayCount = count;
+    }
+
     private boolean canShowAd() {
         long elapsed = System.currentTimeMillis() - lastAdShowTime;
         Log.d("AdManager", "Time since last ad: " + elapsed + " milliseconds");
         return elapsed > adIntervalMillis;
     }
 
-    /**
-     * Handles the display of interstitial ads, setting callbacks for ad events.
-     *
-     * @param activity The activity used to display the ad.
-     * @param callback The callback to handle actions after the ad is closed.
-     * @param reloadAd Indicates if the ad should be reloaded after being shown.
-     */
     private void showAd(Activity activity, AdManagerCallback callback, boolean reloadAd) {
         if (isReady()) {
             mInterstitialAd.setFullScreenContentCallback(new FullScreenContentCallback() {
@@ -188,6 +206,11 @@ public class AdManager {
                     if (reloadAd) {
                         loadInterstitialAd(activity, adUnitId);
                     }
+
+                    // Log Firebase event for ad dismissed
+                    Bundle params = new Bundle();
+                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                    firebaseAnalytics.logEvent("ad_dismissed", params);
                 }
 
                 @Override
@@ -196,12 +219,24 @@ public class AdManager {
                     mInterstitialAd = null;
                     Log.e("AdManager", "Failed to show full-screen content: " + adError.getMessage());
                     callback.onNextAction();
+
+                    // Log Firebase event for ad failed to show
+                    Bundle params = new Bundle();
+                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                    params.putString("ad_error_code", adError.getCode() + "");
+                    firebaseAnalytics.logEvent("ad_failed_to_show", params);
                 }
 
                 @Override
                 public void onAdShowedFullScreenContent() {
                     isDisplayingAd = true;
                     lastAdShowTime = System.currentTimeMillis();
+                    adDisplayCount++;
+
+                    // Log Firebase event for ad impression
+                    Bundle params = new Bundle();
+                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params);
                 }
             });
             mInterstitialAd.show(activity);

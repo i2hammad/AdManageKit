@@ -52,6 +52,7 @@ dependencies {
     implementation(libs.play.services.ads)
     implementation(libs.shimmer)
     implementation(libs.androidx.lifecycle.process)
+    implementation (libs.firebase.analytics)
 
 }
 
@@ -62,7 +63,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "1.0.2-beta"
+                version = "1.0.3-beta"
             }
         }
     }
