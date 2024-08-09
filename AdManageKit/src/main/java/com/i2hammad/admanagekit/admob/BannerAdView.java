@@ -57,19 +57,14 @@ public class BannerAdView extends RelativeLayout {
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true);
 
         parent = findViewById(R.id.parent);
-        adView = new AdView(context);
-
         shimmerFrameLayout = findViewById(R.id.shimmer_frame_layout);
 
         shimmerFrameLayout.startShimmer();
 
         firebaseAnalytics = FirebaseAnalytics.getInstance(context);
-
     }
 
-
     public void loadBanner(Activity context, String adUnitId) {
-
         loadCollapsibleBanner(context, adUnitId, false);
     }
 
@@ -79,11 +74,13 @@ public class BannerAdView extends RelativeLayout {
             shimmerFrameLayout.setVisibility(View.GONE);
             return;
         }
+
+        // Create a new AdView instance every time you want to load a new ad.
+        adView = new AdView(context);
         adView.setAdUnitId(adUnitId);
         adView.setAdSize(getAdSize());
 
         AdRequest.Builder builder = new AdRequest.Builder();
-
 
         if (collapsible) {
             Bundle extras = new Bundle();
@@ -93,12 +90,12 @@ public class BannerAdView extends RelativeLayout {
 
         adView.loadAd(builder.build());
 
-
         LayoutParams adLayoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
         adView.setAdListener(new AdListener() {
             @Override
             public void onAdLoaded() {
+                parent.removeAllViews();  // Remove any existing views first
                 parent.addView(adView);
                 adView.setLayoutParams(adLayoutParams);
                 shimmerFrameLayout.stopShimmer();
@@ -108,7 +105,6 @@ public class BannerAdView extends RelativeLayout {
                 Bundle params = new Bundle();
                 params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
                 firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params);
-
             }
 
             @Override
@@ -121,12 +117,9 @@ public class BannerAdView extends RelativeLayout {
                 params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
                 params.putString("ad_error_code", adError.getCode() + "");
                 firebaseAnalytics.logEvent("ad_failed_to_load", params);
-
-
-
-
             }
         });
+
         adView.setOnPaidEventListener(new OnPaidEventListener() {
             @Override
             public void onPaidEvent(@NonNull AdValue adValue) {
@@ -168,12 +161,12 @@ public class BannerAdView extends RelativeLayout {
         return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, adWidth);
     }
 
-    public void hideAd(){
+    public void hideAd() {
         adView.setVisibility(View.GONE);
         shimmerFrameLayout.setVisibility(View.GONE);
     }
 
-    public void showAd(){
+    public void showAd() {
         adView.setVisibility(View.VISIBLE);
         shimmerFrameLayout.setVisibility(View.VISIBLE);
     }

@@ -51,23 +51,25 @@ public class AdManager {
     }
 
     private void showLoadingDialog(Activity activity, AdManagerCallback callback, boolean isReload) {
-        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
-        builder.setTitle("Please Wait");
-        builder.setMessage("Loading ad, please wait a moment...");
-        builder.setCancelable(false);
+//        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
+//        builder.setTitle("Please Wait");
+//        builder.setMessage("Loading ad, please wait a moment...");
+//        builder.setCancelable(false);
+//
+//        AlertDialog dialog = builder.create();
+//        dialog.show();
+//
+//        // Delay to dismiss the dialog and show the ad
+//        new Handler().postDelayed(() -> {
+//            dialog.dismiss();
+//
+//        }, 1000); // Delay time (e.g., 1 seconds)
 
-        AlertDialog dialog = builder.create();
-        dialog.show();
-
-        // Delay to dismiss the dialog and show the ad
-        new Handler().postDelayed(() -> {
-            dialog.dismiss();
-            if (isReady()) {
-                showAd(activity, callback, isReload);
-            } else {
-                callback.onNextAction();
-            }
-        }, 1000); // Delay time (e.g., 1 seconds)
+        if (isReady()) {
+            showAd(activity, callback, isReload);
+        } else {
+            callback.onNextAction();
+        }
     }
 
     public void loadInterstitialAd(Context context, String adUnitId) {

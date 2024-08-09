@@ -47,7 +47,7 @@ while also offering a sample project to demonstrate its usage.
 
 
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.0.3'
+   implementation 'com.github.i2hammad:admanagekit:1.0.4'
    ```
 
 2. **Sync your project** with Gradle files.
@@ -262,6 +262,7 @@ Contributions are welcome! If you'd like to contribute to this project, please f
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ### Support
-
+If you find AdManageKit valuable and wish to support its ongoing development, consider buying me a cup of tea.
+[buymeacoffee.com/i2hammad](buymeacoffee.com/i2hammad)
 For any questions or issues, please open an issue in this repository or contact me
 at [hammadmughal0001@gmail.com](mailto:hammadmughal0001@gmail.com).
