@@ -35,6 +35,10 @@ public class AdManager {
     private long adIntervalMillis = 15 * 1000; // Default to 15 seconds
     private int adDisplayCount = 0; // Track the number of times ads have been displayed
     private FirebaseAnalytics firebaseAnalytics;
+    private static final int PURCHASED_APP_ERROR_CODE = 1001;
+    private static final String PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit";
+    private static final String PURCHASED_APP_ERROR_MESSAGE = "Ads are not shown because the app has been purchased.";
+
 
     private AdManager() {
     }
@@ -72,6 +76,70 @@ public class AdManager {
         }
     }
 
+
+    /**
+     * Loads an interstitial ad with a specified timeout, to be used on the splash screen.
+     *
+     * @param context The context in which the ad is being loaded.
+     * @param adUnitId The ad unit ID for the interstitial ad.
+     * @param timeoutMillis The timeout in milliseconds to wait for the ad to load.
+     * @param callback The callback to handle actions after the ad loading is complete.
+     */
+    public void loadInterstitialAdForSplash(Context context, String adUnitId, long timeoutMillis, AdManagerCallback callback) {
+        if (AppPurchase.getInstance().isPurchased()) {
+            // User has purchased, no ads should be shown
+            callback.onNextAction();
+            return;
+        }
+
+        this.adUnitId = adUnitId;
+        initializeFirebase(context);
+        AdRequest adRequest = new AdRequest.Builder().build();
+
+        isAdLoading = true;
+
+        // Load the interstitial ad
+        InterstitialAd.load(context, adUnitId, adRequest, new InterstitialAdLoadCallback() {
+            @Override
+            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
+                mInterstitialAd = interstitialAd;
+                isAdLoading = false;
+                Log.d("AdManager", "Interstitial ad loaded for splash");
+
+                // Call the callback since the ad is loaded
+                callback.onNextAction();
+            }
+
+            @Override
+            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+                Log.e("AdManager", "Failed to load interstitial ad for splash: " + loadAdError.getMessage());
+                isAdLoading = false;
+                mInterstitialAd = null;
+
+                // Log Firebase event for ad failed to load
+                Bundle params = new Bundle();
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
+                params.putString("ad_error_code", loadAdError.getCode() + "");
+                firebaseAnalytics.logEvent("ad_failed_to_load", params);
+
+                // Call the callback on failure
+                callback.onNextAction();
+            }
+        });
+
+        // Set a timeout for loading the ad
+        new Handler().postDelayed(() -> {
+            if (isAdLoading) {
+                Log.d("AdManager", "Ad loading timed out for splash");
+                isAdLoading = false;
+
+                // Ensure the callback is called if the ad loading is taking too long
+                callback.onNextAction();
+            }
+        }, timeoutMillis);
+    }
+
+
     public void loadInterstitialAd(Context context, String adUnitId) {
         this.adUnitId = adUnitId;
         initializeFirebase(context);
@@ -101,7 +169,22 @@ public class AdManager {
         });
     }
 
+
+
     public void loadInterstitialAd(Context context, String adUnitId, InterstitialAdLoadCallback interstitialAdLoadCallback) {
+
+
+        if (AppPurchase.getInstance().isPurchased()) {
+            // User has purchased, no ads should be shown
+            interstitialAdLoadCallback.onAdFailedToLoad(new LoadAdError(
+                    PURCHASED_APP_ERROR_CODE,
+                    PURCHASED_APP_ERROR_MESSAGE,
+                    PURCHASED_APP_ERROR_DOMAIN,
+                    null, // No underlying AdError cause
+                    null  // No additional ResponseInfo
+            ));
+            return;
+        }
         this.adUnitId = adUnitId;
         initializeFirebase(context);
         AdRequest adRequest = new AdRequest.Builder().build();
@@ -170,6 +253,50 @@ public class AdManager {
             callback.onNextAction();
         }
     }
+
+
+    /**
+     * Shows an interstitial ad immediately, regardless of the time interval.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
+     */
+    public void forceShowInterstitial(Activity activity, AdManagerCallback callback, boolean reloadAd) {
+        showLoadingDialog(activity, callback, reloadAd);
+    }
+
+    /**
+     * Shows an interstitial ad based on the specified time interval criteria.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
+     */
+    public void showInterstitialAdByTime(Activity activity, AdManagerCallback callback, boolean reloadAd) {
+        if (canShowAd()) {
+            showLoadingDialog(activity, callback, reloadAd);
+        } else {
+            callback.onNextAction();
+        }
+    }
+
+    /**
+     * Shows an interstitial ad based on the specified number of times it has been displayed.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param maxDisplayCount The maximum number of times the ad can be displayed.
+     * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
+     */
+    public void showInterstitialAdByCount(Activity activity, AdManagerCallback callback, int maxDisplayCount, boolean reloadAd) {
+        if (adDisplayCount < maxDisplayCount) {
+            showLoadingDialog(activity, callback, reloadAd);
+        } else {
+            callback.onNextAction();
+        }
+    }
+
 
     public boolean isReady() {
         return mInterstitialAd != null && !AppPurchase.getInstance().isPurchased();
