@@ -10,6 +10,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
+import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
@@ -34,6 +35,7 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     private lateinit var adUnitId: String
 
+    var callback: AdManagerCallback? = null
 
     fun loadNativeBannerAd(activity: Activity, adNativeBanner: String) {
         this.adUnitId = adNativeBanner
@@ -41,6 +43,11 @@ class NativeBannerSmall @JvmOverloads constructor(
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         if (AppPurchase.getInstance().isPurchased) {
             shimmerFrameLayout.visibility = GONE
+            callback?.onFailedToLoad(AdError(
+                AdManager.PURCHASED_APP_ERROR_CODE,
+                AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                AdManager.PURCHASED_APP_ERROR_DOMAIN))
+
             return
         }
 
@@ -86,6 +93,8 @@ class NativeBannerSmall @JvmOverloads constructor(
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                     }
                     firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                    callback?.onAdLoaded()
+
 
                 }
 
@@ -101,6 +110,9 @@ class NativeBannerSmall @JvmOverloads constructor(
                         putString("ad_error_code", adError.code.toString())
                     }
                     firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+
+                    callback?.onFailedToLoad(adError)
+
                 }
             })
 
@@ -141,6 +153,11 @@ class NativeBannerSmall @JvmOverloads constructor(
         }
 
         nativeAdView.setNativeAd(nativeAd)
+    }
+
+
+    private fun setAdManagerCallback(callback: AdManagerCallback) {
+        this.callback = callback
     }
 
     public fun hideAd() {

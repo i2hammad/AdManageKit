@@ -35,9 +35,9 @@ public class AdManager {
     private long adIntervalMillis = 15 * 1000; // Default to 15 seconds
     private int adDisplayCount = 0; // Track the number of times ads have been displayed
     private FirebaseAnalytics firebaseAnalytics;
-    private static final int PURCHASED_APP_ERROR_CODE = 1001;
-    private static final String PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit";
-    private static final String PURCHASED_APP_ERROR_MESSAGE = "Ads are not shown because the app has been purchased.";
+    public static final int PURCHASED_APP_ERROR_CODE = 1001;
+    public static final String PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit";
+    public static final String PURCHASED_APP_ERROR_MESSAGE = "Ads are not shown because the app has been purchased.";
 
 
     private AdManager() {
@@ -108,6 +108,7 @@ public class AdManager {
 
                 // Call the callback since the ad is loaded
                 callback.onNextAction();
+                callback.onAdLoaded();
             }
 
             @Override
@@ -124,6 +125,7 @@ public class AdManager {
 
                 // Call the callback on failure
                 callback.onNextAction();
+                callback.onFailedToLoad(loadAdError);
             }
         });
 
@@ -204,13 +206,13 @@ public class AdManager {
                 Log.e("AdManager", "Failed to load interstitial ad: " + loadAdError.getMessage());
                 isAdLoading = false;
                 mInterstitialAd = null;
-                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError);
 
                 // Log Firebase event for ad failed to load
                 Bundle params = new Bundle();
                 params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
                 params.putString("ad_error_code", loadAdError.getCode() + "");
                 firebaseAnalytics.logEvent("ad_failed_to_load", params);
+                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError);
             }
         });
     }
@@ -332,14 +334,17 @@ public class AdManager {
                     isDisplayingAd = false;
                     mInterstitialAd = null;
                     callback.onNextAction();
-                    if (reloadAd) {
-                        loadInterstitialAd(activity, adUnitId);
-                    }
+
 
                     // Log Firebase event for ad dismissed
                     Bundle params = new Bundle();
                     params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
                     firebaseAnalytics.logEvent("ad_dismissed", params);
+
+
+                    if (reloadAd) {
+                        loadInterstitialAd(activity, adUnitId);
+                    }
                 }
 
                 @Override
@@ -354,6 +359,7 @@ public class AdManager {
                     params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
                     params.putString("ad_error_code", adError.getCode() + "");
                     firebaseAnalytics.logEvent("ad_failed_to_show", params);
+//                    callback.onFailedToLoad(adError);
                 }
 
                 @Override

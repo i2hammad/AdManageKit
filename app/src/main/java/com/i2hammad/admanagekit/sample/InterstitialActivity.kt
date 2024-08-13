@@ -45,7 +45,7 @@ class InterstitialActivity : AppCompatActivity() {
 
 
                 adsConsentManager.requestUMP(this@InterstitialActivity) {
-                    statusTextView.text = "Interstitial ad requested."
+
                     MyApplication.instance.initAds()
                     loadBannerAd()
                     loadInterstitialAd()
@@ -81,6 +81,7 @@ class InterstitialActivity : AppCompatActivity() {
     }
 
     fun loadInterstitialAd() {
+        statusTextView.text = "Interstitial ad requested."
         btnInterstitialAd.isEnabled = true
         AdManager.getInstance().loadInterstitialAd(this,
             "ca-app-pub-3940256099942544/1033173712",

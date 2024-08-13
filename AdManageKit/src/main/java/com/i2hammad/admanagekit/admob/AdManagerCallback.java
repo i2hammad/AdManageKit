@@ -1,5 +1,7 @@
-
 package com.i2hammad.admanagekit.admob;
+
+import com.google.android.gms.ads.AdError;
+
 /**
  * Interface defining a callback for ad management actions.
  * Implement this interface to handle actions that should occur
@@ -13,5 +15,14 @@ public interface AdManagerCallback {
     default void onNextAction() {
         // Default implementation does nothing.
         // Override to provide custom behavior.
+    }
+
+
+    default void onFailedToLoad(AdError error) {
+
+    }
+
+    default void onAdLoaded() {
+
     }
 }

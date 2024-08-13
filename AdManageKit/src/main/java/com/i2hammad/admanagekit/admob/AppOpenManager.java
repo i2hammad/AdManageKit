@@ -136,6 +136,8 @@ public class AppOpenManager implements Application.ActivityLifecycleCallbacks, L
         if (!AppPurchase.getInstance().isPurchased()) {
             showAdIfAvailable();
             Log.d(LOG_TAG, "onStart");
+        }else {
+
         }
     }
 

@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    fun loadAds() {
+    private fun loadAds() {
 
 
 
