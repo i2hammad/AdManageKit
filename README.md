@@ -1,5 +1,6 @@
 # AdManageKit
 [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
+
 AdManageKit is an Android library designed to simplify the management of Google AdMob ads, billing
 using the Google Play Billing Library, and User Messaging Platform (UMP) consent. This library
 provides a streamlined approach to integrating ads and handling user consent for privacy compliance,
