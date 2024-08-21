@@ -1,81 +1,66 @@
-package com.i2hammad.admanagekit.admob;
+package com.i2hammad.admanagekit.admob
 
-import android.app.Activity;
-import android.content.Context;
-import android.os.Bundle;
-import android.os.Handler;
-import android.util.Log;
-
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
-
-import com.google.android.gms.ads.AdError;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.FullScreenContentCallback;
-import com.google.android.gms.ads.LoadAdError;
-import com.google.android.gms.ads.interstitial.InterstitialAd;
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
-import com.google.android.material.dialog.MaterialAlertDialogBuilder;
-import com.google.firebase.analytics.FirebaseAnalytics;
-import com.i2hammad.admanagekit.billing.AppPurchase;
+import android.app.Activity
+import android.content.Context
+import android.os.Bundle
+import android.os.Handler
+import android.util.Log
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.i2hammad.admanagekit.billing.AppPurchase
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
  * using Google AdMob. It provides functionality to load and show ads, manage
  * display intervals, and handle ad-related callbacks.
  */
-public class AdManager {
+class AdManager private constructor() {
 
-    private static AdManager instance;
-    private InterstitialAd mInterstitialAd;
-    private String adUnitId;
-    private boolean isAdLoading = false;
-    private boolean isDisplayingAd = false;
-    private long lastAdShowTime = 0;
-    private long adIntervalMillis = 15 * 1000; // Default to 15 seconds
-    private int adDisplayCount = 0; // Track the number of times ads have been displayed
-    private FirebaseAnalytics firebaseAnalytics;
-    public static final int PURCHASED_APP_ERROR_CODE = 1001;
-    public static final String PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit";
-    public static final String PURCHASED_APP_ERROR_MESSAGE = "Ads are not shown because the app has been purchased.";
+    private var mInterstitialAd: InterstitialAd? = null
+    private var adUnitId: String? = null
+    private var isAdLoading = false
+    private var isDisplayingAd = false
+    private var lastAdShowTime: Long = 0
+    private var adIntervalMillis: Long = 15 * 1000 // Default to 15 seconds
+    private var adDisplayCount = 0 // Track the number of times ads have been displayed
+    private lateinit var firebaseAnalytics: FirebaseAnalytics
 
+    companion object {
+        const val PURCHASED_APP_ERROR_CODE = 1001
+        const val PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit"
+        const val PURCHASED_APP_ERROR_MESSAGE =
+            "Ads are not shown because the app has been purchased."
 
-    private AdManager() {
-    }
+        @Volatile
+        private var instance: AdManager? = null
 
-    public static AdManager getInstance() {
-        if (instance == null) {
-            instance = new AdManager();
+        fun getInstance(): AdManager {
+            return instance ?: synchronized(this) {
+                instance ?: AdManager().also { instance = it }
+            }
         }
-        return instance;
     }
 
-    public void initializeFirebase(Context context) {
-        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
+    fun initializeFirebase(context: Context) {
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context)
     }
 
-    private void showLoadingDialog(Activity activity, AdManagerCallback callback, boolean isReload) {
-//        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(activity);
-//        builder.setTitle("Please Wait");
-//        builder.setMessage("Loading ad, please wait a moment...");
-//        builder.setCancelable(false);
-//
-//        AlertDialog dialog = builder.create();
-//        dialog.show();
-//
-//        // Delay to dismiss the dialog and show the ad
-//        new Handler().postDelayed(() -> {
-//            dialog.dismiss();
-//
-//        }, 1000); // Delay time (e.g., 1 seconds)
-
+    private fun showLoadingDialog(
+        activity: Activity,
+        callback: AdManagerCallback,
+        isReload: Boolean
+    ) {
         if (isReady()) {
-            showAd(activity, callback, isReload);
+            showAd(activity, callback, isReload)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
-
 
     /**
      * Loads an interstitial ad with a specified timeout, to be used on the splash screen.
@@ -85,136 +70,142 @@ public class AdManager {
      * @param timeoutMillis The timeout in milliseconds to wait for the ad to load.
      * @param callback The callback to handle actions after the ad loading is complete.
      */
-    public void loadInterstitialAdForSplash(Context context, String adUnitId, long timeoutMillis, AdManagerCallback callback) {
+    fun loadInterstitialAdForSplash(
+        context: Context,
+        adUnitId: String,
+        timeoutMillis: Long,
+        callback: AdManagerCallback
+    ) {
         if (AppPurchase.getInstance().isPurchased()) {
             // User has purchased, no ads should be shown
-            callback.onNextAction();
-            return;
+            callback.onNextAction()
+            return
         }
 
-        this.adUnitId = adUnitId;
-        initializeFirebase(context);
-        AdRequest adRequest = new AdRequest.Builder().build();
+        this.adUnitId = adUnitId
+        initializeFirebase(context)
+        val adRequest = AdRequest.Builder().build()
 
-        isAdLoading = true;
+        isAdLoading = true
 
         // Load the interstitial ad
-        InterstitialAd.load(context, adUnitId, adRequest, new InterstitialAdLoadCallback() {
-            @Override
-            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
-                mInterstitialAd = interstitialAd;
-                isAdLoading = false;
-                Log.d("AdManager", "Interstitial ad loaded for splash");
+        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                mInterstitialAd = interstitialAd
+                isAdLoading = false
+                Log.d("AdManager", "Interstitial ad loaded for splash")
 
                 // Call the callback since the ad is loaded
-                callback.onNextAction();
-                callback.onAdLoaded();
+                callback.onNextAction()
+                callback.onAdLoaded()
             }
 
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                Log.e("AdManager", "Failed to load interstitial ad for splash: " + loadAdError.getMessage());
-                isAdLoading = false;
-                mInterstitialAd = null;
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                Log.e(
+                    "AdManager",
+                    "Failed to load interstitial ad for splash: ${loadAdError.message}"
+                )
+                isAdLoading = false
+                mInterstitialAd = null
 
                 // Log Firebase event for ad failed to load
-                Bundle params = new Bundle();
-                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                params.putString("ad_error_code", loadAdError.getCode() + "");
-                firebaseAnalytics.logEvent("ad_failed_to_load", params);
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", loadAdError.code.toString())
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
                 // Call the callback on failure
-                callback.onNextAction();
-                callback.onFailedToLoad(loadAdError);
+                callback.onNextAction()
+                callback.onFailedToLoad(loadAdError)
             }
-        });
+        })
 
         // Set a timeout for loading the ad
-        new Handler().postDelayed(() -> {
+        Handler().postDelayed({
             if (isAdLoading) {
-                Log.d("AdManager", "Ad loading timed out for splash");
-                isAdLoading = false;
+                Log.d("AdManager", "Ad loading timed out for splash")
+                isAdLoading = false
 
                 // Ensure the callback is called if the ad loading is taking too long
-                callback.onNextAction();
+                callback.onNextAction()
             }
-        }, timeoutMillis);
+        }, timeoutMillis)
     }
 
+    fun loadInterstitialAd(context: Context, adUnitId: String) {
+        this.adUnitId = adUnitId
+        initializeFirebase(context)
+        val adRequest = AdRequest.Builder().build()
 
-    public void loadInterstitialAd(Context context, String adUnitId) {
-        this.adUnitId = adUnitId;
-        initializeFirebase(context);
-        AdRequest adRequest = new AdRequest.Builder().build();
-
-        isAdLoading = true;
-        InterstitialAd.load(context, adUnitId, adRequest, new InterstitialAdLoadCallback() {
-            @Override
-            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
-                mInterstitialAd = interstitialAd;
-                isAdLoading = false;
-                Log.d("AdManager", "Interstitial ad loaded");
+        isAdLoading = true
+        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                mInterstitialAd = interstitialAd
+                isAdLoading = false
+                Log.d("AdManager", "Interstitial ad loaded")
             }
 
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                Log.e("AdManager", "Failed to load interstitial ad: " + loadAdError.getMessage());
-                isAdLoading = false;
-                mInterstitialAd = null;
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
+                isAdLoading = false
+                mInterstitialAd = null
 
                 // Log Firebase event for ad failed to load
-                Bundle params = new Bundle();
-                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                params.putString("ad_error_code", loadAdError.getCode() + "");
-                firebaseAnalytics.logEvent("ad_failed_to_load", params);
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", loadAdError.code.toString())
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
             }
-        });
+        })
     }
 
-
-
-    public void loadInterstitialAd(Context context, String adUnitId, InterstitialAdLoadCallback interstitialAdLoadCallback) {
-
-
+    fun loadInterstitialAd(
+        context: Context,
+        adUnitId: String,
+        interstitialAdLoadCallback: InterstitialAdLoadCallback
+    ) {
         if (AppPurchase.getInstance().isPurchased()) {
             // User has purchased, no ads should be shown
-            interstitialAdLoadCallback.onAdFailedToLoad(new LoadAdError(
+            interstitialAdLoadCallback.onAdFailedToLoad(
+                LoadAdError(
                     PURCHASED_APP_ERROR_CODE,
                     PURCHASED_APP_ERROR_MESSAGE,
                     PURCHASED_APP_ERROR_DOMAIN,
                     null, // No underlying AdError cause
                     null  // No additional ResponseInfo
-            ));
-            return;
+                )
+            )
+            return
         }
-        this.adUnitId = adUnitId;
-        initializeFirebase(context);
-        AdRequest adRequest = new AdRequest.Builder().build();
+        this.adUnitId = adUnitId
+        initializeFirebase(context)
+        val adRequest = AdRequest.Builder().build()
 
-        isAdLoading = true;
-        InterstitialAd.load(context, adUnitId, adRequest, new InterstitialAdLoadCallback() {
-            @Override
-            public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
-                mInterstitialAd = interstitialAd;
-                isAdLoading = false;
-                Log.d("AdManager", "Interstitial ad loaded");
-                interstitialAdLoadCallback.onAdLoaded(mInterstitialAd);
+        isAdLoading = true
+        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                mInterstitialAd = interstitialAd
+                isAdLoading = false
+                Log.d("AdManager", "Interstitial ad loaded")
+                interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
             }
 
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                Log.e("AdManager", "Failed to load interstitial ad: " + loadAdError.getMessage());
-                isAdLoading = false;
-                mInterstitialAd = null;
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
+                isAdLoading = false
+                mInterstitialAd = null
 
                 // Log Firebase event for ad failed to load
-                Bundle params = new Bundle();
-                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                params.putString("ad_error_code", loadAdError.getCode() + "");
-                firebaseAnalytics.logEvent("ad_failed_to_load", params);
-                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError);
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", loadAdError.code.toString())
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError)
             }
-        });
+        })
     }
 
     /**
@@ -223,8 +214,8 @@ public class AdManager {
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
-    public void forceShowInterstitial(Activity activity, AdManagerCallback callback) {
-        showLoadingDialog(activity,callback,true);
+    fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
+        showLoadingDialog(activity, callback, true)
     }
 
     /**
@@ -233,11 +224,11 @@ public class AdManager {
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
-    public void showInterstitialAdByTime(Activity activity, AdManagerCallback callback) {
+    fun showInterstitialAdByTime(activity: Activity, callback: AdManagerCallback) {
         if (canShowAd()) {
-            showLoadingDialog(activity,callback,true);
+            showLoadingDialog(activity, callback, true)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
 
@@ -248,14 +239,17 @@ public class AdManager {
      * @param callback The callback to handle actions after the ad is closed.
      * @param maxDisplayCount The maximum number of times the ad can be displayed.
      */
-    public void showInterstitialAdByCount(Activity activity, AdManagerCallback callback, int maxDisplayCount) {
+    fun showInterstitialAdByCount(
+        activity: Activity,
+        callback: AdManagerCallback,
+        maxDisplayCount: Int
+    ) {
         if (adDisplayCount < maxDisplayCount) {
-            showLoadingDialog(activity,callback,true);
+            showLoadingDialog(activity, callback, true)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
-
 
     /**
      * Shows an interstitial ad immediately, regardless of the time interval.
@@ -264,8 +258,8 @@ public class AdManager {
      * @param callback The callback to handle actions after the ad is closed.
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
-    public void forceShowInterstitial(Activity activity, AdManagerCallback callback, boolean reloadAd) {
-        showLoadingDialog(activity, callback, reloadAd);
+    fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
+        showLoadingDialog(activity, callback, reloadAd)
     }
 
     /**
@@ -275,11 +269,15 @@ public class AdManager {
      * @param callback The callback to handle actions after the ad is closed.
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
-    public void showInterstitialAdByTime(Activity activity, AdManagerCallback callback, boolean reloadAd) {
+    fun showInterstitialAdByTime(
+        activity: Activity,
+        callback: AdManagerCallback,
+        reloadAd: Boolean
+    ) {
         if (canShowAd()) {
-            showLoadingDialog(activity, callback, reloadAd);
+            showLoadingDialog(activity, callback, reloadAd)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
 
@@ -291,92 +289,93 @@ public class AdManager {
      * @param maxDisplayCount The maximum number of times the ad can be displayed.
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
-    public void showInterstitialAdByCount(Activity activity, AdManagerCallback callback, int maxDisplayCount, boolean reloadAd) {
+    fun showInterstitialAdByCount(
+        activity: Activity,
+        callback: AdManagerCallback,
+        maxDisplayCount: Int,
+        reloadAd: Boolean
+    ) {
         if (adDisplayCount < maxDisplayCount) {
-            showLoadingDialog(activity, callback, reloadAd);
+            showLoadingDialog(activity, callback, reloadAd)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
 
-
-    public boolean isReady() {
-        return mInterstitialAd != null && !AppPurchase.getInstance().isPurchased();
+    fun isReady(): Boolean {
+        return mInterstitialAd != null && !AppPurchase.getInstance().isPurchased()
     }
 
-    public boolean isDisplayingAd() {
-        return isDisplayingAd;
+    fun isDisplayingAd(): Boolean {
+        return isDisplayingAd
     }
 
-    public void setAdInterval(long intervalMillis) {
-        this.adIntervalMillis = intervalMillis;
+    fun setAdInterval(intervalMillis: Long) {
+        this.adIntervalMillis = intervalMillis
     }
 
-    public int getAdDisplayCount() {
-        return adDisplayCount;
+    fun getAdDisplayCount(): Int {
+        return adDisplayCount
     }
 
-    public void setAdDisplayCount(int count) {
-        this.adDisplayCount = count;
+    fun setAdDisplayCount(count: Int) {
+        this.adDisplayCount = count
     }
 
-    private boolean canShowAd() {
-        long elapsed = System.currentTimeMillis() - lastAdShowTime;
-        Log.d("AdManager", "Time since last ad: " + elapsed + " milliseconds");
-        return elapsed > adIntervalMillis;
+    private fun canShowAd(): Boolean {
+        val elapsed = System.currentTimeMillis() - lastAdShowTime
+        Log.d("AdManager", "Time since last ad: $elapsed milliseconds")
+        return elapsed > adIntervalMillis
     }
 
-    private void showAd(Activity activity, AdManagerCallback callback, boolean reloadAd) {
+    private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
         if (isReady()) {
-            mInterstitialAd.setFullScreenContentCallback(new FullScreenContentCallback() {
-                @Override
-                public void onAdDismissedFullScreenContent() {
-                    isDisplayingAd = false;
-                    mInterstitialAd = null;
-                    callback.onNextAction();
-
+            mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    isDisplayingAd = false
+                    mInterstitialAd = null
+                    callback.onNextAction()
 
                     // Log Firebase event for ad dismissed
-                    Bundle params = new Bundle();
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                    firebaseAnalytics.logEvent("ad_dismissed", params);
-
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    }
+                    firebaseAnalytics.logEvent("ad_dismissed", params)
 
                     if (reloadAd) {
-                        loadInterstitialAd(activity, adUnitId);
+                        loadInterstitialAd(activity, adUnitId ?: "")
                     }
                 }
 
-                @Override
-                public void onAdFailedToShowFullScreenContent(@NonNull AdError adError) {
-                    isDisplayingAd = false;
-                    mInterstitialAd = null;
-                    Log.e("AdManager", "Failed to show full-screen content: " + adError.getMessage());
-                    callback.onNextAction();
+                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    isDisplayingAd = false
+                    mInterstitialAd = null
+                    Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
+                    callback.onNextAction()
 
                     // Log Firebase event for ad failed to show
-                    Bundle params = new Bundle();
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                    params.putString("ad_error_code", adError.getCode() + "");
-                    firebaseAnalytics.logEvent("ad_failed_to_show", params);
-//                    callback.onFailedToLoad(adError);
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", adError.code.toString())
+                    }
+                    firebaseAnalytics.logEvent("ad_failed_to_show", params)
                 }
 
-                @Override
-                public void onAdShowedFullScreenContent() {
-                    isDisplayingAd = true;
-                    lastAdShowTime = System.currentTimeMillis();
-                    adDisplayCount++;
+                override fun onAdShowedFullScreenContent() {
+                    isDisplayingAd = true
+                    lastAdShowTime = System.currentTimeMillis()
+                    adDisplayCount++
 
                     // Log Firebase event for ad impression
-                    Bundle params = new Bundle();
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId);
-                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params);
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    }
+                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
                 }
-            });
-            mInterstitialAd.show(activity);
+            }
+            mInterstitialAd?.show(activity)
         } else {
-            callback.onNextAction();
+            callback.onNextAction()
         }
     }
 }

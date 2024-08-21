@@ -122,6 +122,7 @@ class BannerAdView : RelativeLayout {
                 firebaseAnalytics!!.logEvent("ad_failed_to_load", params)
                 callback?.onFailedToLoad(adError)
             }
+
         }
 
         adView!!.onPaidEventListener =

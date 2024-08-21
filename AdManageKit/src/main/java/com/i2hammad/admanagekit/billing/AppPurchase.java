@@ -551,8 +551,8 @@ public class AppPurchase {
             }
             String trialId = null;
             for (PurchaseItem item : this.f) {
-                if (item.getItemId().equals(subsId)) {
-                    trialId = item.getTrialId();
+                if (item.itemId.equals(subsId)) {
+                    trialId = item.trialId;
                     break;
                 }
             }
@@ -785,10 +785,10 @@ public class AppPurchase {
         ArrayList<QueryProductDetailsParams.Product> arrayList = new ArrayList<>();
         ArrayList<QueryProductDetailsParams.Product> arrayList2 = new ArrayList<>();
         for (PurchaseItem purchaseItem : purchaseItems) {
-            if (purchaseItem.getType() == TYPE_IAP.PURCHASE) {
-                arrayList.add(QueryProductDetailsParams.Product.newBuilder().setProductId(purchaseItem.getItemId()).setProductType("inapp").build());
+            if (purchaseItem.type == TYPE_IAP.PURCHASE) {
+                arrayList.add(QueryProductDetailsParams.Product.newBuilder().setProductId(purchaseItem.itemId).setProductType("inapp").build());
             } else {
-                arrayList2.add(QueryProductDetailsParams.Product.newBuilder().setProductId(purchaseItem.getItemId()).setProductType("subs").build());
+                arrayList2.add(QueryProductDetailsParams.Product.newBuilder().setProductId(purchaseItem.itemId).setProductType("subs").build());
             }
         }
         this.e = arrayList;

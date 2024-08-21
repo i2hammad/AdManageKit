@@ -1,232 +1,196 @@
 package com.i2hammad.admanagekit.admob;
 
-import static androidx.lifecycle.Lifecycle.Event.ON_START;
-
-import android.app.Activity;
-import android.app.Application;
-import android.os.Bundle;
-import android.util.Log;
-
-import androidx.annotation.NonNull;
-import androidx.lifecycle.LifecycleObserver;
-import androidx.lifecycle.OnLifecycleEvent;
-import androidx.lifecycle.ProcessLifecycleOwner;
-
-import com.google.android.gms.ads.AdError;
-import com.google.android.gms.ads.AdRequest;
-import com.google.android.gms.ads.AdValue;
-import com.google.android.gms.ads.FullScreenContentCallback;
-import com.google.android.gms.ads.LoadAdError;
-import com.google.android.gms.ads.OnPaidEventListener;
-import com.google.android.gms.ads.appopen.AppOpenAd;
-import com.google.firebase.analytics.FirebaseAnalytics;
-import com.i2hammad.admanagekit.billing.AppPurchase;
-
-import java.util.HashSet;
-import java.util.Set;
+import android.app.Activity
+import android.app.Application
+import android.os.Bundle
+import android.util.Log
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+import com.google.android.gms.ads.*
+import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.firebase.analytics.FirebaseAnalytics
+import com.i2hammad.admanagekit.billing.AppPurchase
 
 /**
  * Prefetches App Open Ads.
  */
-public class AppOpenManager implements Application.ActivityLifecycleCallbacks, LifecycleObserver {
-    private Activity currentActivity;
-    private static final String LOG_TAG = "AppOpenManager";
+class AppOpenManager(private val myApplication: Application, private var adUnitId: String) :
+    Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
 
-    private AppOpenAd appOpenAd = null;
-    private AppOpenAd.AppOpenAdLoadCallback loadCallback;
-    private final Application myApplication;
+    private var currentActivity: Activity? = null
+    private var appOpenAd: AppOpenAd? = null
 
-    public static boolean isShowingAd = false;
-    public static boolean isShownAd = false;
-    private boolean skipNextAd = false;
-    private String AD_UNIT_ID = "ca-app-pub-3940256099942544/9257395921";
-    private FirebaseAnalytics firebaseAnalytics;
+    private val excludedActivities: MutableSet<Class<*>> = HashSet()
 
-    private final Set<Class<?>> excludedActivities = new HashSet<>();
+    private var skipNextAd = false
+    private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
+
+    init {
+        myApplication.registerActivityLifecycleCallbacks(this)
+        ProcessLifecycleOwner.get().lifecycle.addObserver(this)
+    }
+
+    companion object {
+        private const val LOG_TAG = "AppOpenManager"
+        var isShowingAd = false
+        var isShownAd = false
+    }
 
     /**
      * Shows the ad if one isn't already showing.
      */
-    public void showAdIfAvailable() {
-        if (currentActivity != null && excludedActivities.contains(currentActivity.getClass())) {
-            Log.d(LOG_TAG, "Ad display is skipped for this activity.");
-            fetchAd();
-            return;
+    fun showAdIfAvailable() {
+        if (currentActivity != null && excludedActivities.contains(currentActivity!!::class.java)) {
+            Log.d(LOG_TAG, "Ad display is skipped for this activity.")
+            fetchAd()
+            return
         }
 
         if (!isShowingAd && isAdAvailable() && !skipNextAd) {
-            Log.e(LOG_TAG, "Will show ad.");
+            Log.e(LOG_TAG, "Will show ad.")
 
-            FullScreenContentCallback fullScreenContentCallback = new FullScreenContentCallback() {
-                @Override
-                public void onAdDismissedFullScreenContent() {
-                    AppOpenManager.this.appOpenAd = null;
-                    isShowingAd = false;
-                    fetchAd();
+            val fullScreenContentCallback = object : FullScreenContentCallback() {
+                override fun onAdDismissedFullScreenContent() {
+                    appOpenAd = null
+                    isShowingAd = false
+                    fetchAd()
                 }
 
-                @Override
-                public void onAdFailedToShowFullScreenContent(@NonNull AdError adError) {
+                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                     // Log Firebase event for ad failed to load
-                    Bundle params = new Bundle();
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, AD_UNIT_ID);
-                    params.putString("ad_error_code", adError.getCode() + "");
-                    firebaseAnalytics.logEvent("ad_failed_to_load", params);
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", adError.code.toString())
+                    }
+                    firebaseAnalytics.logEvent("ad_failed_to_load", params)
                 }
 
-                @Override
-                public void onAdShowedFullScreenContent() {
-                    isShowingAd = true;
-                    isShownAd = true;
+                override fun onAdShowedFullScreenContent() {
+                    isShowingAd = true
+                    isShownAd = true
 
                     // Log Firebase event for ad impression
-                    Bundle params = new Bundle();
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, AD_UNIT_ID);
-                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params);
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    }
+                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
                 }
-            };
+            }
 
-            appOpenAd.setOnPaidEventListener(new OnPaidEventListener() {
-                @Override
-                public void onPaidEvent(@NonNull AdValue adValue) {
+            appOpenAd?.apply {
+                setOnPaidEventListener { adValue ->
                     // Log Firebase event for revenue generated by the ad
-                    double adValueInStandardUnits = adValue.getValueMicros() / 1_000_000.0;
+                    val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
 
-                    Bundle revenueParams = new Bundle();
-                    revenueParams.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, AD_UNIT_ID);
-                    revenueParams.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits);
-                    revenueParams.putString(FirebaseAnalytics.Param.CURRENCY, adValue.getCurrencyCode());
-                    firebaseAnalytics.logEvent("ad_paid_event", revenueParams);
+                    val revenueParams = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                        putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                    }
+                    firebaseAnalytics.logEvent("ad_paid_event", revenueParams)
                 }
-            });
-
-            appOpenAd.setFullScreenContentCallback(fullScreenContentCallback);
-            appOpenAd.show(currentActivity);
+                setFullScreenContentCallback(fullScreenContentCallback)
+                show(currentActivity!!)
+            }
         } else {
-            Log.d(LOG_TAG, "Cannot show ad.");
-            fetchAd();
+            Log.d(LOG_TAG, "Cannot show ad.")
+            fetchAd()
         }
 
-        skipNextAd = false;
+        skipNextAd = false
     }
 
-    public void skipNextAd() {
-        skipNextAd = true;
-    }
-
-    /**
-     * Constructor
-     */
-    public AppOpenManager(Application myApplication, String adUnitId) {
-        this.AD_UNIT_ID = adUnitId;
-        this.myApplication = myApplication;
-        this.myApplication.registerActivityLifecycleCallbacks(this);
-        ProcessLifecycleOwner.get().getLifecycle().addObserver(this);
-
-        // Initialize Firebase Analytics
-        firebaseAnalytics = FirebaseAnalytics.getInstance(myApplication);
-    }
-
-    public void setAdUnitId(String adUnitId) {
-        this.AD_UNIT_ID = adUnitId;
-    }
-
-    @OnLifecycleEvent(ON_START)
-    public void onStart() {
-        if (!AppPurchase.getInstance().isPurchased()) {
-            showAdIfAvailable();
-            Log.d(LOG_TAG, "onStart");
-        }else {
-
-        }
+    fun skipNextAd() {
+        skipNextAd = true
     }
 
     /**
      * Request an ad
      */
-    public void fetchAd() {
+    fun fetchAd() {
         if (isAdAvailable()) {
-            return;
+            return
         }
 
-        loadCallback = new AppOpenAd.AppOpenAdLoadCallback() {
-            @Override
-            public void onAdLoaded(@NonNull AppOpenAd ad) {
-                AppOpenManager.this.appOpenAd = ad;
+
+        val request = getAdRequest()
+        AppOpenAd.load(
+            myApplication,
+            adUnitId,
+            request,
+            AppOpenAd.APP_OPEN_AD_ORIENTATION_PORTRAIT,
+            object : AppOpenAd.AppOpenAdLoadCallback() {
+                override fun onAdLoaded(ad: AppOpenAd) {
+                    appOpenAd = ad
+                }
+
+                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                    Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
+
+                    // Log Firebase event for ad failed to load
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", loadAdError.code.toString())
+                    }
+                    firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                }
             }
-
-            @Override
-            public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-                Log.e(LOG_TAG, "onAdFailedToLoad: failed to load");
-
-                // Log Firebase event for ad failed to load
-                Bundle params = new Bundle();
-                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, AD_UNIT_ID);
-                params.putString("ad_error_code", loadAdError.getCode() + "");
-                firebaseAnalytics.logEvent("ad_failed_to_load", params);
-            }
-        };
-
-        AdRequest request = getAdRequest();
-        AppOpenAd.load(myApplication, AD_UNIT_ID, request, AppOpenAd.APP_OPEN_AD_ORIENTATION_PORTRAIT, loadCallback);
+        )
     }
 
     /**
      * Creates and returns ad request.
      */
-    private AdRequest getAdRequest() {
-        return new AdRequest.Builder().build();
+    private fun getAdRequest(): AdRequest {
+        return AdRequest.Builder().build()
     }
 
     /**
      * Utility method that checks if ad exists and can be shown.
      */
-    public boolean isAdAvailable() {
-        return appOpenAd != null;
+    fun isAdAvailable(): Boolean {
+        return appOpenAd != null
     }
 
-    @Override
-    public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+
+    override fun onActivityStarted(activity: Activity) {
+        currentActivity = activity
     }
 
-    @Override
-    public void onActivityStarted(Activity activity) {
-        currentActivity = activity;
+    override fun onActivityResumed(activity: Activity) {
+        currentActivity = activity
     }
 
-    @Override
-    public void onActivityResumed(Activity activity) {
-        currentActivity = activity;
-    }
+    override fun onActivityStopped(activity: Activity) {}
 
-    @Override
-    public void onActivityStopped(Activity activity) {
-    }
+    override fun onActivityPaused(activity: Activity) {}
 
-    @Override
-    public void onActivityPaused(Activity activity) {
-    }
+    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
-    @Override
-    public void onActivitySaveInstanceState(Activity activity, Bundle bundle) {
-    }
-
-    @Override
-    public void onActivityDestroyed(Activity activity) {
-        currentActivity = null;
+    override fun onActivityDestroyed(activity: Activity) {
+        currentActivity = null
     }
 
     /**
      * Adds an activity class to the set of excluded activities.
      */
-    public void disableAppOpenWithActivity(Class<?> activityClass) {
-        excludedActivities.add(activityClass);
+    fun disableAppOpenWithActivity(activityClass: Class<*>) {
+        excludedActivities.add(activityClass)
     }
 
     /**
      * Removes an activity class from the set of excluded activities.
      */
-    public void includeAppOpenActivityForAds(Class<?> activityClass) {
-        excludedActivities.remove(activityClass);
+    fun includeAppOpenActivityForAds(activityClass: Class<*>) {
+        excludedActivities.remove(activityClass)
+    }
+
+    override fun onStart(owner: LifecycleOwner) {
+        if (!AppPurchase.getInstance().isPurchased()) {
+            showAdIfAvailable()
+            Log.d(LOG_TAG, "onStart")
+        }
     }
 }

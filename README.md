@@ -47,7 +47,7 @@ while also offering a sample project to demonstrate its usage.
 
 
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.0.6'
+   implementation 'com.github.i2hammad:admanagekit:1.0.7'
    ```
 
 2. **Sync your project** with Gradle files.

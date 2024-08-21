@@ -149,4 +149,9 @@ public class AdsConsentManager {
     public boolean canRequestAds() {
         return canRequestAds.get();
     }
+
+
+    public boolean isPrivacyOptionsRequired() {
+        return consentInformation.getPrivacyOptionsRequirementStatus() == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED;
+    }
 }
