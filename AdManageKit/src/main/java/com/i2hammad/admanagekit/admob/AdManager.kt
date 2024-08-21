@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
@@ -39,6 +40,7 @@ class AdManager private constructor() {
         @Volatile
         private var instance: AdManager? = null
 
+        @JvmStatic
         fun getInstance(): AdManager {
             return instance ?: synchronized(this) {
                 instance ?: AdManager().also { instance = it }
@@ -51,9 +53,7 @@ class AdManager private constructor() {
     }
 
     private fun showLoadingDialog(
-        activity: Activity,
-        callback: AdManagerCallback,
-        isReload: Boolean
+        activity: Activity, callback: AdManagerCallback, isReload: Boolean
     ) {
         if (isReady()) {
             showAd(activity, callback, isReload)
@@ -71,10 +71,7 @@ class AdManager private constructor() {
      * @param callback The callback to handle actions after the ad loading is complete.
      */
     fun loadInterstitialAdForSplash(
-        context: Context,
-        adUnitId: String,
-        timeoutMillis: Long,
-        callback: AdManagerCallback
+        context: Context, adUnitId: String, timeoutMillis: Long, callback: AdManagerCallback
     ) {
         if (AppPurchase.getInstance().isPurchased()) {
             // User has purchased, no ads should be shown
@@ -102,8 +99,7 @@ class AdManager private constructor() {
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 Log.e(
-                    "AdManager",
-                    "Failed to load interstitial ad for splash: ${loadAdError.message}"
+                    "AdManager", "Failed to load interstitial ad for splash: ${loadAdError.message}"
                 )
                 isAdLoading = false
                 mInterstitialAd = null
@@ -121,8 +117,8 @@ class AdManager private constructor() {
             }
         })
 
-        // Set a timeout for loading the ad
-        Handler().postDelayed({
+
+        Handler(Looper.getMainLooper()).postDelayed({
             if (isAdLoading) {
                 Log.d("AdManager", "Ad loading timed out for splash")
                 isAdLoading = false
@@ -162,9 +158,7 @@ class AdManager private constructor() {
     }
 
     fun loadInterstitialAd(
-        context: Context,
-        adUnitId: String,
-        interstitialAdLoadCallback: InterstitialAdLoadCallback
+        context: Context, adUnitId: String, interstitialAdLoadCallback: InterstitialAdLoadCallback
     ) {
         if (AppPurchase.getInstance().isPurchased()) {
             // User has purchased, no ads should be shown
@@ -240,9 +234,7 @@ class AdManager private constructor() {
      * @param maxDisplayCount The maximum number of times the ad can be displayed.
      */
     fun showInterstitialAdByCount(
-        activity: Activity,
-        callback: AdManagerCallback,
-        maxDisplayCount: Int
+        activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int
     ) {
         if (adDisplayCount < maxDisplayCount) {
             showLoadingDialog(activity, callback, true)
@@ -270,9 +262,7 @@ class AdManager private constructor() {
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
     fun showInterstitialAdByTime(
-        activity: Activity,
-        callback: AdManagerCallback,
-        reloadAd: Boolean
+        activity: Activity, callback: AdManagerCallback, reloadAd: Boolean
     ) {
         if (canShowAd()) {
             showLoadingDialog(activity, callback, reloadAd)
@@ -290,10 +280,7 @@ class AdManager private constructor() {
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
     fun showInterstitialAdByCount(
-        activity: Activity,
-        callback: AdManagerCallback,
-        maxDisplayCount: Int,
-        reloadAd: Boolean
+        activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int, reloadAd: Boolean
     ) {
         if (adDisplayCount < maxDisplayCount) {
             showLoadingDialog(activity, callback, reloadAd)

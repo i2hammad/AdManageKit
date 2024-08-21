@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
+import android.util.DisplayMetrics
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -70,11 +71,14 @@ class BannerAdView : RelativeLayout {
     fun loadCollapsibleBanner(context: Activity?, adUnitId: String?, collapsible: Boolean) {
         this.context = context
         if (AppPurchase.getInstance().isPurchased) {
-            callback?.onFailedToLoad(AdError(
-                AdManager.PURCHASED_APP_ERROR_CODE,
-                AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                AdManager.PURCHASED_APP_ERROR_DOMAIN))
-            shimmerFrameLayout!!.visibility = GONE
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
+            shimmerFrameLayout.visibility = GONE
             return
         }
 
@@ -101,8 +105,8 @@ class BannerAdView : RelativeLayout {
                 parent!!.removeAllViews() // Remove any existing views first
                 parent!!.addView(adView)
                 adView!!.layoutParams = adLayoutParams
-                shimmerFrameLayout!!.stopShimmer()
-                shimmerFrameLayout!!.visibility = GONE
+                shimmerFrameLayout.stopShimmer()
+                shimmerFrameLayout.visibility = GONE
 
                 // Log Firebase event for ad loaded
                 val params = Bundle()
@@ -112,8 +116,8 @@ class BannerAdView : RelativeLayout {
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                shimmerFrameLayout!!.stopShimmer()
-                shimmerFrameLayout!!.visibility = GONE
+                shimmerFrameLayout.stopShimmer()
+                shimmerFrameLayout.visibility = GONE
 
                 // Log Firebase event for ad failed to load
                 val params = Bundle()
@@ -166,11 +170,11 @@ class BannerAdView : RelativeLayout {
 
     fun hideAd() {
         adView!!.visibility = GONE
-        shimmerFrameLayout!!.visibility = GONE
+        shimmerFrameLayout.visibility = GONE
     }
 
     fun showAd() {
         adView!!.visibility = VISIBLE
-        shimmerFrameLayout!!.visibility = VISIBLE
+        shimmerFrameLayout.visibility = VISIBLE
     }
 }

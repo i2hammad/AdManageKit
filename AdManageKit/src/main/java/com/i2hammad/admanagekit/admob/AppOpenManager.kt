@@ -119,7 +119,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             myApplication,
             adUnitId,
             request,
-            AppOpenAd.APP_OPEN_AD_ORIENTATION_PORTRAIT,
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     appOpenAd = ad

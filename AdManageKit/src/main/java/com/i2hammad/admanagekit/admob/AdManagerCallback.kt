@@ -12,15 +12,16 @@ interface AdManagerCallback {
      * Called to perform the next action after an ad is shown or dismissed.
      * Override this method to implement custom behavior when the ad flow completes.
      */
-    fun onNextAction() {
-        // Default implementation does nothing.
-        // Override to provide custom behavior.
+
+    open fun onNextAction() {
+        // Default implementation
     }
 
-
-    fun onFailedToLoad(error: AdError?) {
+    open fun onFailedToLoad(error: AdError?) {
+        // Default implementation
     }
 
-    fun onAdLoaded() {
+    open fun onAdLoaded() {
+        // Default implementation
     }
 }
