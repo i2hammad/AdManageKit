@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.jetbrains.kotlin.android)
     id("maven-publish")
-    id("org.jetbrains.dokka") version "1.4.32"
+//    id("org.jetbrains.dokka") version "1.4.32"
 
 }
 
@@ -65,10 +65,10 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "1.0.8"
+                version = "1.0.9"
 
-                artifact(tasks["sourcesJar"])
-                artifact(tasks["javadocJar"])
+//                artifact(tasks["sourcesJar"])
+//                artifact(tasks["javadocJar"])
             }
 
 
@@ -76,19 +76,19 @@ afterEvaluate {
     }
 }
 
-tasks.register<Jar>("sourcesJar") {
-    from(android.sourceSets["main"].java.srcDirs)
-    archiveClassifier.set("sources")
-}
-
-tasks.register<Jar>("javadocJar") {
-    dependsOn("dokkaHtml")
-    from(tasks["dokkaHtml"])
-    archiveClassifier.set("javadoc")
-}
-tasks.dokkaHtml {
-    outputDirectory.set(buildDir.resolve("dokka"))
-}
+//tasks.register<Jar>("sourcesJar") {
+//    from(android.sourceSets["main"].java.srcDirs)
+//    archiveClassifier.set("sources")
+//}
+//
+//tasks.register<Jar>("javadocJar") {
+//    dependsOn("dokkaHtml")
+//    from(tasks["dokkaHtml"])
+//    archiveClassifier.set("javadoc")
+//}
+//tasks.dokkaHtml {
+//    outputDirectory.set(layout.buildDirectory.dir("dokka"))
+//}
 
 
 

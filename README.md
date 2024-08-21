@@ -1,5 +1,5 @@
 # AdManageKit
-
+[![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
 AdManageKit is an Android library designed to simplify the management of Google AdMob ads, billing
 using the Google Play Billing Library, and User Messaging Platform (UMP) consent. This library
 provides a streamlined approach to integrating ads and handling user consent for privacy compliance,
@@ -45,10 +45,8 @@ while also offering a sample project to demonstrate its usage.
 
    Add the following to your `build.gradle` file in the `dependencies` section:
 
-  [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
-
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.0.8'
+   implementation 'com.github.i2hammad:admanagekit:1.0.9'
    ```
 
 2. **Sync your project** with Gradle files.
