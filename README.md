@@ -45,6 +45,7 @@ while also offering a sample project to demonstrate its usage.
 
    Add the following to your `build.gradle` file in the `dependencies` section:
 
+  [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
 
    ```groovy
    implementation 'com.github.i2hammad:admanagekit:1.0.8'
@@ -83,10 +84,8 @@ For displaying banner ad include following code in xml
 
 ```xml
 
-<com.i2hammad.admanagekit.admob.BannerAdView 
-    android:id="@+id/bannerAdView"
-    android:layout_height="wrap_content" 
-    android:layout_width="match_parent" />
+<com.i2hammad.admanagekit.admob.BannerAdView android:id="@+id/bannerAdView"
+    android:layout_height="wrap_content" android:layout_width="match_parent" />
 ```
 
 Use following code to load banner ad:
@@ -102,10 +101,9 @@ bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617
 Similarly for NativeBannerMedium, NativeBannerSmall, NativeLarge
 
 ```xml
-<com.i2hammad.admanagekit.admob.NativeBannerSmall 
-    android:id="@+id/nativeBannerSmall"
-    android:layout_width="match_parent" 
-    android:layout_height="wrap_content">
+
+<com.i2hammad.admanagekit.admob.NativeBannerSmall android:id="@+id/nativeBannerSmall"
+    android:layout_width="match_parent" android:layout_height="wrap_content">
 
 </com.i2hammad.admanagekit.admob.NativeBannerSmall>
 ```
@@ -117,10 +115,8 @@ nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/22476961
 
 ```xml
 
-<com.i2hammad.admanagekit.admob.NativeBannerMedium 
-    android:id="@+id/nativeBannerLarge"
-    android:layout_height="wrap_content" 
-    android:layout_width="match_parent">
+<com.i2hammad.admanagekit.admob.NativeBannerMedium android:id="@+id/nativeBannerLarge"
+    android:layout_height="wrap_content" android:layout_width="match_parent">
 
 </com.i2hammad.admanagekit.admob.NativeBannerMedium>
 ```
@@ -144,19 +140,20 @@ nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
 ```
 
 To load interstitial ads use following code.. it will cache ad for later use
+
 ```kotlin
 AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-3940256099942544/1033173712")
 ```
-        
 
-for displaying interstitial ad use following code. onNextAction will be called always even when ad is not loaded or user has purchased app. Auto reload next ad for later use
+for displaying interstitial ad use following code. onNextAction will be called always even when ad
+is not loaded or user has purchased app. Auto reload next ad for later use
 
 ```kotlin
 AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback {
-override fun onNextAction() {
-val nativeAdsIntent = Intent(this@InterstitialActivity, MainActivity::class.java)
-startActivity(nativeAdsIntent)
-}
+    override fun onNextAction() {
+        val nativeAdsIntent = Intent(this@InterstitialActivity, MainActivity::class.java)
+        startActivity(nativeAdsIntent)
+    }
 })
 ```
 
@@ -172,7 +169,11 @@ Play Billing Library. Follow these steps to set up in-app purchases:
 2. **Initialize the Billing Client**:
 
 ```java
-AppPurchase.getInstance().initBilling(getApplication(),Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
+AppPurchase.getInstance().
+
+initBilling(getApplication(),Arrays.
+
+asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
 ```
 
 3. **Start a Purchase Flow**:
@@ -180,7 +181,9 @@ AppPurchase.getInstance().initBilling(getApplication(),Arrays.asList(new Purchas
 To initiate a purchase flow, use the `AppPurchase` class:
 
 ```java
-AppPurchase.getInstance().purchase(activity, "your_product_id");
+AppPurchase.getInstance().
+
+purchase(activity, "your_product_id");
 ```
 
 4. **Handle Purchase Results**:
@@ -211,7 +214,9 @@ AppPurchase.getInstance().setPurchaseListener(new PurchaseListener() {
 If your product is consumable, you can consume the purchase to allow it to be bought again:
 
 ```java
-AppPurchase.getInstance().consumePurchase("your_product_id");
+AppPurchase.getInstance().
+
+consumePurchase("your_product_id");
 ```
 
 #### User Messaging Platform (UMP) Consent
@@ -219,7 +224,9 @@ AppPurchase.getInstance().consumePurchase("your_product_id");
 Request user consent using the following method:
 
 ```java
-AdsConsentManager.getInstance(this).requestUMP(this,true,"TEST_DEVICE_ID",false,new UMPResultListener() {
+AdsConsentManager.getInstance(this).
+
+requestUMP(this,true,"TEST_DEVICE_ID",false,new UMPResultListener() {
     @Override
     public void onCheckUMPSuccess ( boolean isConsentGiven){
         if (isConsentGiven) {
@@ -262,7 +269,9 @@ Contributions are welcome! If you'd like to contribute to this project, please f
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ### Support
-If you find AdManageKit valuable and wish to support its ongoing development, consider buying me a cup of tea.  
+
+If you find AdManageKit valuable and wish to support its ongoing development, consider buying me a
+cup of tea.  
 [Buy me a coffee](https://buymeacoffee.com/i2hammad)
 
 For any questions or issues, please open an issue in this repository or contact me
