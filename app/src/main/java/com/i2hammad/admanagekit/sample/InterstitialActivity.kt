@@ -57,7 +57,7 @@ class InterstitialActivity : AppCompatActivity() {
         btnInterstitialAd = findViewById(R.id.btnShowInterstitialAd)
         btnInterstitialAd.isEnabled = false
         btnInterstitialAd.setOnClickListener {
-            AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback {
+            AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
                 override fun onNextAction() {
                     val nativeAdsIntent =
                         Intent(this@InterstitialActivity, MainActivity::class.java)
@@ -74,6 +74,8 @@ class InterstitialActivity : AppCompatActivity() {
     fun loadBannerAd() {
         var bannerAdView: BannerAdView = findViewById(R.id.bannerAdView)
         bannerAdView.loadBanner(this, "ca-app-pub-3940256099942544/9214589741")
+
+
 //
         // for Collapsible Banner Ad
 //        bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617", true)

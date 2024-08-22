@@ -32,7 +32,7 @@ class BannerAdView : RelativeLayout {
     private var parent: RelativeLayout? = null
     private var context: Activity? = null
 
-    var callback: AdManagerCallback? = null
+    var callback: AdLoadCallback? = null
 
     constructor(context: Context) : super(context) {
         init(context)
@@ -59,16 +59,28 @@ class BannerAdView : RelativeLayout {
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
     }
 
-    fun loadBanner(context: Activity?, adUnitId: String?) {
-        loadCollapsibleBanner(context, adUnitId, false)
+    public fun loadBanner(context: Activity?, adUnitId: String?) {
+        loadCollapsibleBanner(context, adUnitId, false, callback)
+    }
+
+    public fun loadBanner(context: Activity?, adUnitId: String?, adLoadCallback: AdLoadCallback?) {
+        loadCollapsibleBanner(context, adUnitId, false, adLoadCallback)
     }
 
 
-    fun setAdManagerCallback(callback: AdManagerCallback?) {
+    public fun setAdCallback(callback: AdLoadCallback?) {
         this.callback = callback
     }
 
-    fun loadCollapsibleBanner(context: Activity?, adUnitId: String?, collapsible: Boolean) {
+    public fun loadCollapsibleBanner(
+        context: Activity?, adUnitId: String?, collapsible: Boolean
+    ) {
+        loadCollapsibleBanner(context, adUnitId, collapsible, callback)
+    }
+
+    public fun loadCollapsibleBanner(
+        context: Activity?, adUnitId: String?, collapsible: Boolean, callback: AdLoadCallback?
+    ) {
         this.context = context
         if (AppPurchase.getInstance().isPurchased) {
             callback?.onFailedToLoad(
@@ -101,18 +113,45 @@ class BannerAdView : RelativeLayout {
             LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
 
         adView!!.adListener = object : AdListener() {
+
+
             override fun onAdLoaded() {
+                callback?.onAdLoaded()
                 parent!!.removeAllViews() // Remove any existing views first
                 parent!!.addView(adView)
                 adView!!.layoutParams = adLayoutParams
                 shimmerFrameLayout.stopShimmer()
                 shimmerFrameLayout.visibility = GONE
 
-                // Log Firebase event for ad loaded
+
+            }
+
+            override fun onAdClicked() {
+                super.onAdClicked()
+                callback?.onAdClicked()
+            }
+
+            override fun onAdClosed() {
+                super.onAdClosed()
+
+                callback?.onAdClosed()
+            }
+
+            override fun onAdOpened() {
+                super.onAdOpened()
+                callback?.onAdOpened()
+            }
+
+
+            override fun onAdImpression() {
+                super.onAdImpression()
+
+                // Log Firebase event for ad impression
                 val params = Bundle()
                 params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                 firebaseAnalytics!!.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                callback?.onAdLoaded()
+                callback?.onAdImpression()
+
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
@@ -125,6 +164,7 @@ class BannerAdView : RelativeLayout {
                 params.putString("ad_error_code", adError.code.toString() + "")
                 firebaseAnalytics!!.logEvent("ad_failed_to_load", params)
                 callback?.onFailedToLoad(adError)
+
             }
 
         }

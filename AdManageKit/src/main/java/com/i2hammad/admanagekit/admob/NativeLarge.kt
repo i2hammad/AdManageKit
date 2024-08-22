@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.privacysandbox.ads.adservices.adid.AdId
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdListener
@@ -25,16 +26,23 @@ class NativeLarge @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    private  var callback: AdManagerCallback? = null
+    private  var callback: AdLoadCallback? = null
     private val binding: LayoutNativeLargeBinding =
         LayoutNativeLargeBinding.inflate(LayoutInflater.from(context), this)
     private var firebaseAnalytics: FirebaseAnalytics? = null
 
     private lateinit var adUnitId: String
 
-    fun loadNativeAds(activity: Context, adNativeLarge: String) {
+    public fun loadNativeAds(activity: Context, adNativeLarge: String) {
+        loadAd(activity, adNativeLarge, callback)
+    }
 
-        this.adUnitId = adNativeLarge
+   public fun loadNativeAds(activity: Context, adNativeLarge: String, callback: AdLoadCallback) {
+        loadAd(activity, adNativeLarge, callback)
+    }
+
+    private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?){
+        this.adUnitId = adUnitId
         val nativeAdView: NativeAdView = binding.nativeAdView
         val viewGroup = binding.adUnit
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
@@ -57,7 +65,7 @@ class NativeLarge @JvmOverloads constructor(
         nativeAdView.advertiserView = nativeAdView.findViewById<View>(R.id.tertiary)
 
 
-        val builder = AdLoader.Builder(activity, adNativeLarge).forNativeAd { nativeAd ->
+        val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
             populateNativeAdView(nativeAd, nativeAdView)
             viewGroup.visibility = View.VISIBLE
             nativeAdView.visibility = View.VISIBLE
@@ -77,15 +85,23 @@ class NativeLarge @JvmOverloads constructor(
             }
 
         }.withAdListener(object : AdListener() {
-            override fun onAdLoaded() {
-                super.onAdLoaded()
 
+            override fun onAdImpression() {
+                super.onAdImpression()
 
                 // Log Firebase event for ad loaded
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                 }
                 firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+
+                callback?.onAdImpression()
+            }
+
+            override fun onAdLoaded() {
+                super.onAdLoaded()
+
+
                 callback?.onAdLoaded()
             }
 
@@ -104,9 +120,26 @@ class NativeLarge @JvmOverloads constructor(
                 callback?.onFailedToLoad(adError)
 
             }
+
+            override fun onAdOpened() {
+                super.onAdOpened()
+                callback?.onAdOpened()
+
+            }
+
+            override fun onAdClicked() {
+                super.onAdClicked()
+                callback?.onAdClicked()}
+
+            override fun onAdClosed() {
+                super.onAdClosed()
+                callback?.onAdClosed()
+            }
+
         })
         builder.build().loadAd(AdRequest.Builder().build())
     }
+
 
     private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView) {
         (nativeAdView.headlineView as TextView?)?.text = nativeAd.headline
@@ -137,7 +170,7 @@ class NativeLarge @JvmOverloads constructor(
     }
 
 
-    private fun setAdManagerCallback(callback: AdManagerCallback) {
+    public fun setAdManagerCallback(callback: AdLoadCallback) {
         this.callback = callback
     }
 

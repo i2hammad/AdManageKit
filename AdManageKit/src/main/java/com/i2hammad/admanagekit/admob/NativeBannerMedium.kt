@@ -34,24 +34,27 @@ class NativeBannerMedium @JvmOverloads constructor(
     private lateinit var adUnitId: String
     private var firebaseAnalytics: FirebaseAnalytics? = null
 
-    var callback: AdManagerCallback? = null
+    var callback: AdLoadCallback? = null
 
 
-    fun loadNativeBannerAd(activity: Activity, adNativeBanner: String) {
-        this.adUnitId = adNativeBanner
+    private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?) {
+        this.adUnitId = adUnitId
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         if (AppPurchase.getInstance().isPurchased) {
             shimmerFrameLayout.visibility = GONE
-            callback?.onFailedToLoad(AdError(
-                AdManager.PURCHASED_APP_ERROR_CODE,
-                AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                AdManager.PURCHASED_APP_ERROR_DOMAIN))
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
             return
         }
         firebaseAnalytics = FirebaseAnalytics.getInstance(context);
 
         shimmerFrameLayout.visibility = VISIBLE
-        val nativeAdView = LayoutInflater.from(activity)
+        val nativeAdView = LayoutInflater.from(context)
             .inflate(R.layout.layout_native_banner_medium, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdplaceholder
         nativeAdView.headlineView = nativeAdView.findViewById(R.id.ad_headline)
@@ -59,7 +62,7 @@ class NativeBannerMedium @JvmOverloads constructor(
         nativeAdView.callToActionView = nativeAdView.findViewById(R.id.ad_call_to_action)
         nativeAdView.iconView = nativeAdView.findViewById(R.id.ad_app_icon)
         nativeAdView.advertiserView = nativeAdView.findViewById(R.id.ad_advertiser)
-        val builder = AdLoader.Builder(activity, adNativeBanner).forNativeAd { nativeAd ->
+        val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
             adPlaceholder.removeAllViews()
             adPlaceholder.addView(nativeAdView)
             adPlaceholder.visibility = VISIBLE
@@ -82,11 +85,6 @@ class NativeBannerMedium @JvmOverloads constructor(
         }.withAdListener(object : AdListener() {
             override fun onAdLoaded() {
                 super.onAdLoaded()
-                // Log Firebase event for ad loaded
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                }
-                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
 
                 callback?.onAdLoaded()
             }
@@ -106,6 +104,34 @@ class NativeBannerMedium @JvmOverloads constructor(
                 callback?.onFailedToLoad(adError)
 
             }
+
+
+            override fun onAdImpression() {
+                super.onAdImpression()
+                // Log Firebase event for ad loaded
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+
+                callback?.onAdImpression()
+            }
+
+
+            override fun onAdClosed() {
+                super.onAdClosed()
+                callback?.onAdClosed()
+            }
+
+            override fun onAdOpened() {
+                super.onAdOpened()
+                callback?.onAdOpened()
+            }
+
+            override fun onAdClicked() {
+                super.onAdClicked()
+                callback?.onAdClicked()
+            }
         })
 
 
@@ -113,7 +139,18 @@ class NativeBannerMedium @JvmOverloads constructor(
         builder.build().loadAd(AdRequest.Builder().build())
     }
 
-    private fun setAdManagerCallback(callback: AdManagerCallback) {
+    public fun loadNativeBannerAd(activity: Activity, adNativeBanner: String) {
+        loadAd(activity, adNativeBanner, callback)
+    }
+
+    public fun loadNativeBannerAd(
+        activity: Activity, adNativeBanner: String, adCallBack: AdLoadCallback
+    ) {
+        loadAd(activity, adNativeBanner, adCallBack)
+    }
+
+
+    public fun setAdManagerCallback(callback: AdLoadCallback) {
         this.callback = callback
     }
 

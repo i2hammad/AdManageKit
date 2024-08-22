@@ -7,7 +7,7 @@ import com.google.android.gms.ads.AdError
  * Implement this interface to handle actions that should occur
  * after an ad is shown or dismissed.
  */
-interface AdManagerCallback {
+abstract class AdManagerCallback {
     /**
      * Called to perform the next action after an ad is shown or dismissed.
      * Override this method to implement custom behavior when the ad flow completes.
