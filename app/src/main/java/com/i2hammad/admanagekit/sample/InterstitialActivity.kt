@@ -37,25 +37,12 @@ class InterstitialActivity : AppCompatActivity() {
         statusTextView = findViewById<TextView>(R.id.statusTextView)
 //        myApplication = MyApplication.getInstance()!!
 
-        val adsConsentManager: AdsConsentManager = AdsConsentManager.getInstance(this)
-
-        AppPurchase.getInstance().setBillingListener(object : BillingListener {
-            override fun onInitBillingFinished(resultCode: Int) {
-                statusTextView.text = "Request UMP called."
-
-
-                adsConsentManager.requestUMP(this@InterstitialActivity) {
-
-                    MyApplication.instance.initAds()
-                    loadBannerAd()
-                    loadInterstitialAd()
-                }
-            }
-        }, 5 * 1000)
-
-
         btnInterstitialAd = findViewById(R.id.btnShowInterstitialAd)
         btnInterstitialAd.isEnabled = false
+
+        loadBannerAd()
+        loadInterstitialAd()
+
         btnInterstitialAd.setOnClickListener {
             AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
                 override fun onNextAction() {

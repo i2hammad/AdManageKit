@@ -7,6 +7,16 @@ import com.i2hammad.admanagekit.admob.AppOpenManager
 
 class MyApplication : Application() {
 
+    var appOpenManager: AppOpenManager? = null
+
+
+    override fun onCreate() {
+        super.onCreate()
+
+        appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
+        appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
+    }
+
 
     fun initAds() {
 
@@ -18,7 +28,6 @@ class MyApplication : Application() {
         MobileAds.setRequestConfiguration(configuration)
         MobileAds.initialize(this)
 
-        AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
     }
 
     companion object {

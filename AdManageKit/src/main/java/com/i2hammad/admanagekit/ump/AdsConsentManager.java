@@ -23,7 +23,7 @@ public class AdsConsentManager {
     private ConsentInformation consentInformation;
 
     // Atomic flag to check if ads can be requested
-    private AtomicBoolean canRequestAds = new AtomicBoolean(false);
+    public AtomicBoolean canRequestAds = new AtomicBoolean(false);
 
     // Singleton instance of AdsConsentManager
     private static AdsConsentManager instance;
