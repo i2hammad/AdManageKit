@@ -150,7 +150,7 @@ for displaying interstitial ad use following code. onNextAction will be called a
 is not loaded or user has purchased app. Auto reload next ad for later use
 
 ```kotlin
-AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback {
+AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
     override fun onNextAction() {
         val nativeAdsIntent = Intent(this@InterstitialActivity, MainActivity::class.java)
         startActivity(nativeAdsIntent)
