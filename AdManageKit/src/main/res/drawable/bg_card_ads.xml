@@ -2,7 +2,7 @@
 <shape android:shape="rectangle"
     xmlns:android="http://schemas.android.com/apk/res/android">
     <corners android:radius="10.0dip" />
-    <solid android:color="?attr/colorSurfaceContainerHigh" />
+    <solid android:color="?attr/colorSurface" />
     <stroke
         android:width="1.0dip"
         android:color="@color/dn_card_stroke" />
