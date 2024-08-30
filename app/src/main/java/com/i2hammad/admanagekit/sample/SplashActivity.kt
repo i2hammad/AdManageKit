@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat.startActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.ads.AdError
@@ -77,12 +78,13 @@ class SplashActivity : AppCompatActivity() {
                 // onlyIfAvailable
                 // showAppOpenAd()
 
-                //force load app open
-//                forceLoadAppOpen()
+                // force load app open
+                // forceLoadAppOpen()
 
 
                 //force loadInterstitialAd
                 forceLoadInterstitialAd()
+
 
             }
 
@@ -121,7 +123,7 @@ class SplashActivity : AppCompatActivity() {
                     // showAppOpenAd()
 
                     //force show app open
-                    forceLoadAppOpen()
+                    forceLoadInterstitialAd()
                 }
 
 
@@ -140,7 +142,9 @@ class SplashActivity : AppCompatActivity() {
                 override fun onNextAction() {
                     super.onNextAction()
                     // ready to server ad
-                    forceShowSplashInterstitialAd()
+                    if (!AdManager.getInstance().isDisplayingAd() && !isFinishing && !isDestroyed) {
+                        forceShowSplashInterstitialAd()
+                    }
                 }
             })
     }
