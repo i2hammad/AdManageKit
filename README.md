@@ -21,13 +21,6 @@ while also offering a sample project to demonstrate its usage.
 
 ## Getting Started
 
-### Prerequisites
-
-- Android Studio Arctic Fox (2020.3.1) or later
-- Gradle 7.0 or later
-- A valid AdMob account
-- Google Play Console access for setting up in-app purchases
-
 ### Installation
 
 1. **Add the library to your project**:
@@ -65,11 +58,19 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         // Initialize the AdsConsentManager
-        AdsConsentManager.getInstance(this).requestUMP(this, new UMPResultListener() {
+        AdsConsentManager adsConsentManager =   AdsConsentManager.getInstance(this);
+        adsConsentManager.requestUMP(this, new UMPResultListener() {
             @Override
             public void onCheckUMPSuccess(boolean isConsentGiven) {
                 if (isConsentGiven) {
                     // Initialize Ads here
+                }else {
+                    // not given
+                }
+
+                if (adsConsentManager.canRequestAds()) {
+                    // moveToNext
+                    // onNextActionCalled()
                 }
             }
         });
@@ -92,7 +93,6 @@ For displaying banner ad include following code in xml
 Use following code to load banner ad:
 
 ```kotlin
-var bannerAdView: BannerAdView = findViewById(R.id.bannerAdView)
 bannerAdView.loadBanner(this, "ca-app-pub-3940256099942544/9214589741")
 
 // for Collapsible Banner Ad
@@ -111,7 +111,6 @@ Similarly for NativeBannerMedium, NativeBannerSmall, NativeLarge
 ```
 
 ```kotlin
-var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
 nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110")
 ```
 
@@ -126,7 +125,6 @@ nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/22476961
 ```
 
 ```kotlin
-var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
 nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110")
 ```
 
@@ -139,7 +137,6 @@ nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696
 ```
 
 ```kotlin
-var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
 nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
 ```
 
@@ -173,8 +170,7 @@ Play Billing Library. Follow these steps to set up in-app purchases:
 2. **Initialize the Billing Client**:
 
 ```java
-    AppPurchase.getInstance()
-    .initBilling(getApplication(),Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
+    AppPurchase.getInstance().initBilling(getApplication(),Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
 ```
 
 3. **Start a Purchase Flow**:
@@ -182,8 +178,7 @@ Play Billing Library. Follow these steps to set up in-app purchases:
 To initiate a purchase flow, use the `AppPurchase` class:
 
 ```java
-    AppPurchase.getInstance().
-    purchase(activity, "your_product_id");
+    AppPurchase.getInstance().purchase(activity, "your_product_id");
 ```
 
 4. **Handle Purchase Results**:
@@ -214,8 +209,7 @@ AppPurchase.getInstance().setPurchaseListener(new PurchaseListener() {
 If your product is consumable, you can consume the purchase to allow it to be bought again:
 
 ```java
-    AppPurchase.getInstance().
-    consumePurchase("your_product_id");
+    AppPurchase.getInstance().consumePurchase("your_product_id");
 ```
 
 #### User Messaging Platform (UMP) Consent
