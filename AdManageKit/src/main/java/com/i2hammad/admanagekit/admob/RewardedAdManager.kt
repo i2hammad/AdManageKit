@@ -101,7 +101,7 @@ object RewardedAdManager {
             }
         }
 
-        rewardedAd?.setOnPaidEventListener(OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
+        rewardedAd?.onPaidEventListener = OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
             val adValueInStandardUnits = adValue.valueMicros / 1000000.0
 
             // Log Firebase event for paid event
@@ -110,7 +110,7 @@ object RewardedAdManager {
             params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
             params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
             firebaseAnalytics?.logEvent("ad_paid_event", params)
-        })
+        }
 
         rewardedAd?.let {
             it.show(activity, onUserEarnedRewardListener)

@@ -6,12 +6,15 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.appcompat.app.AlertDialog
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.OnPaidEventListener
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.billing.AppPurchase
 
@@ -52,15 +55,38 @@ class AdManager private constructor() {
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
     }
 
+
     private fun showLoadingDialog(
         activity: Activity, callback: AdManagerCallback, isReload: Boolean
     ) {
-        if (isReady()) {
-            showAd(activity, callback, isReload)
-        } else {
+        // Check if the user has already purchased, skip the dialog if true
+        if (AppPurchase.getInstance().isPurchased) {
+            // move to the next action
             callback.onNextAction()
+            return
         }
+
+        // Create a Material AlertDialog
+        val dialog = MaterialAlertDialogBuilder(activity).setTitle("Please Wait")
+            .setMessage("The ad will be shown shortly...")
+            .setCancelable(false) // Prevent dismissing the dialog by tapping outside
+            .create()
+
+        // Show the dialog
+        dialog.show()
+
+        // Use a Handler to add a delay before displaying the ad
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Dismiss the dialog and show the ad
+            dialog.dismiss()
+            if (isReady()) {
+                showAd(activity, callback, isReload)
+            } else {
+                callback.onNextAction()
+            }
+        }, 500)
     }
+
 
     /**
      * Loads an interstitial ad with a specified timeout, to be used on the splash screen.
@@ -209,8 +235,22 @@ class AdManager private constructor() {
      * @param callback The callback to handle actions after the ad is closed.
      */
     fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
-        showLoadingDialog(activity, callback, true)
+        showAd(activity, callback, true)
     }
+
+
+    /**
+     * Shows an interstitial ad immediately, regardless of the time interval.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     */
+    fun forceShowInterstitialWithDialog(
+        activity: Activity, callback: AdManagerCallback, isReload: Boolean = true
+    ) {
+        showLoadingDialog(activity, callback, isReload)
+    }
+
 
     /**
      * Shows an interstitial ad based on the specified time interval criteria.
@@ -220,7 +260,7 @@ class AdManager private constructor() {
      */
     fun showInterstitialAdByTime(activity: Activity, callback: AdManagerCallback) {
         if (canShowAd()) {
-            showLoadingDialog(activity, callback, true)
+            showAd(activity, callback, true)
         } else {
             callback.onNextAction()
         }
@@ -237,7 +277,7 @@ class AdManager private constructor() {
         activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int
     ) {
         if (adDisplayCount < maxDisplayCount) {
-            showLoadingDialog(activity, callback, true)
+            showAd(activity, callback, true)
         } else {
             callback.onNextAction()
         }
@@ -251,7 +291,7 @@ class AdManager private constructor() {
      * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
     fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
-        showLoadingDialog(activity, callback, reloadAd)
+        showAd(activity, callback, reloadAd)
     }
 
     /**
@@ -265,7 +305,7 @@ class AdManager private constructor() {
         activity: Activity, callback: AdManagerCallback, reloadAd: Boolean
     ) {
         if (canShowAd()) {
-            showLoadingDialog(activity, callback, reloadAd)
+            showAd(activity, callback, reloadAd)
         } else {
             callback.onNextAction()
         }
@@ -283,7 +323,7 @@ class AdManager private constructor() {
         activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int, reloadAd: Boolean
     ) {
         if (adDisplayCount < maxDisplayCount) {
-            showLoadingDialog(activity, callback, reloadAd)
+            showAd(activity, callback, reloadAd)
         } else {
             callback.onNextAction()
         }
@@ -360,6 +400,17 @@ class AdManager private constructor() {
                     firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
                 }
             }
+            mInterstitialAd?.onPaidEventListener =
+                OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
+                    val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+
+                    // Log Firebase event for paid event
+                    val params = Bundle()
+                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                    firebaseAnalytics!!.logEvent("ad_paid_event", params)
+                }
             mInterstitialAd?.show(activity)
         } else {
             callback.onNextAction()

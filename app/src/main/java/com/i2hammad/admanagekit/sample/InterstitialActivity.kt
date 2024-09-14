@@ -44,7 +44,7 @@ class InterstitialActivity : AppCompatActivity() {
         loadInterstitialAd()
 
         btnInterstitialAd.setOnClickListener {
-            AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
+            AdManager.getInstance().forceShowInterstitialWithDialog(this, object : AdManagerCallback() {
                 override fun onNextAction() {
                     val nativeAdsIntent =
                         Intent(this@InterstitialActivity, MainActivity::class.java)
