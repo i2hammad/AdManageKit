@@ -2,25 +2,28 @@ package com.i2hammad.admanagekit.sample
 
 import android.content.Intent
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
-import com.i2hammad.admanagekit.billing.AppPurchase
-import com.i2hammad.admanagekit.billing.BillingListener
-import com.i2hammad.admanagekit.ump.AdsConsentManager
 
 class InterstitialActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
     lateinit var btnInterstitialAd: Button
+    lateinit var bannerAdView: BannerAdView
+    lateinit var bannerContainer: FrameLayout
 
 //    var myApplication: MyApplication? = null
 
@@ -59,13 +62,30 @@ class InterstitialActivity : AppCompatActivity() {
 
 
     fun loadBannerAd() {
-        var bannerAdView: BannerAdView = findViewById(R.id.bannerAdView)
-        bannerAdView.loadBanner(this, "ca-app-pub-3940256099942544/9214589741")
+        bannerAdView = findViewById(R.id.bannerAdView)
+        bannerContainer = findViewById(R.id.lay_Banner)
+        bannerAdView.loadBanner(
+            this,
+            "ca-app-pub-3940256099942544/9214589741",
+            object : AdLoadCallback() {
+                override fun onFailedToLoad(error: AdError?) {
+                    super.onFailedToLoad(error)
+                    bannerContainer.visibility = View.GONE
+
+                }
+            })
 
 
 //
         // for Collapsible Banner Ad
-//        bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617", true)
+//        bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617", true,object :
+//            AdLoadCallback(){
+//            override fun onFailedToLoad(error: AdError?) {
+//                super.onFailedToLoad(error)
+//                bannerContainer.visibility= View.GONE
+//
+//            }
+//        })
 
     }
 
@@ -90,5 +110,18 @@ class InterstitialActivity : AppCompatActivity() {
             })
     }
 
+    override fun onResume() {
+        super.onResume()
+        bannerAdView.resumeAd()
+    }
 
+    override fun onPause() {
+        bannerAdView.pauseAd()
+        super.onPause()
+    }
+
+    override fun onDestroy() {
+        bannerAdView.destoryAd()
+        super.onDestroy()
+    }
 }

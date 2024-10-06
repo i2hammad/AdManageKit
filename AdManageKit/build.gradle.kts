@@ -65,7 +65,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "1.1.1"
+                version = "1.1.3"
 
 //                artifact(tasks["sourcesJar"])
 //                artifact(tasks["javadocJar"])
