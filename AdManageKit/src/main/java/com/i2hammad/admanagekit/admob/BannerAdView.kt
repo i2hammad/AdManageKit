@@ -10,7 +10,11 @@ import android.util.DisplayMetrics
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import android.widget.RelativeLayout
+import androidx.cardview.widget.CardView
+import androidx.core.os.ConfigurationCompat
+import androidx.fragment.app.Fragment
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.AdError
@@ -24,12 +28,14 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.billing.AppPurchase
 
-class BannerAdView : RelativeLayout {
+class BannerAdView : FrameLayout {
     private var firebaseAnalytics: FirebaseAnalytics? = null
 
     private var adView: AdView? = null
     lateinit var shimmerFrameLayout: ShimmerFrameLayout
-    private var parent: RelativeLayout? = null
+    private var parent: CardView? = null
+    private lateinit var layBannerAd: FrameLayout
+
     private var context: Activity? = null
 
     var callback: AdLoadCallback? = null
@@ -50,10 +56,9 @@ class BannerAdView : RelativeLayout {
 
     private fun init(context: Context) {
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true)
-
         parent = findViewById(R.id.parent)
         shimmerFrameLayout = findViewById(R.id.shimmer_frame_layout)
-
+        layBannerAd = findViewById(R.id.fl_ad_container)
         shimmerFrameLayout.startShimmer()
 
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
@@ -109,17 +114,39 @@ class BannerAdView : RelativeLayout {
 
         adView!!.loadAd(builder.build())
 
-        val adLayoutParams =
-            LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+
+//        val params = layBannerAd?.layoutParams
+//        val outMetricsBanner = DisplayMetrics()
+//        val displayBanner = context.windowManager.defaultDisplay
+//        displayBanner.getMetrics(outMetricsBanner)
+//        val densityBanner = outMetricsBanner.density
+//        params!!.height = (densityBanner * adSize.height).toInt()
+//        params.width = (densityBanner * adSize.width).toInt()
+//        layBannerAd?.layoutParams = params
+
+        val paramsShammir = shimmerFrameLayout?.layoutParams
+        val outMetrics = DisplayMetrics()
+        val display = context.windowManager.defaultDisplay
+        display.getMetrics(outMetrics)
+        val density = outMetrics.density
+        paramsShammir!!.height = (density * adSize.height).toInt()
+        paramsShammir.width = (density * adSize.width).toInt()
+        shimmerFrameLayout?.layoutParams = paramsShammir
 
         adView!!.adListener = object : AdListener() {
 
 
             override fun onAdLoaded() {
                 callback?.onAdLoaded()
-                parent!!.removeAllViews() // Remove any existing views first
-                parent!!.addView(adView)
-                adView!!.layoutParams = adLayoutParams
+                layBannerAd?.removeAllViews() // Remove any existing views first
+                if (adView == null) {
+                    shimmerFrameLayout.stopShimmer()
+                    shimmerFrameLayout.visibility = GONE
+                    return
+                }
+                val parent = adView!!.parent as? ViewGroup
+                parent?.removeView(adView)
+                layBannerAd?.addView(adView)
                 shimmerFrameLayout.stopShimmer()
                 shimmerFrameLayout.visibility = GONE
 
@@ -157,6 +184,7 @@ class BannerAdView : RelativeLayout {
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 shimmerFrameLayout.stopShimmer()
                 shimmerFrameLayout.visibility = GONE
+                parent?.visibility= GONE
 
                 // Log Firebase event for ad failed to load
                 val params = Bundle()
@@ -185,7 +213,7 @@ class BannerAdView : RelativeLayout {
     private val adSize: AdSize
         get() {
             var bounds = Rect()
-            var adWidthPixels = parent!!.width.toFloat()
+            var adWidthPixels = layBannerAd!!.width.toFloat()
 
             // If the ad hasn't been laid out, default to the full screen width.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -206,6 +234,7 @@ class BannerAdView : RelativeLayout {
             val adWidth = (adWidthPixels / density).toInt()
 
             return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context!!, adWidth)
+//            return AdSize.getLandscapeAnchoredAdaptiveBannerAdSize(context!!, adWidth)
         }
 
     fun hideAd() {
@@ -216,5 +245,14 @@ class BannerAdView : RelativeLayout {
     fun showAd() {
         adView!!.visibility = VISIBLE
         shimmerFrameLayout.visibility = VISIBLE
+    }
+    fun destoryAd() {
+        adView?.destroy()
+    }
+    fun resumeAd() {
+        adView?.resume()
+    }
+    fun pauseAd() {
+        adView?.pause()
     }
 }

@@ -31,19 +31,27 @@
         android:id="@+id/sampleBanner"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/bannerAdView"
+        android:layout_above="@+id/lay_Banner"
         android:layout_centerHorizontal="true"
         android:padding="16dp"
         android:text="Sample Banner"
         android:textAlignment="center">
 
     </TextView>
-
-    <com.i2hammad.admanagekit.admob.BannerAdView
-        android:id="@+id/bannerAdView"
+    <FrameLayout
+        android:id="@+id/lay_Banner"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true" />
+        android:paddingTop="3dp"
+        android:paddingBottom="3dp"
+        android:background="@drawable/ad_divider"
+        android:layout_alignParentBottom="true">
+        <com.i2hammad.admanagekit.admob.BannerAdView
+            android:id="@+id/bannerAdView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            />
+    </FrameLayout>
 
 
 </RelativeLayout>

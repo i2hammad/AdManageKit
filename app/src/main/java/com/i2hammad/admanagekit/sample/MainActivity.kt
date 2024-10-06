@@ -5,13 +5,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.i2hammad.admanagekit.admob.BannerAdView
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.admob.NativeLarge
-import com.i2hammad.admanagekit.billing.AppPurchase
-import com.i2hammad.admanagekit.billing.BillingListener
-import com.i2hammad.admanagekit.ump.AdsConsentManager
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
