@@ -5,8 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="bottom"
-    android:paddingBottom="3dp"
     android:paddingTop="3dp"
+    android:paddingBottom="3dp"
     app:shimmer_auto_start="true"
     app:shimmer_base_color="#ccc">
 
@@ -78,6 +78,7 @@
                 android:textStyle="bold" />
 
         </LinearLayout>
+
         <TextView
             style="@style/AdsTheme"
             android:layout_gravity="start" />
