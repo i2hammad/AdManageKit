@@ -23,7 +23,7 @@ import com.i2hammad.admanagekit.billing.AppPurchase
  * using Google AdMob. It provides functionality to load and show ads, manage
  * display intervals, and handle ad-related callbacks.
  */
-class AdManager private constructor() {
+class AdManager() {
 
     private var mInterstitialAd: InterstitialAd? = null
     private var adUnitId: String? = null

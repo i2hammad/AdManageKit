@@ -26,7 +26,7 @@ class NativeLarge @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
 ) : FrameLayout(context, attrs, defStyleAttr) {
 
-    private  var callback: AdLoadCallback? = null
+    private var callback: AdLoadCallback? = null
     private val binding: LayoutNativeLargeBinding =
         LayoutNativeLargeBinding.inflate(LayoutInflater.from(context), this)
     private var firebaseAnalytics: FirebaseAnalytics? = null
@@ -37,21 +37,24 @@ class NativeLarge @JvmOverloads constructor(
         loadAd(activity, adNativeLarge, callback)
     }
 
-   public fun loadNativeAds(activity: Context, adNativeLarge: String, callback: AdLoadCallback) {
+    public fun loadNativeAds(activity: Context, adNativeLarge: String, callback: AdLoadCallback) {
         loadAd(activity, adNativeLarge, callback)
     }
 
-    private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?){
+    private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?) {
         this.adUnitId = adUnitId
         val nativeAdView: NativeAdView = binding.nativeAdView
         val viewGroup = binding.adUnit
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         if (AppPurchase.getInstance().isPurchased) {
             shimmerFrameLayout.visibility = GONE
-            callback?.onFailedToLoad(AdError(
-                AdManager.PURCHASED_APP_ERROR_CODE,
-                AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                AdManager.PURCHASED_APP_ERROR_DOMAIN))
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
 
             return
         }
@@ -129,7 +132,8 @@ class NativeLarge @JvmOverloads constructor(
 
             override fun onAdClicked() {
                 super.onAdClicked()
-                callback?.onAdClicked()}
+                callback?.onAdClicked()
+            }
 
             override fun onAdClosed() {
                 super.onAdClosed()
@@ -138,6 +142,50 @@ class NativeLarge @JvmOverloads constructor(
 
         })
         builder.build().loadAd(AdRequest.Builder().build())
+    }
+
+    fun displayAd(preloadedNativeAd: NativeAd) {
+
+        val nativeAdView: NativeAdView = binding.nativeAdView
+        val viewGroup = binding.adUnit
+        val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
+        if (AppPurchase.getInstance().isPurchased) {
+            shimmerFrameLayout.visibility = GONE
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
+            return
+        }
+        // Populate the NativeAdView with the preloaded NativeAd
+        nativeAdView.mediaView = binding.mediaView
+        nativeAdView.headlineView = nativeAdView.findViewById(R.id.primary)
+        nativeAdView.bodyView = nativeAdView.findViewById<View>(R.id.secondary)
+        nativeAdView.callToActionView = nativeAdView.findViewById<View>(R.id.cta)
+        nativeAdView.iconView = nativeAdView.findViewById(R.id.icon)
+        nativeAdView.advertiserView = nativeAdView.findViewById<View>(R.id.tertiary)
+        preloadedNativeAd.setOnPaidEventListener { adValue ->
+            // Convert the value from micros to the standard currency unit
+            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+
+            // Log Firebase event for paid event
+            val params = Bundle().apply {
+                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+            }
+            firebaseAnalytics!!.logEvent("ad_paid_event", params)
+        }
+        // Populate the view with the NativeAd content
+        populateNativeAdView(preloadedNativeAd, nativeAdView)
+
+        // Set the visibility
+        viewGroup.visibility = View.VISIBLE
+        nativeAdView.visibility = View.VISIBLE
+        shimmerFrameLayout.visibility = View.GONE
     }
 
 

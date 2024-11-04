@@ -108,6 +108,8 @@ class InterstitialActivity : AppCompatActivity() {
                     btnInterstitialAd.text = "Load Native Ads"
                 }
             })
+
+
     }
 
     override fun onResume() {
@@ -121,7 +123,7 @@ class InterstitialActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        bannerAdView.destoryAd()
+        bannerAdView.destroyAd()
         super.onDestroy()
     }
 }

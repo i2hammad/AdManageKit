@@ -9,7 +9,6 @@ class MyApplication : Application() {
 
     var appOpenManager: AppOpenManager? = null
 
-
     override fun onCreate() {
         super.onCreate()
 

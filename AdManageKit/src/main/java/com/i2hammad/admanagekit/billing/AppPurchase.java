@@ -46,36 +46,34 @@ public class AppPurchase {
     private static final String Tag = "AppPurchase";
     public static final String PRODUCT_ID_TEST = "android.test.purchased";
 
-    // Singleton instance of AppPurchase
-    @SuppressLint({"StaticFieldLeak"})
     private static AppPurchase appPurchase;
 
     // Member variables
 
     private String c; // Deprecated item ID
-    private ArrayList<QueryProductDetailsParams.Product> d; // Subscription products
-    private ArrayList<QueryProductDetailsParams.Product> e; // In-app products
-    private List<PurchaseItem> f; // List of purchase items
+    private ArrayList<QueryProductDetailsParams.Product> subProductArrayList; // Subscription products
+    private ArrayList<QueryProductDetailsParams.Product> inAppProductArrayList; // In-app products
+    private List<PurchaseItem> purchaseItemList; // List of purchase items
     private PurchaseListener purchaseListener; // Listener for purchase events
     private UpdatePurchaseListener updatePurchaseListener; // Listener for purchase updates
     private BillingListener billingListener; // Listener for billing events
     private BillingClient billingClient; // Google Play Billing client
     private List<ProductDetails> productDetailsList; // Details of in-app products
     private List<ProductDetails> productDetailsList1; // Details of subscription products
-    private boolean p; // Billing availability flag
+    private boolean isBillingAvailable; // Billing availability flag
     private boolean q; // Product details queried flag
-    private int v; // Type of purchase (in-app or subscription)
+    private int TYPE_IAP_PURCHASE; // Type of purchase (in-app or subscription)
     private Handler handler; // Handler for delayed tasks
     private Runnable runnable; // Runnable task
     private String a = "2.89$"; // Price string
     private String b = "3.50$"; // Old price string
-    private Boolean j = Boolean.FALSE; // Billing initialization flag
-    private final Map<String, ProductDetails> productDetailsMap = new HashMap<>(); // In-app product details map
-    private final Map<String, ProductDetails> o = new HashMap<>(); // Subscription product details map
-    private boolean r = false; // Consume purchase flag
+    private Boolean isBillingInitialized = Boolean.FALSE; // Billing initialization flag
+    private final Map<String, ProductDetails> inAppProductDetailsMap = new HashMap<>(); // In-app product details map
+    private final Map<String, ProductDetails> subProductDetailsMap = new HashMap<>(); // Subscription product details map
+    private boolean consumePurchase = false; // Consume purchase flag
     private int s = 0; // State variable
     private int t = 4; // State variable
-    private String u = ""; // Current product ID
+    private String productId = ""; // Current product ID
     private boolean w = false; // Verification flag
     private boolean x = false; // Verification flag
     private boolean y = false; // Verification flag
@@ -93,7 +91,7 @@ public class AppPurchase {
             if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK && list != null) {
                 for (Purchase purchase : list) {
                     purchase.getSkus();
-                    AppPurchase.this.a(purchase);
+                    AppPurchase.this.handlePurchase(purchase);
                 }
             } else if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.USER_CANCELED) {
                 if (AppPurchase.this.purchaseListener != null) {
@@ -109,35 +107,35 @@ public class AppPurchase {
     // Listener for billing client state events
     BillingClientStateListener billingClientStateListener = new BillingClientStateListener() {
         public void onBillingServiceDisconnected() {
-            AppPurchase.this.p = false;
+            AppPurchase.this.isBillingAvailable = false;
         }
 
         public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
             Log.d(AppPurchase.Tag, "onBillingSetupFinished: " + billingResult.getResponseCode());
-            if (!AppPurchase.this.j) {
+            if (!AppPurchase.this.isBillingInitialized) {
                 AppPurchase.this.verifyPurchased(true);
             }
-            AppPurchase.this.j = Boolean.TRUE;
+            AppPurchase.this.isBillingInitialized = Boolean.TRUE;
             if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                AppPurchase.this.p = true;
-                if (!AppPurchase.this.e.isEmpty()) {
+                AppPurchase.this.isBillingAvailable = true;
+                if (!AppPurchase.this.inAppProductArrayList.isEmpty()) {
                     AppPurchase.this.billingClient.queryProductDetailsAsync(
-                            QueryProductDetailsParams.newBuilder().setProductList(AppPurchase.this.e).build(),
+                            QueryProductDetailsParams.newBuilder().setProductList(AppPurchase.this.inAppProductArrayList).build(),
                             new ProductDetailsResponseListener() {
                                 public void onProductDetailsResponse(BillingResult billingResult2, List<ProductDetails> productDetailsList) {
                                     if (productDetailsList != null) {
                                         Log.d(AppPurchase.Tag, "onSkuINAPDetailsResponse: " + productDetailsList.size());
                                         AppPurchase.this.productDetailsList = productDetailsList;
                                         AppPurchase.this.q = true;
-                                        AppPurchase.this.a(productDetailsList);
+                                        AppPurchase.this.handlePurchase(productDetailsList);
                                     }
                                 }
                             }
                     );
                 }
-                if (!AppPurchase.this.d.isEmpty()) {
-                    QueryProductDetailsParams build = QueryProductDetailsParams.newBuilder().setProductList(AppPurchase.this.d).build();
-                    Iterator<QueryProductDetailsParams.Product> it = AppPurchase.this.d.iterator();
+                if (!AppPurchase.this.subProductArrayList.isEmpty()) {
+                    QueryProductDetailsParams build = QueryProductDetailsParams.newBuilder().setProductList(AppPurchase.this.subProductArrayList).build();
+                    Iterator<QueryProductDetailsParams.Product> it = AppPurchase.this.subProductArrayList.iterator();
                     while (it.hasNext()) {
                         Log.d(AppPurchase.Tag, "onBillingSetupFinished: " + it.next().zza());
                     }
@@ -216,9 +214,9 @@ public class AppPurchase {
      */
     public void setBillingListener(BillingListener billingListener) {
         this.billingListener = billingListener;
-        if (this.p) {
+        if (this.isBillingAvailable) {
             billingListener.onInitBillingFinished(BillingClient.BillingResponseCode.OK);
-            this.j = Boolean.TRUE;
+            this.isBillingInitialized = Boolean.TRUE;
         }
     }
 
@@ -228,7 +226,7 @@ public class AppPurchase {
      * @return True if billing is available, false otherwise.
      */
     public boolean isAvailable() {
-        return this.p;
+        return this.isBillingAvailable;
     }
 
     /**
@@ -237,7 +235,7 @@ public class AppPurchase {
      * @return True if billing is initialized, false otherwise.
      */
     public Boolean getInitBillingFinish() {
-        return this.j;
+        return this.isBillingInitialized;
     }
 
     /**
@@ -269,7 +267,7 @@ public class AppPurchase {
      * @param consumePurchase True to consume purchase automatically, false otherwise.
      */
     public void setConsumePurchase(boolean consumePurchase) {
-        this.r = consumePurchase;
+        this.consumePurchase = consumePurchase;
     }
 
     /**
@@ -311,8 +309,8 @@ public class AppPurchase {
         if (BuildConfig.DEBUG) {
             listINAPId.add(PRODUCT_ID_TEST);
         }
-        this.d = a(listSubsId, "subs");
-        this.e = a(listINAPId, "inapp");
+        this.subProductArrayList = handlePurchase(listSubsId, "subs");
+        this.inAppProductArrayList = handlePurchase(listINAPId, "inapp");
         BillingClient build = BillingClient.newBuilder(application)
                 .setListener(this.purchasesUpdatedListener)
                 .enablePendingPurchases()
@@ -354,9 +352,9 @@ public class AppPurchase {
      * @param isCallback True if a callback is required, false otherwise.
      */
     public void verifyPurchased(boolean isCallback) {
-        Log.d(Tag, "isPurchased : " + this.d.size());
+        Log.d(Tag, "isPurchased : " + this.subProductArrayList.size());
         this.w = false;
-        if (this.e != null) {
+        if (this.inAppProductArrayList != null) {
             this.billingClient.queryPurchasesAsync(
                     QueryPurchasesParams.newBuilder().setProductType("inapp").build(),
                     (billingResult, list) -> {
@@ -365,7 +363,7 @@ public class AppPurchase {
                         Log.d(Tag, "verifyPurchased INAPP code: " + billingResult.getResponseCode() + " === size: " + list.size());
                         if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                             for (Purchase purchase : list) {
-                                for (QueryProductDetailsParams.Product product : this.e) {
+                                for (QueryProductDetailsParams.Product product : this.inAppProductArrayList) {
                                     if (purchase.getProducts().contains(product.zza())) {
                                         Log.d(Tag, "verifyPurchased INAPP: true");
                                         this.stringList.add(product.zza());
@@ -396,16 +394,16 @@ public class AppPurchase {
                     }
             );
         }
-        if (this.d != null) {
+        if (this.subProductArrayList != null) {
             this.billingClient.queryPurchasesAsync(
                     QueryPurchasesParams.newBuilder().setProductType("subs").build(),
                     (billingResult2, list2) -> {
                         Log.d(Tag, "verifyPurchased SUBS code: " + billingResult2.getResponseCode() + " === size: " + list2.size());
                         if (billingResult2.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                             for (Purchase purchase : list2) {
-                                for (QueryProductDetailsParams.Product product : this.d) {
+                                for (QueryProductDetailsParams.Product product : this.subProductArrayList) {
                                     if (purchase.getProducts().contains(product.zza())) {
-                                        a(
+                                        handlePurchase(
                                                 new PurchaseResult(
                                                         purchase.getOrderId(),
                                                         purchase.getPackageName(),
@@ -453,13 +451,13 @@ public class AppPurchase {
      * Updates the purchase status of the user's owned items.
      */
     public void updatePurchaseStatus() {
-        if (this.e != null) {
+        if (this.inAppProductArrayList != null) {
             this.billingClient.queryPurchasesAsync(
                     QueryPurchasesParams.newBuilder().setProductType("inapp").build(),
                     (billingResult, list) -> {
                         if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                             for (Purchase purchase : list) {
-                                for (QueryProductDetailsParams.Product product : this.e) {
+                                for (QueryProductDetailsParams.Product product : this.inAppProductArrayList) {
                                     if (purchase.getProducts().contains(product.zza()) && !this.stringList.contains(product.zza())) {
                                         this.stringList.add(product.zza());
                                     }
@@ -473,15 +471,15 @@ public class AppPurchase {
                     }
             );
         }
-        if (this.d != null) {
+        if (this.subProductArrayList != null) {
             this.billingClient.queryPurchasesAsync(
                     QueryPurchasesParams.newBuilder().setProductType("subs").build(),
                     (billingResult2, list2) -> {
                         if (billingResult2.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                             for (Purchase purchase : list2) {
-                                for (QueryProductDetailsParams.Product product : this.d) {
+                                for (QueryProductDetailsParams.Product product : this.subProductArrayList) {
                                     if (purchase.getProducts().contains(product.zza())) {
-                                        a(
+                                        handlePurchase(
                                                 new PurchaseResult(
                                                         purchase.getOrderId(),
                                                         purchase.getPackageName(),
@@ -541,16 +539,16 @@ public class AppPurchase {
             purchase(activity, PRODUCT_ID_TEST);
             return "Billing test";
         } else {
-            ProductDetails productDetails = this.o.get(subsId);
+            ProductDetails productDetails = this.subProductDetailsMap.get(subsId);
             if (productDetails == null) {
                 return "Product ID invalid";
             }
-            List<ProductDetails.SubscriptionOfferDetails> subscriptionOfferDetails = this.o.get(subsId).getSubscriptionOfferDetails();
+            List<ProductDetails.SubscriptionOfferDetails> subscriptionOfferDetails = this.subProductDetailsMap.get(subsId).getSubscriptionOfferDetails();
             if (subscriptionOfferDetails == null || subscriptionOfferDetails.isEmpty()) {
                 return "Can't find offer for this subscription!";
             }
             String trialId = null;
-            for (PurchaseItem item : this.f) {
+            for (PurchaseItem item : this.purchaseItemList) {
                 if (item.itemId.equals(subsId)) {
                     trialId = item.trialId;
                     break;
@@ -646,7 +644,7 @@ public class AppPurchase {
      * @return The formatted price of the subscription product.
      */
     public String getPriceSub(String productId) {
-        ProductDetails productDetails = this.o.get(productId);
+        ProductDetails productDetails = this.subProductDetailsMap.get(productId);
         if (productDetails == null) {
             return "";
         }
@@ -663,7 +661,7 @@ public class AppPurchase {
      * @return The list of pricing phases.
      */
     public List<ProductDetails.PricingPhase> getPricePricingPhaseList(String productId) {
-        ProductDetails productDetails = this.o.get(productId);
+        ProductDetails productDetails = this.subProductDetailsMap.get(productId);
         if (productDetails == null) {
             return null;
         }
@@ -678,7 +676,7 @@ public class AppPurchase {
      * @return The introductory price of the subscription product.
      */
     public String getIntroductorySubPrice(String productId) {
-        ProductDetails productDetails = this.o.get(productId);
+        ProductDetails productDetails = this.subProductDetailsMap.get(productId);
         if (productDetails == null) {
             return "";
         }
@@ -701,7 +699,7 @@ public class AppPurchase {
      * @return The currency code.
      */
     public String getCurrency(String productId, int typeIAP) {
-        ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? this.productDetailsMap.get(productId) : this.o.get(productId);
+        ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? this.inAppProductDetailsMap.get(productId) : this.subProductDetailsMap.get(productId);
         if (productDetails == null) {
             return "";
         }
@@ -721,7 +719,7 @@ public class AppPurchase {
      * @return The price without the currency symbol.
      */
     public double getPriceWithoutCurrency(String productId, int typeIAP) {
-        ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? this.productDetailsMap.get(productId) : this.o.get(productId);
+        ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? this.inAppProductDetailsMap.get(productId) : this.subProductDetailsMap.get(productId);
         if (productDetails == null) {
             return 0.0d;
         }
@@ -768,7 +766,7 @@ public class AppPurchase {
      * @return The price of the product.
      */
     public String getPrice(String productId) {
-        ProductDetails productDetails = this.productDetailsMap.get(productId);
+        ProductDetails productDetails = this.inAppProductDetailsMap.get(productId);
         if (productDetails == null) {
             return "";
         }
@@ -791,10 +789,10 @@ public class AppPurchase {
                 arrayList2.add(QueryProductDetailsParams.Product.newBuilder().setProductId(purchaseItem.itemId).setProductType("subs").build());
             }
         }
-        this.e = arrayList;
-        Log.d(Tag, "syncPurchaseItemsToListProduct: listINAPId " + this.e.size());
-        this.d = arrayList2;
-        Log.d(Tag, "syncPurchaseItemsToListProduct: listSubscriptionId " + this.d.size());
+        this.inAppProductArrayList = arrayList;
+        Log.d(Tag, "syncPurchaseItemsToListProduct: listINAPId " + this.inAppProductArrayList.size());
+        this.subProductArrayList = arrayList2;
+        Log.d(Tag, "syncPurchaseItemsToListProduct: listSubscriptionId " + this.subProductArrayList.size());
     }
 
     /**
@@ -804,7 +802,7 @@ public class AppPurchase {
      */
     private void b(List<ProductDetails> skuList) {
         for (ProductDetails productDetails : skuList) {
-            this.o.put(productDetails.getProductId(), productDetails);
+            this.subProductDetailsMap.put(productDetails.getProductId(), productDetails);
         }
     }
 
@@ -817,16 +815,16 @@ public class AppPurchase {
     public void setBillingListener(BillingListener billingListener, int timeout) {
         Log.d(Tag, "setBillingListener: timeout " + timeout);
         this.billingListener = billingListener;
-        if (this.p) {
+        if (this.isBillingAvailable) {
             Log.d(Tag, "setBillingListener: finish");
             billingListener.onInitBillingFinished(BillingClient.BillingResponseCode.OK);
-            this.j = Boolean.TRUE;
+            this.isBillingInitialized = Boolean.TRUE;
             return;
         }
         this.handler = new Handler();
         Runnable runnable = () -> {
             Log.d(Tag, "setBillingListener: timeout run");
-            this.j = Boolean.TRUE;
+            this.isBillingInitialized = Boolean.TRUE;
             billingListener.onInitBillingFinished(BillingClient.BillingResponseCode.SERVICE_TIMEOUT);
         };
         this.runnable = runnable;
@@ -886,13 +884,13 @@ public class AppPurchase {
             }
             return "";
         }
-        ProductDetails productDetails = this.productDetailsMap.get(productId);
+        ProductDetails productDetails = this.inAppProductDetailsMap.get(productId);
         if (BuildConfig.DEBUG) {
             new PurchaseDevBottomSheet(TYPE_IAP.PURCHASE, productDetails, activity, this.purchaseListener).show();
             return "";
         }
-        this.u = productId;
-        this.v = TYPE_IAP.PURCHASE;
+        this.productId = productId;
+        this.TYPE_IAP_PURCHASE = TYPE_IAP.PURCHASE;
         switch (this.billingClient.launchBillingFlow(
                 activity,
                 BillingFlowParams.newBuilder()
@@ -941,9 +939,9 @@ public class AppPurchase {
      *
      * @param skuList The list of product details.
      */
-    private void a(List<ProductDetails> skuList) {
+    private void handlePurchase(List<ProductDetails> skuList) {
         for (ProductDetails productDetails : skuList) {
-            this.productDetailsMap.put(productDetails.getProductId(), productDetails);
+            this.inAppProductDetailsMap.put(productDetails.getProductId(), productDetails);
         }
     }
 
@@ -953,7 +951,7 @@ public class AppPurchase {
      * @param purchaseResult The purchase result to add.
      * @param id             The product ID.
      */
-    private void a(PurchaseResult purchaseResult, String id) {
+    private void handlePurchase(PurchaseResult purchaseResult, String id) {
         boolean exists = false;
         Iterator<PurchaseResult> it = this.purchaseResultList.iterator();
         while (it.hasNext()) {
@@ -980,7 +978,7 @@ public class AppPurchase {
         if (BuildConfig.DEBUG) {
             purchaseItemList.add(new PurchaseItem(PRODUCT_ID_TEST, "", TYPE_IAP.PURCHASE));
         }
-        this.f = purchaseItemList;
+        this.purchaseItemList = purchaseItemList;
         c(purchaseItemList);
         BillingClient build = BillingClient.newBuilder(application)
                 .setListener(this.purchasesUpdatedListener)
@@ -997,7 +995,7 @@ public class AppPurchase {
      */
     private List<String> b() {
         ArrayList<String> arrayList = new ArrayList<>();
-        for (QueryProductDetailsParams.Product product : this.d) {
+        for (QueryProductDetailsParams.Product product : this.subProductArrayList) {
             arrayList.add(product.zza());
         }
         return arrayList;
@@ -1008,9 +1006,9 @@ public class AppPurchase {
      *
      * @return The list of in-app product IDs.
      */
-    private List<String> a() {
+    private List<String> handlePurchase() {
         ArrayList<String> arrayList = new ArrayList<>();
-        for (QueryProductDetailsParams.Product product : this.e) {
+        for (QueryProductDetailsParams.Product product : this.inAppProductArrayList) {
             arrayList.add(product.zza());
         }
         return arrayList;
@@ -1021,17 +1019,17 @@ public class AppPurchase {
      *
      * @param purchase The purchase to handle.
      */
-    public void a(Purchase purchase) {
-        double priceWithoutCurrency = getPriceWithoutCurrency(this.u, this.v);
+    public void handlePurchase(Purchase purchase) {
+        double priceWithoutCurrency = getPriceWithoutCurrency(this.productId, this.TYPE_IAP_PURCHASE);
         if (this.purchaseListener != null) {
             this.B = true;
             this.purchaseListener.onProductPurchased(purchase.getOrderId(), purchase.getOriginalJson());
         }
-        if (this.r) {
+        if (this.consumePurchase) {
             this.billingClient.consumeAsync(
                     ConsumeParams.newBuilder().setPurchaseToken(purchase.getPurchaseToken()).build(),
                     new ConsumeResponseListener() {
-                        public void onConsumeResponse(BillingResult billingResult, String purchaseToken) {
+                        public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String purchaseToken) {
                             Log.d(AppPurchase.Tag, "onConsumeResponse: " + billingResult.getDebugMessage());
                         }
                     }
@@ -1058,7 +1056,7 @@ public class AppPurchase {
      * @param currency The currency code.
      * @return The formatted price string.
      */
-    private String a(double price, String currency) {
+    private String handlePurchase(double price, String currency) {
         NumberFormat currencyInstance = NumberFormat.getCurrencyInstance();
         currencyInstance.setMaximumFractionDigits(0);
         currencyInstance.setCurrency(Currency.getInstance(currency));
@@ -1073,7 +1071,7 @@ public class AppPurchase {
      * @return The list of query product details params.
      */
     @Deprecated
-    private ArrayList<QueryProductDetailsParams.Product> a(List<String> listId, String styleBilling) {
+    private ArrayList<QueryProductDetailsParams.Product> handlePurchase(List<String> listId, String styleBilling) {
         ArrayList<QueryProductDetailsParams.Product> arrayList = new ArrayList<>();
         for (String str : listId) {
             arrayList.add(QueryProductDetailsParams.Product.newBuilder().setProductId(str).setProductType(styleBilling).build());

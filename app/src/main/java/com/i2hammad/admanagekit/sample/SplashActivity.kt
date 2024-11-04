@@ -2,22 +2,26 @@ package com.i2hammad.admanagekit.sample
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.TextView
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat.startActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.MobileAds
+import com.i2hammad.admanagekit.AdConfig
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
+import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.billing.AppPurchase
 import com.i2hammad.admanagekit.billing.BillingListener
 import com.i2hammad.admanagekit.ump.AdsConsentManager
 
 class SplashActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,9 +33,13 @@ class SplashActivity : AppCompatActivity() {
             insets
         }
 
+//        adViewModel.setMaxRetries("ca-app-pub-3940256099942544/2247696110", 3)
+
         statusTextView = findViewById(R.id.message)
 
 //        Log.e("splash", "On Create Called")
+//        MobileAds.setLogLevel(Log.DEBUG)
+
         initBilling()
 
     }
@@ -135,6 +143,17 @@ class SplashActivity : AppCompatActivity() {
 
 
     private fun forceLoadInterstitialAd() {
+
+        val adUnitId = "ca-app-pub-3940256099942544/2247696110"
+
+        NativeAdManager.preloadAd(
+            this.applicationContext, AdConfig.NATIVE_BANNER_MEDIUM_AD, adUnitId
+        )
+        NativeAdManager.preloadAd(
+            this.applicationContext, AdConfig.NATIVE_BANNER_SMALL_AD, adUnitId
+        )
+        NativeAdManager.preloadAd(this.applicationContext, AdConfig.NATIVE_LARGE_AD, adUnitId)
+
         AdManager.getInstance().loadInterstitialAdForSplash(this,
             "ca-app-pub-3940256099942544/1033173712",
             10 * 1000,
@@ -179,7 +198,8 @@ class SplashActivity : AppCompatActivity() {
         // make sure you have skipped SplashActivity on AppOpenManager in MyApplication to avoid default showAppOpenAd() behaviour
         // appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
 
-        MyApplication.instance.appOpenManager?.forceShowAdIfAvailable(this,
+        MyApplication.instance.appOpenManager?.forceShowAdIfAvailable(
+            this,
             object : AdManagerCallback() {
                 override fun onNextAction() {
                     super.onNextAction()

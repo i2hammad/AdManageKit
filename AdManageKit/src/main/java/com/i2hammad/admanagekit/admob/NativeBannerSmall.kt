@@ -192,6 +192,54 @@ class NativeBannerSmall @JvmOverloads constructor(
     }
 
 
+
+    fun displayAd(preloadedAd: NativeAd) {
+
+        val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
+        if (AppPurchase.getInstance().isPurchased) {
+            shimmerFrameLayout.visibility = GONE
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
+
+            return
+        }
+        val nativeAdView = LayoutInflater.from(context)
+            .inflate(R.layout.layout_native_banner_small, null) as NativeAdView
+        val adPlaceholder: FrameLayout = binding.flAdplaceholder
+
+        nativeAdView.headlineView = nativeAdView.findViewById(R.id.ad_headline)
+        nativeAdView.bodyView = nativeAdView.findViewById(R.id.ad_body)
+        nativeAdView.callToActionView = nativeAdView.findViewById(R.id.ad_call_to_action)
+        nativeAdView.iconView = nativeAdView.findViewById(R.id.ad_app_icon)
+        nativeAdView.advertiserView = nativeAdView.findViewById(R.id.ad_advertiser)
+
+        adPlaceholder.removeAllViews()
+        adPlaceholder.addView(nativeAdView)
+        adPlaceholder.visibility = VISIBLE
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
+
+        preloadedAd.setOnPaidEventListener { adValue ->
+            // Convert the value from micros to the standard currency unit
+            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+
+            // Log Firebase event for paid event
+            val params = Bundle().apply {
+                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+            }
+            firebaseAnalytics!!.logEvent("ad_paid_event", params)
+        }
+        populateNativeAdView(preloadedAd, nativeAdView)
+        binding.shimmerContainerNative.visibility = GONE
+    }
+
+
     public fun setAdManagerCallback(callback: AdLoadCallback) {
         this.callback = callback
     }
