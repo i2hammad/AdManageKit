@@ -8,6 +8,7 @@
         android:id="@+id/ad_unit_content"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+
         android:orientation="vertical">
 
         <LinearLayout
@@ -19,15 +20,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:layout_gravity="center"
-                android:gravity="center"
                 android:padding="8dp">
 
                 <ImageView
                     android:id="@+id/ad_app_icon"
                     android:layout_width="48dp"
                     android:layout_height="48dp"
-                    android:layout_marginStart="2dp"
                     android:adjustViewBounds="true" />
 
                 <LinearLayout
@@ -85,9 +83,9 @@
             <Button
                 android:id="@+id/ad_call_to_action"
                 android:layout_width="match_parent"
-                android:layout_height="45dp"
-                android:layout_marginBottom="8dp"
+                android:layout_height="wrap_content"
                 android:layout_marginHorizontal="8dp"
+                android:layout_marginBottom="8dp"
                 android:background="@drawable/ads_bg_lib"
                 android:gravity="center"
                 android:text="Call to action"

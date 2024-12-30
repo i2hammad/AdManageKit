@@ -1,5 +1,5 @@
 [versions]
-agp = "8.7.1"
+agp = "8.7.3"
 billing = "7.1.1"
 firebaseBom = "33.5.1"
 kotlin = "1.9.0"
@@ -9,7 +9,7 @@ lifecycleProcess = "2.8.6"
 material = "1.10.0"
 activity = "1.9.2"
 constraintlayout = "2.1.4"
-playServicesAds = "23.4.0"
+playServicesAds = "23.6.0"
 userMessagingPlatform = "3.0.0"
 shimmer = "0.5.0"
 

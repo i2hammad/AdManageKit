@@ -181,7 +181,7 @@ class NativeBannerMedium @JvmOverloads constructor(
         nativeAdView.advertiserView?.let { advertiserView ->
             val advertiser = nativeAd.advertiser
             if (advertiser == null) {
-                advertiserView.visibility = INVISIBLE
+                advertiserView.visibility = GONE
             } else {
                 (advertiserView as TextView).text = advertiser
                 advertiserView.visibility = VISIBLE
