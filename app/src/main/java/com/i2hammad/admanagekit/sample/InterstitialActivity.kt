@@ -38,7 +38,6 @@ class InterstitialActivity : AppCompatActivity() {
         }
 
         statusTextView = findViewById<TextView>(R.id.statusTextView)
-//        myApplication = MyApplication.getInstance()!!
 
         btnInterstitialAd = findViewById(R.id.btnShowInterstitialAd)
         btnInterstitialAd.isEnabled = false

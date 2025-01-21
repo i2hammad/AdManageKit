@@ -2,7 +2,7 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/ad_unit"
         android:layout_width="match_parent"
         android:layout_height="300dp"
@@ -14,7 +14,7 @@
             android:layout_height="match_parent"
 
             android:background="@drawable/bg_card_ads"
-            android:visibility="visible">
+            android:visibility="gone">
 
             <RelativeLayout
                 android:id="@+id/background"
@@ -146,12 +146,12 @@
                 android:textSize="12sp" />
         </com.google.android.gms.ads.nativead.NativeAdView>
 
-        <com.facebook.shimmer.ShimmerFrameLayout xmlns:app="http://schemas.android.com/apk/res-auto"
+        <com.facebook.shimmer.ShimmerFrameLayout
             android:id="@+id/shimmer_container_native"
             android:layout_width="match_parent"
             android:layout_height="320dip"
             android:background="@drawable/bg_card_ads"
-            android:visibility="gone"
+            android:visibility="visible"
             app:shimmer_auto_start="true"
             app:shimmer_base_color="#ccc">
 
@@ -293,5 +293,5 @@
                     android:layout_alignParentTop="true" />
             </RelativeLayout>
         </com.facebook.shimmer.ShimmerFrameLayout>
-    </LinearLayout>
+    </FrameLayout>
 </merge>

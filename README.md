@@ -40,7 +40,7 @@ while also offering a sample project to demonstrate its usage.
    Add the following to your `build.gradle` file in the `dependencies` section:
 
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.1.5'
+   implementation 'com.github.i2hammad:admanagekit:1.1.6'
    ```
 
 2. **Sync your project** with Gradle files.

@@ -2,7 +2,7 @@
 <merge xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <LinearLayout
+    <FrameLayout
         android:id="@+id/ad_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -167,6 +167,6 @@
             android:layout_height="wrap_content"
             android:background="@drawable/bg_card_ads"
             android:orientation="vertical"
-            android:visibility="gone" />
-    </LinearLayout>
+            android:visibility="visible" />
+    </FrameLayout>
 </merge>
