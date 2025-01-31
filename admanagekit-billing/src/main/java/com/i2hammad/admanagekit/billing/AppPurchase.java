@@ -882,21 +882,45 @@ public class AppPurchase {
             if (this.purchaseListener != null) {
                 this.purchaseListener.displayErrorMessage("Billing error init");
             }
-            return "";
+            return "Billing error init";
         }
+
+        // Check if product exists
         ProductDetails productDetails = this.inAppProductDetailsMap.get(productId);
+        if (productDetails == null) {
+            Log.e("Billing", "Product details not found for productId: " + productId);
+            if (this.purchaseListener != null) {
+                this.purchaseListener.displayErrorMessage("Product details not found");
+            }
+            return "Product details not found";
+        }
+
+        if (!billingClient.isReady()) {
+            Log.e("Billing", "BillingClient is not ready");
+            if (this.purchaseListener != null) {
+                this.purchaseListener.displayErrorMessage("Billing client not ready");
+            }
+            return "Billing client not ready";
+        }
+
         if (BuildConfig.DEBUG) {
             new PurchaseDevBottomSheet(TYPE_IAP.PURCHASE, productDetails, activity, this.purchaseListener).show();
-            return "";
+            return "Debug purchase simulated";
         }
+
         this.productId = productId;
         this.TYPE_IAP_PURCHASE = TYPE_IAP.PURCHASE;
-        switch (this.billingClient.launchBillingFlow(
-                activity,
-                BillingFlowParams.newBuilder()
-                        .setProductDetailsParamsList(List.of(BillingFlowParams.ProductDetailsParams.newBuilder().setProductDetails(productDetails).build()))
-                        .build()
-        ).getResponseCode()) {
+
+        BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(List.of(
+                        BillingFlowParams.ProductDetailsParams.newBuilder()
+                                .setProductDetails(productDetails)
+                                .build()))
+                .build();
+
+        BillingResult result = billingClient.launchBillingFlow(activity, billingFlowParams);
+
+        switch (result.getResponseCode()) {
             case BillingClient.BillingResponseCode.SERVICE_TIMEOUT:
                 return "Timeout";
             case BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED:
@@ -930,10 +954,9 @@ public class AppPurchase {
             case BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED:
                 return "Selected item is already owned";
             default:
-                return "";
+                return "Unknown error occurred";
         }
     }
-
     /**
      * Stores the product details for in-app products.
      *

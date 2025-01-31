@@ -9,7 +9,8 @@ import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.NativeAd
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
+//import com.i2hammad.admanagekit.billing.AppPurchase
 
 object NativeAdManager {
 
@@ -54,8 +55,9 @@ object NativeAdManager {
     fun preloadAd(context: Context, customKey: String, adUnitId: String) {
 //        Log.d("NativeAdManager", "Preloading ad for customKey: $customKey with adUnitId: $adUnitId")
 
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
         // Check if the user has purchased the ad-free experience
-        if (AppPurchase.getInstance().isPurchased) {
+        if (purchaseProvider.isPurchased()) {
 //            Log.d("NativeAdManager", "App is purchased. Skipping ad load for customKey: $customKey")
             updateAdState(customKey, AdState.Showed)
             return

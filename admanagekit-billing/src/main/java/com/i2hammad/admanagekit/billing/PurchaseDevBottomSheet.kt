@@ -8,7 +8,7 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.ProductDetails.PricingPhase
 import com.android.billingclient.api.ProductDetails.SubscriptionOfferDetails
 import com.google.android.material.bottomsheet.BottomSheetDialog
-import com.i2hammad.admanagekit.R
+import com.i2hammad.admanagekit.billing.R
 
 class PurchaseDevBottomSheet(
     private val typeIap: Int,

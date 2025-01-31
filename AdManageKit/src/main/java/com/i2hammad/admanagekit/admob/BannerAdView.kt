@@ -2,7 +2,6 @@ package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
 import android.content.Context
-import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.AttributeSet
@@ -11,15 +10,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowMetrics
-import android.view.WindowManager
 import android.widget.FrameLayout
-import androidx.cardview.widget.CardView
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.*
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
+
+//import com.i2hammad.admanagekit.billing.AppPurchase
 
 class BannerAdView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0
@@ -70,7 +69,8 @@ class BannerAdView @JvmOverloads constructor(
     ) {
         if (isInEditMode) return
         this.activityContext = context
-        if (AppPurchase.getInstance().isPurchased) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
             callback?.onFailedToLoad(
                 AdError(
                     AdManager.PURCHASED_APP_ERROR_CODE,

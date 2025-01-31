@@ -4,6 +4,9 @@ import android.app.Application
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.i2hammad.admanagekit.admob.AppOpenManager
+import com.i2hammad.admanagekit.billing.BillingConfig
+import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
+import com.i2hammad.admanagekit.core.NoPurchaseProvider
 
 class MyApplication : Application() {
 
@@ -11,7 +14,7 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-
+        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
     }

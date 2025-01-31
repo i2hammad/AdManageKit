@@ -12,7 +12,9 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
+
+//import com.i2hammad.admanagekit.billing.AppPurchase
 
 /**
  * Prefetches App Open Ads.
@@ -315,7 +317,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     override fun onStart(owner: LifecycleOwner) {
-        if (!AppPurchase.getInstance().isPurchased()) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (!purchaseProvider.isPurchased()) {
             showAdIfAvailable()
             Log.d(LOG_TAG, "onStart")
         }

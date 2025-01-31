@@ -9,7 +9,6 @@ import android.view.LayoutInflater
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdListener
@@ -20,7 +19,8 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
+//import com.i2hammad.admanagekit.billing.AppPurchase
 import com.i2hammad.admanagekit.databinding.LayoutNativeBannerMediumPreviewBinding
 
 class NativeBannerMedium @JvmOverloads constructor(
@@ -41,7 +41,10 @@ class NativeBannerMedium @JvmOverloads constructor(
     private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?) {
         this.adUnitId = adUnitId
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
-        if (AppPurchase.getInstance().isPurchased) {
+
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+
+        if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
             callback?.onFailedToLoad(
                 AdError(
@@ -194,7 +197,8 @@ class NativeBannerMedium @JvmOverloads constructor(
 
     fun displayAd(preloadedAd: NativeAd) {
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
-        if (AppPurchase.getInstance().isPurchased) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
             callback?.onFailedToLoad(
                 AdError(

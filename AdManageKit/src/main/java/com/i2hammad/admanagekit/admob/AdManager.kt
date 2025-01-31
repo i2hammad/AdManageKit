@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.appcompat.app.AlertDialog
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -16,7 +15,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
@@ -60,7 +59,8 @@ class AdManager() {
         activity: Activity, callback: AdManagerCallback, isReload: Boolean
     ) {
         // Check if the user has already purchased, skip the dialog if true
-        if (AppPurchase.getInstance().isPurchased) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
             // move to the next action
             callback.onNextAction()
             return
@@ -99,7 +99,9 @@ class AdManager() {
     fun loadInterstitialAdForSplash(
         context: Context, adUnitId: String, timeoutMillis: Long, callback: AdManagerCallback
     ) {
-        if (AppPurchase.getInstance().isPurchased()) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased())
+        {
             // User has purchased, no ads should be shown
             callback.onNextAction()
             return
@@ -186,7 +188,8 @@ class AdManager() {
     fun loadInterstitialAd(
         context: Context, adUnitId: String, interstitialAdLoadCallback: InterstitialAdLoadCallback
     ) {
-        if (AppPurchase.getInstance().isPurchased()) {
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()){
             // User has purchased, no ads should be shown
             interstitialAdLoadCallback.onAdFailedToLoad(
                 LoadAdError(
@@ -330,7 +333,8 @@ class AdManager() {
     }
 
     fun isReady(): Boolean {
-        return mInterstitialAd != null && !AppPurchase.getInstance().isPurchased()
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        return mInterstitialAd != null && !purchaseProvider.isPurchased()
     }
 
     fun isDisplayingAd(): Boolean {

@@ -23,3 +23,5 @@ dependencyResolutionManagement {
 rootProject.name = "Ad Manage Kit"
 include(":app")
 include(":AdManageKit")
+include(":admanagekit-billing")
+include(":admanagekit-core")

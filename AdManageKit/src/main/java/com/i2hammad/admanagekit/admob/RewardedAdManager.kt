@@ -11,7 +11,9 @@ import com.google.android.gms.ads.OnUserEarnedRewardListener
 import com.google.android.gms.ads.rewarded.RewardedAd
 import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.billing.BillingConfig
+
+//import com.i2hammad.admanagekit.billing.AppPurchase
 
 object RewardedAdManager {
     private var rewardedAd: RewardedAd? = null
@@ -119,6 +121,7 @@ object RewardedAdManager {
     }
 
     fun isAdLoaded(): Boolean {
-        return rewardedAd != null && !AppPurchase.getInstance().isPurchased
+        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        return rewardedAd != null && !purchaseProvider.isPurchased()
     }
 }
