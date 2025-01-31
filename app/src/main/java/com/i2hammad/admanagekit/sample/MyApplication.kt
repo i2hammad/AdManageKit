@@ -14,7 +14,9 @@ class MyApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
-        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
+
+        // you want to use billing feature must use billing provider
+        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
     }
