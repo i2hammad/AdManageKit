@@ -23,14 +23,9 @@
 -keep class com.google.android.gms.* {*;}
 
 -keep class com.i2hammad.admanagekit.admob.*{*;}
--keep class com.i2hammad.admanagekit.billing.*{*;}
 -keep class com.i2hammad.admanagekit.ump.*{*;}
 -keep class com.android.billingclient.*{*;}
 -keep class com.android.billingclient.api.*{*;}
--keep class com.i2hammad.admanagekit.billing.AppPurchase.*{*;}
--keep class com.i2hammad.admanagekit.billing.BillingListener.*{*;}
--keep class com.i2hammad.admanagekit.billing.PurchaseItem.*{*;}
--keep class com.i2hammad.admanagekit.billing.PurchaseResult.*{*;}
 -keep class com.google.ads.consent.* { *; }
 
 -keep class * {

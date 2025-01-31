@@ -19,3 +19,8 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+-keep class com.i2hammad.admanagekit.billing.*{*;}
+-keep class com.i2hammad.admanagekit.billing.AppPurchase.*{*;}
+-keep class com.i2hammad.admanagekit.billing.BillingListener.*{*;}
+-keep class com.i2hammad.admanagekit.billing.PurchaseItem.*{*;}
+-keep class com.i2hammad.admanagekit.billing.PurchaseResult.*{*;}
