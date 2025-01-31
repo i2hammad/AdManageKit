@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)  // Changed to library
     alias(libs.plugins.jetbrains.kotlin.android)
+    id("maven-publish")
 
 }
 
@@ -33,4 +34,18 @@ android {
 
 dependencies {
 
+}
+
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("maven") {
+                from(components["release"])  // Now works correctly
+                groupId = "com.github.i2hammad"
+                artifactId = "ad-manage-kit-core"
+                version = "1.1.7"
+            }
+        }
+    }
 }

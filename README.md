@@ -40,7 +40,8 @@ while also offering a sample project to demonstrate its usage.
 
    ```groovy
    implementation 'com.github.i2hammad:admanagekit:1.1.7'
-   implementation 'com.github.i2hammad:admanagekitbilling:1.1.7'
+   implementation 'com.github.i2hammad:admanagekit-core:1.1.7'
+   implementation 'com.github.i2hammad:admanagekit-billing:1.1.7'
    ```
 
 2. **Sync your project** with Gradle files.
