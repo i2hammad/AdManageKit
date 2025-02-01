@@ -1,4 +1,4 @@
-package com.i2hammad.admanagekit.billing
+package com.i2hammad.admanagekit.core
 
 import com.i2hammad.admanagekit.core.AppPurchaseProvider
 import com.i2hammad.admanagekit.core.NoPurchaseProvider

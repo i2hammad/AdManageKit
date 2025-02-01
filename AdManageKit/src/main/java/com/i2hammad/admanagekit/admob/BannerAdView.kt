@@ -16,9 +16,8 @@ import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.*
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
-import com.i2hammad.admanagekit.billing.BillingConfig
+import com.i2hammad.admanagekit.core.BillingConfig
 
-//import com.i2hammad.admanagekit.billing.AppPurchase
 
 class BannerAdView @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null, defStyleAttr: Int = 0

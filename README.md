@@ -39,9 +39,8 @@ while also offering a sample project to demonstrate its usage.
    Add the following to your `build.gradle` file in the `dependencies` section:
 
    ```groovy
-   implementation 'com.github.i2hammad:admanagekit:1.1.8'
-   implementation 'com.github.i2hammad:admanagekit-core:1.1.8'
-   implementation 'com.github.i2hammad:admanagekit-billing:1.1.8'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.1.8'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.1.8'
    ```
 
 2. **Sync your project** with Gradle files.
@@ -338,8 +337,8 @@ AdManageKit is an Android library designed to simplify the management of Google 
 
    ```kotlin
    dependencies {
-       implementation 'com.github.i2hammad:ad-manage-kit-ads:1.1.7'  // AdMob Ads Module
-       implementation 'com.github.i2hammad:ad-manage-kit-billing:1.1.7'  // Billing Module
+       implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.1.8'  // AdMob Ads Module
+       implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.1.8'  // Billing Module
    }
    ```
 

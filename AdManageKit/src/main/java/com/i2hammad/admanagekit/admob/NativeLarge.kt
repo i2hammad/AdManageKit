@@ -18,8 +18,7 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
-import com.i2hammad.admanagekit.billing.BillingConfig
-//import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.databinding.LayoutNativeLargeBinding
 
 class NativeLarge @JvmOverloads constructor(

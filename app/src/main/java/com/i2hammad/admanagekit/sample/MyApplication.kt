@@ -4,7 +4,7 @@ import android.app.Application
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.i2hammad.admanagekit.admob.AppOpenManager
-import com.i2hammad.admanagekit.billing.BillingConfig
+import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
 import com.i2hammad.admanagekit.core.NoPurchaseProvider
 
@@ -15,8 +15,11 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
-        // you want to use billing feature must use billing provider
+        //If you want to use billing feature must use billing provider
         BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+        //If you do not want to use billing library for it
+        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
+
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
     }

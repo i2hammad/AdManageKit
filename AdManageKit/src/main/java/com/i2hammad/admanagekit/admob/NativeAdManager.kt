@@ -9,8 +9,7 @@ import com.google.android.gms.ads.AdLoader
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.NativeAd
-import com.i2hammad.admanagekit.billing.BillingConfig
-//import com.i2hammad.admanagekit.billing.AppPurchase
+import com.i2hammad.admanagekit.core.BillingConfig
 
 object NativeAdManager {
 

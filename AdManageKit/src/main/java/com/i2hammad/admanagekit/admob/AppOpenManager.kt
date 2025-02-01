@@ -12,7 +12,7 @@ import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.i2hammad.admanagekit.billing.BillingConfig
+import com.i2hammad.admanagekit.core.BillingConfig
 
 //import com.i2hammad.admanagekit.billing.AppPurchase
 

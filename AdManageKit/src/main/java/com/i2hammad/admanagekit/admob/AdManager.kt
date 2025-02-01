@@ -15,7 +15,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
-import com.i2hammad.admanagekit.billing.BillingConfig
+import com.i2hammad.admanagekit.core.BillingConfig
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
