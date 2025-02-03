@@ -167,14 +167,14 @@ AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback()
 In your main application class (`MyApp.kt`), set the **purchase provider** globally so that all ads automatically respect the user's purchase status:
 
 ```kotlin
-import com.i2hammad.admanagekit.ads.AdConfig
+import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
 
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
         // Register the billing provider globally
-        AdConfig.setPurchaseProvider(BillingPurchaseProvider())
+        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
     }
 }
 ```
