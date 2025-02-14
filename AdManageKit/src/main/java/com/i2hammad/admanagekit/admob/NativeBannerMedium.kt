@@ -65,6 +65,8 @@ class NativeBannerMedium @JvmOverloads constructor(
         nativeAdView.callToActionView = nativeAdView.findViewById(R.id.ad_call_to_action)
         nativeAdView.iconView = nativeAdView.findViewById(R.id.ad_app_icon)
         nativeAdView.advertiserView = nativeAdView.findViewById(R.id.ad_advertiser)
+        nativeAdView.adChoicesView = nativeAdView.findViewById(R.id.ad_choices_view)
+
         val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
             adPlaceholder.removeAllViews()
             adPlaceholder.addView(nativeAdView)
@@ -158,6 +160,8 @@ class NativeBannerMedium @JvmOverloads constructor(
     }
 
     private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView) {
+        Log.d("NativeAd", "AdChoices info: ${nativeAd.adChoicesInfo}")
+
         nativeAdView.headlineView?.let { headlineView ->
             (headlineView as TextView).text = nativeAd.headline ?: ""
         }
@@ -188,7 +192,19 @@ class NativeBannerMedium @JvmOverloads constructor(
                 (advertiserView as TextView).text = advertiser
                 advertiserView.visibility = VISIBLE
             }
-        }
+
+            nativeAdView.adChoicesView?.let { adChoicesView ->
+
+                val choicesView = nativeAdView.adChoicesView
+                if (choicesView == null) {
+                    adChoicesView.visibility = GONE
+                }else{
+                    adChoicesView.visibility = VISIBLE
+                    nativeAdView.adChoicesView = choicesView
+                }
+            }
+            }
+
 
         nativeAdView.setNativeAd(nativeAd)
     }

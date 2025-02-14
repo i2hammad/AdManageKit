@@ -29,6 +29,7 @@ import com.google.android.datatransport.BuildConfig;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -529,7 +530,7 @@ public class AppPurchase {
      * @param subsId   The subscription ID.
      * @return A message indicating the subscription result.
      */
-    public String subscribe(Activity activity, String subsId) {
+ /*   public String subscribe(Activity activity, String subsId) {
         if (this.productDetailsList1 == null) {
             if (this.purchaseListener != null) {
                 this.purchaseListener.displayErrorMessage("Billing error init");
@@ -614,6 +615,147 @@ public class AppPurchase {
             }
         }
     }
+*/
+    public String subscribe(Activity activity, String subsId) {
+        // Check for valid activity context
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            Log.e("Billing", "Invalid activity context");
+            notifyListener("Invalid activity");
+            return "Invalid activity context";
+        }
+
+        // Check subscription products initialization
+        if (subProductDetailsMap == null || subProductDetailsMap.isEmpty()) {
+            Log.e("Billing", "Subscription products not initialized");
+            notifyListener("Billing not initialized");
+            return "Billing not initialized";
+        }
+
+        // Debug mode handling
+        if (BuildConfig.DEBUG) {
+            if (!activity.isFinishing() && !activity.isDestroyed()) {
+                new PurchaseDevBottomSheet(
+                        TYPE_IAP.SUBSCRIPTION,
+                        null,
+                        activity,
+                        purchaseListener
+                ).show();
+            }
+            return "Debug subscription simulated";
+        }
+
+        // Validate product details
+        ProductDetails productDetails = subProductDetailsMap.get(subsId);
+        if (productDetails == null) {
+            Log.e("Billing", "Subscription not found: " + subsId);
+            notifyListener("Subscription not available");
+            return "Invalid subscription ID";
+        }
+
+        // Check billing client readiness
+        if (billingClient == null || !billingClient.isReady()) {
+            Log.e("Billing", "BillingClient not ready");
+            notifyListener("Billing service unavailable");
+            return "Billing service unavailable";
+        }
+
+        // Validate subscription offers
+        List<ProductDetails.SubscriptionOfferDetails> offers =
+                productDetails.getSubscriptionOfferDetails();
+
+        if (offers == null || offers.isEmpty()) {
+            Log.e("Billing", "No subscription offers found");
+            notifyListener("No available offers");
+            return "No subscription offers available";
+        }
+
+        // Find appropriate offer token
+        String offerToken = findBestOfferToken(subsId, offers);
+
+        // Prepare billing flow parameters
+        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .setOfferToken(offerToken)
+                .build();
+
+        BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(Collections.singletonList(params))
+                .build();
+
+        // Launch billing flow
+        BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
+
+        // Handle billing response
+        return handleBillingResult(result);
+    }
+
+    private String findBestOfferToken(String subsId, List<ProductDetails.SubscriptionOfferDetails> offers) {
+        String trialId = null;
+
+        // Safely check purchase history
+        if (purchaseItemList != null) {
+            for (PurchaseItem item : purchaseItemList) {
+                if (subsId.equals(item.itemId)) {
+                    trialId = item.trialId;
+                    break;
+                }
+            }
+        }
+
+        // Find matching offer token
+        for (ProductDetails.SubscriptionOfferDetails offer : offers) {
+            if (offer.getOfferId() != null && offer.getOfferId().equals(trialId)) {
+                return offer.getOfferToken();
+            }
+        }
+
+        // Fallback to last offer if no match found
+        return offers.get(offers.size() - 1).getOfferToken();
+    }
+
+    private String handleBillingResult(BillingResult result) {
+
+
+        switch (result.getResponseCode()) {
+            case BillingClient.BillingResponseCode.SERVICE_TIMEOUT:
+                return "Timeout";
+            case BillingClient.BillingResponseCode.FEATURE_NOT_SUPPORTED:
+                return "Error processing request.";
+            case BillingClient.BillingResponseCode.SERVICE_DISCONNECTED:
+                return "Play Store service is not connected now";
+            case BillingClient.BillingResponseCode.OK:
+                return "Subscribed Successfully";
+            case BillingClient.BillingResponseCode.USER_CANCELED:
+                if (this.purchaseListener != null) {
+                    this.purchaseListener.displayErrorMessage("Request Canceled");
+                }
+                return "Request Canceled";
+            case BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE:
+                if (this.purchaseListener != null) {
+                    this.purchaseListener.displayErrorMessage("Network error.");
+                }
+                return "Network Connection down";
+            case BillingClient.BillingResponseCode.BILLING_UNAVAILABLE:
+                if (this.purchaseListener != null) {
+                    this.purchaseListener.displayErrorMessage("Billing not supported for type of request");
+                }
+                return "Billing not supported for type of request";
+            case BillingClient.BillingResponseCode.ITEM_UNAVAILABLE:
+                return "Item not available";
+            case BillingClient.BillingResponseCode.DEVELOPER_ERROR:
+                if (this.purchaseListener != null) {
+                    this.purchaseListener.displayErrorMessage("Error completing request");
+                }
+                return "Error completing request";
+            case BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED:
+                notifyListener("Subscription already active");
+                return "Subscription already active";
+            default:
+                notifyListener("Error: " + result.getDebugMessage());
+                return "Subscription error: " + result.getResponseCode();
+        }
+    }
+
 
     /**
      * Consumes a purchase for the currently selected product.
@@ -877,7 +1019,7 @@ public class AppPurchase {
      * @param productId The product ID to purchase.
      * @return A message indicating the purchase result.
      */
-    public String purchase(Activity activity, String productId) {
+/*    public String purchase(Activity activity, String productId) {
         if (this.productDetailsList == null) {
             if (this.purchaseListener != null) {
                 this.purchaseListener.displayErrorMessage("Billing error init");
@@ -955,6 +1097,102 @@ public class AppPurchase {
                 return "Selected item is already owned";
             default:
                 return "Unknown error occurred";
+        }
+    }*/
+
+    public String purchase(Activity activity, String productId) {
+        // Check for valid activity context
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            Log.e("Billing", "Invalid activity context");
+            if (purchaseListener != null) {
+                purchaseListener.displayErrorMessage("Invalid activity");
+            }
+            return "Invalid activity";
+        }
+
+        // Check if product details map is initialized
+        if (inAppProductDetailsMap == null || inAppProductDetailsMap.isEmpty()) {
+            Log.e("Billing", "Product details not initialized");
+            if (purchaseListener != null) {
+                purchaseListener.displayErrorMessage("Billing not initialized");
+            }
+            return "Billing not initialized";
+        }
+
+        // Check if product exists
+        ProductDetails productDetails = inAppProductDetailsMap.get(productId);
+        if (productDetails == null) {
+            Log.e("Billing", "Product details not found: " + productId);
+            if (purchaseListener != null) {
+                purchaseListener.displayErrorMessage("Product not found");
+            }
+            return "Product not found";
+        }
+
+        // Check billing client initialization and readiness
+        if (billingClient == null) {
+            Log.e("Billing", "BillingClient not initialized");
+            if (purchaseListener != null) {
+                purchaseListener.displayErrorMessage("Billing service unavailable");
+            }
+            return "Billing service unavailable";
+        }
+
+        if (!billingClient.isReady()) {
+            Log.e("Billing", "BillingClient not ready");
+            if (purchaseListener != null) {
+                purchaseListener.displayErrorMessage("Billing client not ready");
+            }
+            return "Billing client not ready";
+        }
+
+        // Debug mode simulation
+        if (BuildConfig.DEBUG) {
+            if (!activity.isFinishing() && !activity.isDestroyed()) {
+                new PurchaseDevBottomSheet(
+                        TYPE_IAP.PURCHASE,
+                        productDetails,
+                        activity,
+                        purchaseListener
+                ).show();
+            }
+            return "Debug purchase simulated";
+        }
+
+        // Prepare billing flow parameters with compatibility fix
+        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .build();
+
+        BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(Collections.singletonList(params))
+                .build();
+
+        // Launch billing flow and handle result
+        BillingResult result = billingClient.launchBillingFlow(activity, billingFlowParams);
+
+        // Handle billing response code
+        switch (result.getResponseCode()) {
+            case BillingClient.BillingResponseCode.OK:
+                return "Billing flow started";
+            case BillingClient.BillingResponseCode.USER_CANCELED:
+                notifyListener("Purchase canceled");
+                return "Purchase canceled";
+            case BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED:
+                notifyListener("Item already owned");
+                return "Item already owned";
+            case BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE:
+                notifyListener("Network unavailable");
+                return "Network unavailable";
+            default:
+                notifyListener("Error: " + result.getDebugMessage());
+                return "Error code: " + result.getResponseCode();
+        }
+    }
+
+    private void notifyListener(String message) {
+        if (purchaseListener != null) {
+            purchaseListener.displayErrorMessage(message);
         }
     }
     /**

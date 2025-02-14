@@ -59,8 +59,11 @@ class MainActivity : AppCompatActivity() {
         // Observe LiveData
 
 
+
         NativeAdManager.getAdState(AdConfig.NATIVE_BANNER_SMALL_AD).let { adState ->
+
             if (adState !is AdState.Ready) {
+
                 NativeAdManager.preloadAd(this, AdConfig.NATIVE_BANNER_SMALL_AD, adUnitId)
             }
         }
@@ -69,6 +72,8 @@ class MainActivity : AppCompatActivity() {
 
 
         NativeAdManager.getAdStatesLiveData().observe(this, Observer { adStates ->
+
+
             adStates.forEach { (adKey, adState) ->
                 handleAdState(adKey, adState)
             }
@@ -117,15 +122,15 @@ class MainActivity : AppCompatActivity() {
 
             is AdState.Showed -> {
                 // Handle the ad being shown
-                Toast.makeText(this, "Ad $adKey is shown", Toast.LENGTH_SHORT).show()
+//                Toast.makeText(this, "Ad $adKey is shown", Toast.LENGTH_SHORT).show()
             }
 
             is AdState.Error -> {
                 // Hide the loading indicator and show an error message
 //                showLoadingIndicator(adUnitId, false)
-                Toast.makeText(
-                    this, "Failed to load ad $adKey: ${adState.errorMessage}", Toast.LENGTH_SHORT
-                ).show()
+//                Toast.makeText(
+//                    this, "Failed to load ad $adKey: ${adState.errorMessage}", Toast.LENGTH_SHORT
+//                ).show()
             }
 
             is AdState.Idle -> {

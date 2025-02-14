@@ -168,6 +168,7 @@ class NativeLarge @JvmOverloads constructor(
         nativeAdView.callToActionView = nativeAdView.findViewById<View>(R.id.cta)
         nativeAdView.iconView = nativeAdView.findViewById(R.id.icon)
         nativeAdView.advertiserView = nativeAdView.findViewById<View>(R.id.tertiary)
+        nativeAdView.adChoicesView = nativeAdView.findViewById(R.id.ad_choices_view)
         preloadedNativeAd.setOnPaidEventListener { adValue ->
             // Convert the value from micros to the standard currency unit
             val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
@@ -209,6 +210,7 @@ class NativeLarge @JvmOverloads constructor(
             (nativeAdView.advertiserView as TextView?)?.text = nativeAd.advertiser
             nativeAdView.advertiserView?.visibility = View.VISIBLE
         }
+
 
         nativeAdView.setNativeAd(nativeAd)
     }

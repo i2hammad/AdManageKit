@@ -37,8 +37,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     api(libs.billing)
-    api(libs.google.material)
-    api(project(":admanagekit-core")) // Use 'api' instead of 'implementation' to expose it
+    api(project(":admanagekit-core"))
+    implementation(libs.androidx.constraintlayout) // Use 'api' instead of 'implementation' to expose it
+    api(libs.material)
 
 }
 
@@ -49,7 +50,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-billing"
-                version = "1.1.8"
+                version = "1.1.9"
             }
         }
     }

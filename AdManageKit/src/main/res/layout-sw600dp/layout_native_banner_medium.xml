@@ -1,99 +1,125 @@
 <?xml version="1.0" encoding="utf-8"?>
 <com.google.android.gms.ads.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/native_ad_view"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
+    android:id="@+id/native_ad_view"
     android:layout_height="wrap_content">
 
-    <RelativeLayout
-        android:id="@+id/ad_unit_content"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
 
-        android:orientation="vertical">
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/ad_app_icon"
+            android:layout_width="70dip"
+            android:layout_height="70dip"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp"
+            android:adjustViewBounds="true"
+            android:src="#000000"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <LinearLayout
-            android:layout_width="match_parent"
+            android:id="@+id/linearLayout2"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="@+id/ad_app_icon"
+            app:layout_constraintEnd_toStartOf="@+id/ad_call_to_action"
+            app:layout_constraintStart_toEndOf="@+id/ad_app_icon"
+            app:layout_constraintTop_toTopOf="@+id/ad_app_icon">
+
+            <TextView
+                android:id="@+id/ad_headline"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="8dp"
+                android:ellipsize="end"
+                android:fontFamily="@font/roboto_medium"
+                android:maxLines="2"
+                android:text="Sample Text"
+                android:textSize="14sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="8dp">
 
-                <ImageView
-                    android:id="@+id/ad_app_icon"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:adjustViewBounds="true" />
+                android:layout_marginHorizontal="8dp"
 
-                <LinearLayout
-                    android:layout_width="match_parent"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/ad_advertiser"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_gravity="center"
-                    android:layout_marginStart="6dp"
-                    android:orientation="vertical">
-
-                    <TextView
-                        android:id="@+id/ad_headline"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:maxLines="2"
-                        android:fontFamily="@font/roboto_medium"
-                        android:text="This is sample title"
-                        android:textSize="13sp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/roboto_medium"
+                    android:gravity="bottom"
+                    android:lines="1"
+                    android:text="This is advertiser"
+                    android:textSize="11sp" />
 
 
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/ad_advertiser"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:gravity="bottom"
-                            android:lines="1"
-                            android:fontFamily="@font/roboto_medium"
-                            android:text="This is advertiser"
-                            android:textSize="11sp" />
-
-
-                    </LinearLayout>
-                    <TextView
-                        android:id="@+id/ad_body"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginEnd="10dp"
-                        android:maxLines="3"
-                        android:fontFamily="@font/roboto"
-
-                        android:text="Sample ad text"
-                        android:textSize="11sp" />
-                </LinearLayout>
             </LinearLayout>
 
-
-
-            <Button
-                android:id="@+id/ad_call_to_action"
-                android:layout_width="match_parent"
+            <TextView
+                android:id="@+id/ad_body"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="8dp"
-                android:layout_marginBottom="8dp"
-                android:background="@drawable/ads_bg_lib"
-                android:gravity="center"
-                android:text="Call to action"
-                android:textColor="@color/colorWhite"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+
+                android:layout_marginBottom="4dp"
+
+                android:fontFamily="@font/roboto"
+                android:maxLines="3"
+                android:text="This is sample long text of native ad and this is sample long text of native ad"
+                android:textSize="12sp" />
+
         </LinearLayout>
 
-        <TextView style="@style/AdsTheme" />
-    </RelativeLayout>
+        <Button
+            android:id="@+id/ad_call_to_action"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginEnd="20dp"
+            android:background="@drawable/ads_bg_lib"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:minWidth="120dp"
+            android:text="INSTALL"
+            android:textColor="@color/colorWhite"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+        <com.google.android.gms.ads.nativead.AdChoicesView
+            android:id="@+id/ad_choices_view"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_alignParentEnd="true"
+            android:gravity="end"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+
+        <TextView
+            android:id="@+id/textView2"
+            style="@style/AdsTheme"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
 </com.google.android.gms.ads.nativead.NativeAdView>
