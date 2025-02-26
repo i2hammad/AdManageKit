@@ -18,6 +18,9 @@ import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
+import com.i2hammad.admanagekit.admob.NativeAdManager
+import com.i2hammad.admanagekit.admob.NativeBannerMedium
+import com.i2hammad.admanagekit.admob.NativeBannerSmall
 
 class InterstitialActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
@@ -26,6 +29,7 @@ class InterstitialActivity : AppCompatActivity() {
     lateinit var bannerContainer: FrameLayout
 
 //    var myApplication: MyApplication? = null
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,10 +41,19 @@ class InterstitialActivity : AppCompatActivity() {
             insets
         }
 
+
+        // if you want to use cached native ads if new ad is not available.
+
+        NativeAdManager.enableCachingNativeAds = true
+
+      var nativeBannerMedium:NativeBannerMedium  =   findViewById(R.id.nativeBannerMedium)
+        nativeBannerMedium.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/2247696110")
+
         statusTextView = findViewById<TextView>(R.id.statusTextView)
 
         btnInterstitialAd = findViewById(R.id.btnShowInterstitialAd)
         btnInterstitialAd.isEnabled = false
+
 
         loadBannerAd()
         loadInterstitialAd()

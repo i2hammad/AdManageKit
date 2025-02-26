@@ -69,10 +69,16 @@ class NativeLarge @JvmOverloads constructor(
 
 
         val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
-            populateNativeAdView(nativeAd, nativeAdView)
             viewGroup.visibility = View.VISIBLE
             nativeAdView.visibility = View.VISIBLE
             shimmerFrameLayout.visibility = View.GONE
+            binding.root.visibility = View.VISIBLE
+
+
+            if (NativeAdManager.enableCachingLargeNativeAds) {
+                NativeAdManager.setCachedNativeLargeAd(nativeAd)
+            }
+            populateNativeAdView(nativeAd, nativeAdView)
 
             nativeAd.setOnPaidEventListener { adValue ->
                 // Convert the value from micros to the standard currency unit
@@ -109,18 +115,23 @@ class NativeLarge @JvmOverloads constructor(
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                viewGroup.visibility = View.GONE
-                nativeAdView.visibility = View.GONE
-                shimmerFrameLayout.visibility = View.GONE
 
+                val cachedNativeLargeAd = NativeAdManager.getCachedNativeLargeAd()
+                if (NativeAdManager.enableCachingLargeNativeAds && cachedNativeLargeAd != null) {
+                    displayAd(cachedNativeLargeAd)
+                } else {
+                    viewGroup.visibility = View.GONE
+                    nativeAdView.visibility = View.GONE
+                    shimmerFrameLayout.visibility = View.GONE
 
-                // Log Firebase event for ad failed to load
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", adError.code.toString())
+                    // Log Firebase event for ad failed to load
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", adError.code.toString())
+                    }
+                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    callback?.onFailedToLoad(adError)
                 }
-                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(adError)
 
             }
 

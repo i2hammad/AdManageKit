@@ -51,7 +51,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        if (!isShowingAd && isAdAvailable() && !skipNextAd) {
+        if (!isShowingAd && isAdAvailable() && !skipNextAd && !AdManager.getInstance().isDisplayingAd()) {
             Log.e(LOG_TAG, "Will show ad.")
 
             val fullScreenContentCallback = object : FullScreenContentCallback() {

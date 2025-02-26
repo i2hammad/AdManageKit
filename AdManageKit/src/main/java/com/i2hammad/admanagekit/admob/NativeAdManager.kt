@@ -22,6 +22,38 @@ object NativeAdManager {
         var nativeAd: NativeAd? = null
     )
 
+
+    private var currentNativeAd: NativeAd? = null
+    private var currentNativeLargeAd: NativeAd? = null
+
+    fun getCachedNativeLargeAd(): NativeAd? {
+        return currentNativeLargeAd
+    }
+    fun getCachedNativeAd(): NativeAd? {
+        return currentNativeAd
+    }
+    fun setCachedNativeLargeAd(nativeAd: NativeAd) {
+        this.currentNativeLargeAd = nativeAd
+    }
+
+
+    fun setCachedNativeAd(nativeAd: NativeAd) {
+        this.currentNativeAd?.destroy()
+        this.currentNativeAd = null
+        this.currentNativeAd = nativeAd
+    }
+    fun destroyCachedAd() {
+        currentNativeAd?.destroy()
+        currentNativeAd = null
+    }
+    fun destroyCachedLargeAd() {
+        currentNativeLargeAd?.destroy()
+        currentNativeLargeAd = null
+    }
+
+    var enableCachingNativeAds = false
+    var enableCachingLargeNativeAds = false
+
     // LiveData to hold the current AdStates mapped by customKey
     private val adStatesLiveData: MutableLiveData<Map<String, AdState>> = MutableLiveData(emptyMap())
 
@@ -54,7 +86,7 @@ object NativeAdManager {
     fun preloadAd(context: Context, customKey: String, adUnitId: String) {
 //        Log.d("NativeAdManager", "Preloading ad for customKey: $customKey with adUnitId: $adUnitId")
 
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
         // Check if the user has purchased the ad-free experience
         if (purchaseProvider.isPurchased()) {
 //            Log.d("NativeAdManager", "App is purchased. Skipping ad load for customKey: $customKey")

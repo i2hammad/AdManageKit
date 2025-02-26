@@ -36,11 +36,10 @@ while also offering a sample project to demonstrate its usage.
 	}
    ```
 
-   Add the following to your `build.gradle` file in the `dependencies` section:
-
+   Add the following to your `build.gradle` file in the `dependencies` section: Latest Version [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.1.9'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.1.9'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.2.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.2.0'
    ```
 
 2. **Sync your project** with Gradle files.
@@ -163,8 +162,7 @@ AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback()
 ### Initializing the Library
 
 #### **Set Up Purchase Provider Globally**
-
-In your main application class (`MyApp.kt`), set the **purchase provider** globally so that all ads automatically respect the user's purchase status:
+Breaking change if you are using old library version. In your main application class (`MyApp.kt`), set the **purchase provider** globally so that all ads automatically  the user's purchase status:
 
 ```kotlin
 import com.i2hammad.admanagekit.core.BillingConfig

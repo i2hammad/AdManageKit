@@ -41,8 +41,10 @@ class MainActivity : AppCompatActivity() {
 
 //        NativeAdManager.preloadAd(this, adUnitId)
 
-//        var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
-//        nativeBannerSmall.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/2247696110")
+        var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
+            // to test cached native ad
+        nativeBannerSmall.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/22476961")
+
 //        NativeAdManager.getAdLiveData(adUnitId).observe(this, { nativeAd ->
 //
 //            Log.d("NativeAdManager", "LiveData observer triggered for $adUnitId")
@@ -59,32 +61,32 @@ class MainActivity : AppCompatActivity() {
         // Observe LiveData
 
 
-
-        NativeAdManager.getAdState(AdConfig.NATIVE_BANNER_SMALL_AD).let { adState ->
-
-            if (adState !is AdState.Ready) {
-
-                NativeAdManager.preloadAd(this, AdConfig.NATIVE_BANNER_SMALL_AD, adUnitId)
-            }
-        }
-
-
-
-
-        NativeAdManager.getAdStatesLiveData().observe(this, Observer { adStates ->
-
-
-            adStates.forEach { (adKey, adState) ->
-                handleAdState(adKey, adState)
-            }
-        })
-
-//        var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
-//        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110")
+//
+//        NativeAdManager.getAdState(AdConfig.NATIVE_BANNER_SMALL_AD).let { adState ->
+//
+//            if (adState !is AdState.Ready) {
+//
+//                NativeAdManager.preloadAd(this, AdConfig.NATIVE_BANNER_SMALL_AD, adUnitId)
+//            }
+//        }
 //
 //
-//        var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
-//        nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
+//
+//
+//        NativeAdManager.getAdStatesLiveData().observe(this, Observer { adStates ->
+//
+//
+//            adStates.forEach { (adKey, adState) ->
+//                handleAdState(adKey, adState)
+//            }
+//        })
+
+        var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
+        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/224769")
+
+
+        var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
+        nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
 
 
     }

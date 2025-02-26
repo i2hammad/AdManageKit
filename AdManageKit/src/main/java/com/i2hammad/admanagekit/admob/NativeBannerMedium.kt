@@ -70,7 +70,11 @@ class NativeBannerMedium @JvmOverloads constructor(
         val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
             adPlaceholder.removeAllViews()
             adPlaceholder.addView(nativeAdView)
+            binding.root.visibility = VISIBLE
             adPlaceholder.visibility = VISIBLE
+            if (NativeAdManager.enableCachingNativeAds){
+                NativeAdManager.setCachedNativeAd(nativeAd)
+            }
             populateNativeAdView(nativeAd, nativeAdView)
             shimmerFrameLayout.visibility = GONE
 
@@ -95,18 +99,25 @@ class NativeBannerMedium @JvmOverloads constructor(
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                Log.d(TAG, "onAdFailedToLoad: NativeBannerMedium, Error: ${adError.message} ")
 
-                adPlaceholder.visibility = GONE
-                shimmerFrameLayout.visibility = GONE
+                val loadedAd = NativeAdManager.getCachedNativeAd()
+                if (NativeAdManager.enableCachingNativeAds && loadedAd!= null){
+                   displayAd(loadedAd)
+               }else{
+                    Log.d(TAG, "onAdFailedToLoad: NativeBannerMedium, Error: ${adError.message} ")
 
-                // Log Firebase event for ad failed to load
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", adError.code.toString())
-                }
-                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(adError)
+                    adPlaceholder.visibility = GONE
+                    shimmerFrameLayout.visibility = GONE
+
+                    // Log Firebase event for ad failed to load
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", adError.code.toString())
+                    }
+                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    callback?.onFailedToLoad(adError)
+               }
+
 
             }
 
