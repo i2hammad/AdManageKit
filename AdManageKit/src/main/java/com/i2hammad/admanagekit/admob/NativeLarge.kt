@@ -43,6 +43,13 @@ class NativeLarge @JvmOverloads constructor(
 
     fun loadNativeAds(
         activity: Context,
+        adNativeLarge: String
+    ) {
+        loadAd(activity, adNativeLarge, false, callback)
+    }
+
+    fun loadNativeAds(
+        activity: Context,
         adNativeLarge: String,
         useCachedAd: Boolean = false,
         callback: AdLoadCallback
