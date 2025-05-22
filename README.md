@@ -38,8 +38,8 @@ while also offering a sample project to demonstrate its usage.
 
    Add the following to your `build.gradle` file in the `dependencies` section: Latest Version [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.1'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.1'
    ```
 
 2. **Sync your project** with Gradle files.
