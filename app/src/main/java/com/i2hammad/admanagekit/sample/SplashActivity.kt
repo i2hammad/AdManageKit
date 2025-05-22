@@ -146,7 +146,6 @@ class SplashActivity : AppCompatActivity() {
 
         val adUnitId = "ca-app-pub-3940256099942544/2247696110"
 
-        NativeAdManager.enableCachingNativeAds = true
         AdManager.getInstance().loadInterstitialAdForSplash(this,
             "ca-app-pub-3940256099942544/1033173712",
             10 * 1000,

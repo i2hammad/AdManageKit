@@ -1,7 +1,7 @@
 # AdManageKit
 [![JitPack](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
 
-AdManageKit is an Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. Version `v1.3.2` introduces advanced native ads caching, app open ads via `AppOpenManager`, and enhanced interstitial ad management via `AdManager`. The library includes a sample project to demonstrate its features.
+AdManageKit is an Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. Version `v1.3.2` introduces advanced native ads caching, app open ads via `AppOpenManager`, and enhanced interstitial ad management via `AdManager`. The library includes a sample project with visual demonstrations of its features.
 
 ## Features
 
@@ -13,6 +13,25 @@ AdManageKit is an Android library designed to simplify the integration and manag
 - **Billing Management (Separate Module)**: Handle in-app purchases and subscriptions using the Google Play Billing Library.
 - **UMP Consent Management**: Manage user consent with Google's UMP for GDPR/CCPA compliance.
 - **Sample Project**: A fully functional sample project demonstrating ad management, caching, billing, and consent handling.
+
+## Screenshots
+
+Below are screenshots showcasing key features of `AdManageKit`:
+
+| NativeBannerSmall Ad | Interstitial Ad | App Open Ad | UMP Consent Form |
+|----------------------|-----------------|-----------------|------------------|
+| ![NativeBannerSmall ad displayed in app](docs/assets/native_ad_small_screenshot.png) | ![Interstitial ad with loading dialog](docs/assets/interstitial_ad_screenshot.png) | ![App open ad on app launch](docs/assets/app_open_ad_screenshot.png) | ![UMP consent form](docs/assets/ump_consent_screenshot.png) |
+
+## Demo Video
+
+Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, and billing:
+
+<video width="100%" controls>
+  <source src="docs/assets/demo_video.mp4" type="video/mp4">
+  Your browser does not support the video tag.
+</video>
+
+[Watch on YouTube](https://youtu.be/VIDEO_ID) <!-- Replace with actual YouTube link -->
 
 ## Getting Started
 
@@ -66,16 +85,20 @@ public class MainActivity extends Activity {
 ```
 
 #### Set Up Purchase Provider Globally
-In your `Application` class, configure the billing provider to check purchase status globally:
+In your `Application` class, configure the billing provider and initialize `AppOpenManager`:
 
 ```kotlin
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
+import com.i2hammad.admanagekit.admob.AppOpenManager
 
 class MyApp : Application() {
+    private lateinit var appOpenManager: AppOpenManager
+
     override fun onCreate() {
         super.onCreate()
         BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+        appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
     }
 }
 ```
@@ -101,7 +124,7 @@ bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617
 ```
 
 ##### Native Ads with Caching
-The library supports caching for `NativeBannerSmall`, `NativeBannerMedium`, and `NativeLarge` ads, with per-ad-unit caching and a 1-hour expiration. Use the `useCachedAd` parameter to serve cached ads when available.
+The library supports caching for `NativeBannerSmall`, `NativeBannerMedium`, and `NativeLarge` ads, with per-ad-unit caching and a 1-hour expiration.
 
 ###### NativeBannerSmall
 Add to your layout:
@@ -253,21 +276,7 @@ AdManager.getInstance().showInterstitialAdByCount(this, object : AdManagerCallba
 For detailed documentation, see the [Interstitial Ads Wiki](docs/interstitial-ads.md).
 
 ##### App Open Ads
-Initialize `AppOpenManager` in your `Application` class to manage app open ads:
-
-```kotlin
-class MyApp : Application() {
-    private lateinit var appOpenManager: AppOpenManager
-
-    override fun onCreate() {
-        super.onCreate()
-        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
-        appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
-    }
-}
-```
-
-Exclude specific activities from showing app open ads:
+Initialize `AppOpenManager` in your `Application` class (see above). Exclude specific activities from showing app open ads:
 
 ```kotlin
 appOpenManager.disableAppOpenWithActivity(MainActivity::class.java)
