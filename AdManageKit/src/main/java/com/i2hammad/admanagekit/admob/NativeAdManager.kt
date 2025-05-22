@@ -1,11 +1,12 @@
 package com.i2hammad.admanagekit.admob
 
 import com.google.android.gms.ads.nativead.NativeAd
+import java.util.Collections
 
 object NativeAdManager {
     var enableCachingNativeAds: Boolean = true
     private data class CachedAd(val ad: NativeAd, val cachedTime: Long)
-    private val cachedAds: MutableMap<String, CachedAd> = mutableMapOf()
+    private val cachedAds: MutableMap<String, CachedAd> = Collections.synchronizedMap(mutableMapOf())
 
     fun setCachedNativeAd(adUnitId: String, ad: NativeAd) {
         if (enableCachingNativeAds) {
