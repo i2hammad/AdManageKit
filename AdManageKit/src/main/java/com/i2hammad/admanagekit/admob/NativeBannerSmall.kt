@@ -44,6 +44,13 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     fun loadNativeBannerAd(
         activity: Activity,
+        adNativeBanner: String
+    ) {
+        loadAd(activity, adNativeBanner,false, callback)
+    }
+
+    fun loadNativeBannerAd(
+        activity: Activity,
         adNativeBanner: String,
         useCachedAd: Boolean = false,
         adCallBack: AdLoadCallback
