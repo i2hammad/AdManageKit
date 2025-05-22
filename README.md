@@ -31,7 +31,7 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
   Your browser does not support the video tag.
 </video>
 
-[Watch on YouTube](https://youtu.be/VIDEO_ID) <!-- Replace with actual YouTube link -->
+[Watch on YouTube](https://youtube.com/shorts/h_872tOARpU)
 
 ## Getting Started
 
