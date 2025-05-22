@@ -38,8 +38,8 @@ while also offering a sample project to demonstrate its usage.
 
    Add the following to your `build.gradle` file in the `dependencies` section: Latest Version [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.2.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.2.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.0'
    ```
 
 2. **Sync your project** with Gradle files.
@@ -111,6 +111,19 @@ Similarly for NativeBannerMedium, NativeBannerSmall, NativeLarge
 
 ```kotlin
 nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110")
+
+// Load a cached ad (if available and not expired)
+nativeBanner.loadNativeBannerAd(activity, "your-ad-unit-id", useCachedAd = true)
+
+// or 
+
+nativeBanner.loadNativeBannerAd(activity, "your-ad-unit-id", useCachedAd = false, object : AdLoadCallback {
+    override fun onAdLoaded() { Log.d("Ad", "Ad loaded") }
+    override fun onFailedToLoad(adError: LoadAdError) { Log.d("Ad", "Ad failed: ${adError.message}") }
+    override fun onAdImpression() { Log.d("Ad", "Ad impression") }
+    override fun onAdClicked() { Log.d("Ad", "Ad clicked") }
+    override fun onAdClosed() { Log.d("Ad", "Ad closed") }
+})
 ```
 
 ```xml
@@ -125,6 +138,19 @@ nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/22476961
 
 ```kotlin
 nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110")
+
+// Load cached ad if available and not expired
+nativeBannerMedium.loadNativeBannerAd(activity, "your-ad-unit-id", useCachedAd = true)
+// or
+nativeBannerMedium.loadNativeBannerAd(activity, "your-ad-unit-id", useCachedAd = false, object : AdLoadCallback {
+    override fun onAdLoaded() { Log.d("Ad", "Medium Ad loaded") }
+    override fun onFailedToLoad(adError: LoadAdError) { Log.d("Ad", "Medium Ad failed: ${adError.message}") }
+    override fun onAdImpression() { Log.d("Ad", "Medium Ad impression") }
+    override fun onAdClicked() { Log.d("Ad", "Medium Ad clicked") }
+    override fun onAdClosed() { Log.d("Ad", "Medium Ad closed") }
+    override fun onAdOpened() { Log.d("Ad", "Medium Ad opened") }
+})
+
 ```
 
 ```xml
@@ -137,6 +163,22 @@ nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696
 
 ```kotlin
 nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
+
+//or
+
+// Load cached ad if available and not expired
+nativeLarge.loadNativeAds(activity, "your-ad-unit-id", useCachedAd = true)
+
+//or
+
+nativeLarge.loadNativeAds(activity, "your-ad-unit-id", useCachedAd = false, object : AdLoadCallback {
+    override fun onAdLoaded() { Log.d("Ad", "Large Ad loaded") }
+    override fun onFailedToLoad(adError: LoadAdError) { Log.d("Ad", "Large Ad failed: ${adError.message}") }
+    override fun onAdImpression() { Log.d("Ad", "Large Ad impression") }
+    override fun onAdClicked() { Log.d("Ad", "Large Ad clicked") }
+    override fun onAdClosed() { Log.d("Ad", "Large Ad closed") }
+    override fun onAdOpened() { Log.d("Ad", "Large Ad opened") }
+})
 ```
 
 To load interstitial ads use following code.. it will cache ad for later use

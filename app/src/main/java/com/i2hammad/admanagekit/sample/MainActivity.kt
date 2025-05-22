@@ -43,7 +43,7 @@ class MainActivity : AppCompatActivity() {
 
         var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
             // to test cached native ad
-        nativeBannerSmall.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/22476961")
+        nativeBannerSmall.loadNativeBannerAd(this,adUnitId,useCachedAd = true)
 
 //        NativeAdManager.getAdLiveData(adUnitId).observe(this, { nativeAd ->
 //
@@ -82,67 +82,67 @@ class MainActivity : AppCompatActivity() {
 //        })
 
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
-        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/224769")
+        nativeBannerMedium.loadNativeBannerAd(this, adUnitId, useCachedAd = true)
 
 
         var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
-        nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110")
+        nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110",useCachedAd = true)
 
 
     }
 
-    private fun handleAdState(adKey: String, adState: AdState) {
-        when (adState) {
-            is AdState.Loading -> {
-                // Show a loading indicator for the specific ad unit
-//                showLoadingIndicator(adUnitId, true)
-            }
-
-            is AdState.Ready -> {
-                // Hide the loading indicator and display the ad
-//                showLoadingIndicator(adUnitId, false)
-                when (adKey) {
-                    AdConfig.NATIVE_BANNER_SMALL_AD -> {
-                        var nativeBannerSmall: NativeBannerSmall =
-                            findViewById(R.id.nativeBannerSmall)
-                        nativeBannerSmall.displayAd(adState.nativeAd)
-                    }
-
-                    AdConfig.NATIVE_BANNER_MEDIUM_AD -> {
-                        var nativeBannerMedium: NativeBannerMedium =
-                            findViewById(R.id.nativeBannerMedium)
-                        nativeBannerMedium.displayAd(adState.nativeAd)
-                    }
-
-                    AdConfig.NATIVE_LARGE_AD -> {
-                        var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
-                        nativeLarge.displayAd(adState.nativeAd)
-                    }
-                }
-
-            }
-
-            is AdState.Showed -> {
-                // Handle the ad being shown
-//                Toast.makeText(this, "Ad $adKey is shown", Toast.LENGTH_SHORT).show()
-            }
-
-            is AdState.Error -> {
-                // Hide the loading indicator and show an error message
-//                showLoadingIndicator(adUnitId, false)
-//                Toast.makeText(
-//                    this, "Failed to load ad $adKey: ${adState.errorMessage}", Toast.LENGTH_SHORT
-//                ).show()
-            }
-
-            is AdState.Idle -> {
-                // Handle idle state if necessary
-            }
-        }
-    }
+//    private fun handleAdState(adKey: String, adState: AdState) {
+//        when (adState) {
+//            is AdState.Loading -> {
+//                // Show a loading indicator for the specific ad unit
+////                showLoadingIndicator(adUnitId, true)
+//            }
+//
+//            is AdState.Ready -> {
+//                // Hide the loading indicator and display the ad
+////                showLoadingIndicator(adUnitId, false)
+//                when (adKey) {
+//                    AdConfig.NATIVE_BANNER_SMALL_AD -> {
+//                        var nativeBannerSmall: NativeBannerSmall =
+//                            findViewById(R.id.nativeBannerSmall)
+//                        nativeBannerSmall.displayAd(adState.nativeAd)
+//                    }
+//
+//                    AdConfig.NATIVE_BANNER_MEDIUM_AD -> {
+//                        var nativeBannerMedium: NativeBannerMedium =
+//                            findViewById(R.id.nativeBannerMedium)
+//                        nativeBannerMedium.displayAd(adState.nativeAd)
+//                    }
+//
+//                    AdConfig.NATIVE_LARGE_AD -> {
+//                        var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
+//                        nativeLarge.displayAd(adState.nativeAd)
+//                    }
+//                }
+//
+//            }
+//
+//            is AdState.Showed -> {
+//                // Handle the ad being shown
+////                Toast.makeText(this, "Ad $adKey is shown", Toast.LENGTH_SHORT).show()
+//            }
+//
+//            is AdState.Error -> {
+//                // Hide the loading indicator and show an error message
+////                showLoadingIndicator(adUnitId, false)
+////                Toast.makeText(
+////                    this, "Failed to load ad $adKey: ${adState.errorMessage}", Toast.LENGTH_SHORT
+////                ).show()
+//            }
+//
+//            is AdState.Idle -> {
+//                // Handle idle state if necessary
+//            }
+//        }
+//    }
 
     override fun onDestroy() {
         super.onDestroy()
-        NativeAdManager.releaseAllAds()
+        NativeAdManager.clearAllCachedAds()
     }
 }

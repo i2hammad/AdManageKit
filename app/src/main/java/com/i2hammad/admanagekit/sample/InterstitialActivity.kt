@@ -42,11 +42,9 @@ class InterstitialActivity : AppCompatActivity() {
         }
 
 
-        // if you want to use cached native ads if new ad is not available.
-
+        // if   you want to use cached native ads if new ad is not available
         NativeAdManager.enableCachingNativeAds = true
-
-      var nativeBannerMedium:NativeBannerMedium  =   findViewById(R.id.nativeBannerMedium)
+        var nativeBannerMedium:NativeBannerMedium  =   findViewById(R.id.nativeBannerMedium)
         nativeBannerMedium.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/2247696110")
 
         statusTextView = findViewById<TextView>(R.id.statusTextView)

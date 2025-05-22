@@ -29,32 +29,39 @@ class NativeBannerSmall @JvmOverloads constructor(
     private val binding: LayoutNativeBannerSmallPreviewBinding =
         LayoutNativeBannerSmallPreviewBinding.inflate(LayoutInflater.from(context), this)
 
-    val TAG = "NativeAds"
-
+    private val TAG = "NativeAds"
     private var firebaseAnalytics: FirebaseAnalytics? = null
-
     private lateinit var adUnitId: String
-
     var callback: AdLoadCallback? = null
 
-
-    public fun loadNativeBannerAd(activity: Activity, adNativeBanner: String) {
-        loadAd(activity, adNativeBanner, callback)
-    }
-
-    public fun loadNativeBannerAd(
-        activity: Activity, adNativeBanner: String, adCallBack: AdLoadCallback
+    fun loadNativeBannerAd(
+        activity: Activity,
+        adNativeBanner: String,
+        useCachedAd: Boolean = false
     ) {
-        loadAd(activity, adNativeBanner, adCallBack)
+        loadAd(activity, adNativeBanner, useCachedAd, callback)
     }
 
+    fun loadNativeBannerAd(
+        activity: Activity,
+        adNativeBanner: String,
+        useCachedAd: Boolean = false,
+        adCallBack: AdLoadCallback
+    ) {
+        this.callback = adCallBack
+        loadAd(activity, adNativeBanner, useCachedAd, adCallBack)
+    }
 
-    private fun loadAd(context: Context, adUnitId: String, callback: AdLoadCallback?) {
-
+    private fun loadAd(
+        context: Context,
+        adUnitId: String,
+        useCachedAd: Boolean,
+        callback: AdLoadCallback?
+    ) {
         this.adUnitId = adUnitId
 
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
             callback?.onFailedToLoad(
@@ -64,12 +71,24 @@ class NativeBannerSmall @JvmOverloads constructor(
                     AdManager.PURCHASED_APP_ERROR_DOMAIN
                 )
             )
-
             return
         }
 
-        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context)
 
+        // Check if cached ad should be used
+        if (useCachedAd && NativeAdManager.enableCachingNativeAds) {
+            val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId)
+            if (cachedAd != null) {
+                displayAd(cachedAd)
+                callback?.onAdLoaded()
+                return
+            } else {
+                Log.d(TAG, "No valid cached ad available for adUnitId: $adUnitId")
+            }
+        }
+
+        // Proceed to load a new ad
         val nativeAdView = LayoutInflater.from(context)
             .inflate(R.layout.layout_native_banner_small, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdplaceholder
@@ -85,16 +104,13 @@ class NativeBannerSmall @JvmOverloads constructor(
             binding.root.visibility = VISIBLE
             adPlaceholder.visibility = VISIBLE
             if (NativeAdManager.enableCachingNativeAds) {
-                NativeAdManager.setCachedNativeAd(nativeAd)
+                NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
             }
             populateNativeAdView(nativeAd, nativeAdView)
             shimmerFrameLayout.visibility = GONE
 
             nativeAd.setOnPaidEventListener { adValue ->
-                // Convert the value from micros to the standard currency unit
                 val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-
-                // Log Firebase event for paid event
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                     putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
@@ -102,41 +118,38 @@ class NativeBannerSmall @JvmOverloads constructor(
                 }
                 firebaseAnalytics!!.logEvent("ad_paid_event", params)
             }
-
         }.withAdListener(object : AdListener() {
             override fun onAdLoaded() {
                 super.onAdLoaded()
                 Log.d(TAG, "onAdLoaded: NativeBannerSmall")
-
                 callback?.onAdLoaded()
-
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
-                val loadedAd = NativeAdManager.getCachedNativeAd()
-                if (NativeAdManager.enableCachingNativeAds && loadedAd != null) {
-                    displayAd(loadedAd)
-                } else {
-
-                    Log.d(TAG, "onAdFailedToLoad: NativeBannerSmall, Error: ${adError.message} ")
-
-                    adPlaceholder.visibility = GONE
-                    shimmerFrameLayout.visibility = GONE
-
-                    // Log Firebase event for ad failed to load
-                    val params = Bundle().apply {
-                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                        putString("ad_error_code", adError.code.toString())
+                // Try to use cached ad if available and not explicitly requesting a new ad
+                if (NativeAdManager.enableCachingNativeAds && !useCachedAd) {
+                    val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId)
+                    if (cachedAd != null) {
+                        displayAd(cachedAd)
+                        callback?.onAdLoaded()
+                        return
                     }
-                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-
-                    callback?.onFailedToLoad(adError)
                 }
+
+                Log.d(TAG, "onAdFailedToLoad: NativeBannerSmall, Error: ${adError.message}")
+                adPlaceholder.visibility = GONE
+                shimmerFrameLayout.visibility = GONE
+
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", adError.code.toString())
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                callback?.onFailedToLoad(adError)
             }
 
             override fun onAdImpression() {
                 super.onAdImpression()
-                // Log Firebase event for ad impression
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                 }
@@ -161,23 +174,18 @@ class NativeBannerSmall @JvmOverloads constructor(
         })
 
         builder.build().loadAd(AdRequest.Builder().build())
-
     }
-
 
     private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView) {
         nativeAdView.headlineView?.let { headlineView ->
             (headlineView as TextView).text = nativeAd.headline ?: ""
         }
-
         nativeAdView.bodyView?.let { bodyView ->
             (bodyView as TextView).text = nativeAd.body ?: ""
         }
-
         nativeAdView.callToActionView?.let { callToActionView ->
             (callToActionView as TextView).text = nativeAd.callToAction ?: ""
         }
-
         nativeAdView.iconView?.let { iconView ->
             val icon = nativeAd.icon
             if (icon == null) {
@@ -187,7 +195,6 @@ class NativeBannerSmall @JvmOverloads constructor(
                 iconView.visibility = VISIBLE
             }
         }
-
         nativeAdView.advertiserView?.let { advertiserView ->
             val advertiser = nativeAd.advertiser
             if (advertiser == null) {
@@ -197,16 +204,12 @@ class NativeBannerSmall @JvmOverloads constructor(
                 advertiserView.visibility = VISIBLE
             }
         }
-
         nativeAdView.setNativeAd(nativeAd)
     }
 
-
-
     fun displayAd(preloadedAd: NativeAd) {
-
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
             callback?.onFailedToLoad(
@@ -216,9 +219,9 @@ class NativeBannerSmall @JvmOverloads constructor(
                     AdManager.PURCHASED_APP_ERROR_DOMAIN
                 )
             )
-
             return
         }
+
         val nativeAdView = LayoutInflater.from(context)
             .inflate(R.layout.layout_native_banner_small, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdplaceholder
@@ -232,13 +235,10 @@ class NativeBannerSmall @JvmOverloads constructor(
         adPlaceholder.removeAllViews()
         adPlaceholder.addView(nativeAdView)
         adPlaceholder.visibility = VISIBLE
-        firebaseAnalytics = FirebaseAnalytics.getInstance(context);
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context)
 
         preloadedAd.setOnPaidEventListener { adValue ->
-            // Convert the value from micros to the standard currency unit
             val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-
-            // Log Firebase event for paid event
             val params = Bundle().apply {
                 putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                 putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
@@ -250,18 +250,15 @@ class NativeBannerSmall @JvmOverloads constructor(
         binding.shimmerContainerNative.visibility = GONE
     }
 
-
-    public fun setAdManagerCallback(callback: AdLoadCallback) {
+    fun setAdManagerCallback(callback: AdLoadCallback) {
         this.callback = callback
     }
 
-    public fun hideAd() {
+    fun hideAd() {
         binding.root.visibility = GONE
-
     }
 
-    public fun showAd() {
+    fun showAd() {
         binding.root.visibility = VISIBLE
-
     }
 }
