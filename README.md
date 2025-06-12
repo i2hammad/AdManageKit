@@ -54,8 +54,9 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
    In your app's `build.gradle`, add the dependencies (Latest Version: `v1.3.2`):
 
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:1.3.2'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.2'
+
    ```
 
 2. **Sync your project** with Gradle.
