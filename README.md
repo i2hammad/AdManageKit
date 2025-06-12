@@ -51,7 +51,7 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
    }
    ```
 
-   In your app's `build.gradle`, add the dependencies (Latest Version: `v1.3.2`):
+   In your app's `build.gradle`, add the dependencies (Latest Version: [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit) ):
 
    ```groovy
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
