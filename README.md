@@ -1,7 +1,7 @@
 # AdManageKit
 [![JitPack](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
 
-AdManageKit is an Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. Version `v1.3.2` introduces advanced native ads caching, app open ads via `AppOpenManager`, and enhanced interstitial ad management via `AdManager`. The library includes a sample project with visual demonstrations of its features.
+AdManageKit is an Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. Version `2.0.0-alpha01` (beta) introduces upgraded support for Google Play Billing Library version 8, with enhanced billing features and improved purchase handling. Version `1.3.2` remains the stable release, offering robust ad management, native ads caching, app open ads via `AppOpenManager`, and enhanced interstitial ad management via `AdManager`. The library includes a sample project with visual demonstrations of its features.
 
 ## Features
 
@@ -10,9 +10,11 @@ AdManageKit is an Android library designed to simplify the integration and manag
 - **App Open Ads**: Manage app open ads with lifecycle-aware loading and display using `AppOpenManager`.
 - **Interstitial Ads**: Flexible interstitial ad loading and display with time/count-based triggers and dialog support.
 - **Firebase Auto-Log Tracking, tROAS**: Automatically track tROAS for all ad types via Firebase Analytics.
-- **Billing Management (Separate Module)**: Handle in-app purchases and subscriptions using the Google Play Billing Library.
+- **Billing Management (Separate Module)**:
+   - **Stable (v1.3.2)**: Handle in-app purchases and subscriptions using the Google Play Billing Library (prior to version 8).
+   - **Beta (v2.0.0-alpha01)**: Upgraded to Google Play Billing Library version 8 with enhanced purchase flows, subscription offer support, and thread-safe billing connection management.
 - **UMP Consent Management**: Manage user consent with Google's UMP for GDPR/CCPA compliance.
-- **Sample Project**: A fully functional sample project demonstrating ad management, caching, billing, and consent handling.
+- **Sample Project**: A fully functional sample project demonstrating ad management, caching, billing, and consent handling, updated to showcase new billing features in `2.0.0-alpha01`.
 
 ## Screenshots
 
@@ -51,12 +53,18 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
    }
    ```
 
-   In your app's `build.gradle`, add the dependencies (Latest Version: [![](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit) ):
+   In your app's `build.gradle`, add the dependencies:
 
+   For the stable version:
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:1.3.2'
+   ```
 
+   For the beta version (use cautiously in production):
+   ```groovy
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:2.0.0-alpha01'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:2.0.0-alpha01'
    ```
 
 2. **Sync your project** with Gradle.
@@ -86,6 +94,7 @@ public class MainActivity extends Activity {
 ```
 
 #### Set Up Purchase Provider Globally
+
 In your `Application` class, configure the billing provider and initialize `AppOpenManager`:
 
 ```kotlin
@@ -308,40 +317,62 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
 
 1. **Initialize the Billing Client**:
 
-```java
-AppPurchase.getInstance().initBilling(getApplication(), Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
-```
+   For stable version (`1.3.2`):
+   ```java
+   AppPurchase.getInstance().initBilling(getApplication(), Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
+   ```
+
+   For beta version (`2.0.0-alpha01`):
+   ```java
+   AppPurchase.getInstance().initBilling(getApplication(), Arrays.asList(new PurchaseItem("your_product_id", "", AppPurchase.TYPE_IAP.PURCHASE)));
+   ```
 
 2. **Start a Purchase Flow**:
 
-```java
-AppPurchase.getInstance().purchase(activity, "your_product_id");
-```
+   ```java
+   AppPurchase.getInstance().purchase(activity, "your_product_id");
+   ```
 
 3. **Handle Purchase Results**:
 
-```java
-AppPurchase.getInstance().setPurchaseListener(new PurchaseListener() {
-    @Override
-    public void onProductPurchased(String orderId, String originalJson) {
-        // Handle successful purchase
-    }
-    @Override
-    public void displayErrorMessage(String errorMessage) {
-        // Handle error
-    }
-    @Override
-    public void onUserCancelBilling() {
-        // Handle cancellation
-    }
-});
-```
+   ```java
+   AppPurchase.getInstance().setPurchaseListener(new PurchaseListener() {
+       @Override
+       public void onProductPurchased(String orderId, String originalJson) {
+           // Handle successful purchase
+       }
+       @Override
+       public void displayErrorMessage(String errorMessage) {
+           // Handle error
+       }
+       @Override
+       public void onUserCancelBilling() {
+           // Handle cancellation
+       }
+   });
+   ```
 
 4. **Consume Purchases** (if consumable):
 
-```java
-AppPurchase.getInstance().consumePurchase("your_product_id");
-```
+   ```java
+   AppPurchase.getInstance().consumePurchase("your_product_id");
+   ```
+
+5. **Query Product Details (Beta v2.0.0-alpha01)**:
+
+   ```java
+   AppPurchase.getInstance().queryProductDetails(Arrays.asList("your_product_id"), BillingClient.ProductType.INAPP);
+   ```
+
+6. **Get Price Information (Beta v2.0.0-alpha01)**:
+
+   ```java
+   String price = AppPurchase.getInstance().getPrice("your_product_id");
+   String currency = AppPurchase.getInstance().getCurrency("your_product_id", AppPurchase.TYPE_IAP.PURCHASE);
+   double priceWithoutCurrency = AppPurchase.getInstance().getPriceWithoutCurrency("your_product_id", AppPurchase.TYPE_IAP.PURCHASE);
+   ```
+
+For detailed billing documentation, see the [Billing Management Wiki](docs/billing-management.md).
 
 #### User Messaging Platform (UMP) Consent
 
@@ -360,7 +391,7 @@ AdsConsentManager.getInstance(this).requestUMP(this, true, "TEST_DEVICE_ID", fal
 
 ### Sample Project
 
-The sample project in the `app` directory demonstrates ad management (banner, interstitial, app open, native with caching), billing, and UMP consent. To run it:
+The sample project in the `app` directory demonstrates ad management (banner, interstitial, app open, native with caching), billing, and UMP consent. The sample has been updated for `2.0.0-alpha01` to include new billing features. To run it:
 
 1. Clone the repository:
 
@@ -373,6 +404,11 @@ The sample project in the `app` directory demonstrates ad management (banner, in
 3. Replace placeholder AdMob IDs and configure in-app purchases in the Google Play Console.
 
 4. Run on a device or emulator.
+
+### Notes for Beta Version (2.0.0-alpha01)
+- **Use with Caution**: The beta version introduces significant changes to the billing module with Google Play Billing Library version 8. Thoroughly test billing flows before deploying to production.
+- **Deprecated Methods**: Replace `initBilling(Application, List<String>, List<String>)`, `purchase(Activity)`, and `getPrice()` with their recommended counterparts (see [Billing Management Wiki](docs/billing-management.md)).
+- **Feedback**: Report issues or suggestions for `2.0.0-alpha01` via GitHub issues or email [hammadmughal0001@gmail.com](mailto:hammadmughal0001@gmail.com).
 
 ### Contributing
 

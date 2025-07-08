@@ -22,7 +22,6 @@ import com.i2hammad.admanagekit.ump.AdsConsentManager
 class SplashActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
 
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -33,34 +32,25 @@ class SplashActivity : AppCompatActivity() {
             insets
         }
 
-//        adViewModel.setMaxRetries("ca-app-pub-3940256099942544/2247696110", 3)
-
         statusTextView = findViewById(R.id.message)
-
-//        Log.e("splash", "On Create Called")
-//        MobileAds.setLogLevel(Log.DEBUG)
+        Log.d("SplashActivity", "onCreate: Activity created and UI initialized")
 
         initBilling()
-
     }
 
     private fun initBilling() {
-
-
         statusTextView.text = "App Purchase initialization started."
+        Log.d("SplashActivity", "initBilling: Starting App Purchase initialization")
 
-//        Log.e("splash", "App Purchase initialization status  ${AppPurchase.getInstance().initBillingFinish}")
-
-        if (AppPurchase.getInstance().initBillingFinish) {
-            // Already initialized request UMP
+        if (AppPurchase.getInstance().isBillingInitialized) {
+            Log.d("SplashActivity", "initBilling: Billing already initialized")
+            statusTextView.text = "Billing already initialized. Proceeding to UMP request."
             requestUMP()
-
         } else {
-//            Log.e("splash", "App Purchase initialize requested  ")
+            Log.d("SplashActivity", "initBilling: Initializing billing")
             AppPurchase.getInstance().setBillingListener(object : BillingListener {
                 override fun onInitBillingFinished(resultCode: Int) {
-
-//                    Log.e("splash", "App Purchase initialization finished. ${AppPurchase.getInstance().initBillingFinish}")
+                    Log.d("SplashActivity", "initBilling: Billing initialization finished with resultCode: $resultCode")
                     statusTextView.text = "App Purchase initialization finished."
                     requestUMP()
                 }
@@ -69,82 +59,47 @@ class SplashActivity : AppCompatActivity() {
     }
 
     private fun requestUMP() {
-
         val adsConsentManager: AdsConsentManager = AdsConsentManager.getInstance(this)
-//        Log.e("splash", "can Request Ads " + adsConsentManager.canRequestAds )
-        if (adsConsentManager.canRequestAds()) {
-            // Already requested
-//            Log.e("splash", "Consent already requested " )
 
+        if (adsConsentManager.canRequestAds()) {
+            Log.d("SplashActivity", "requestUMP: Consent already granted, can request ads")
             statusTextView.text = "Consent Already Requested. Ready to serve Ads"
             MyApplication.instance.initAds()
             runOnUiThread {
-
-                // moveToNext
-                // onNextActionCalled()
-
-                // onlyIfAvailable
-                // showAppOpenAd()
-
-                // force load app open
-                // forceLoadAppOpen()
-
-
-                //force loadInterstitialAd
+                Log.d("SplashActivity", "requestUMP: Forcing interstitial ad load")
                 forceLoadInterstitialAd()
-
-
             }
-
         } else {
-
+            Log.d("SplashActivity", "requestUMP: Requesting consent")
             statusTextView.text = "Consent Requested."
-//            Log.e("splash", "Consent requested " )
-
 
             adsConsentManager.requestUMP(
-                this@SplashActivity, true, "EC60C39375F6619F5C03850A0E440646", false
+                this@SplashActivity, true, "EC60C39375F6619F5C03850A0E440646", true
             ) { isUserAccepted ->
                 if (isUserAccepted) {
-//                    Log.e("splash", "Consent shown and accepted by user: ", )
-//                    Log.e("splash", "can Request Ads " + adsConsentManager.canRequestAds )
-
-
+                    Log.d("SplashActivity", "requestUMP: Consent accepted by user")
+                    statusTextView.text = "Consent shown and user accepted."
                     MyApplication.instance.initAds()
-                    runOnUiThread {
-                        statusTextView.text = "Consent shown and user accepted."
-                    }
+
                 } else {
-                    // not shown
-
-//                    Log.e("splash", "Not Shown Called by ads may be requested: ", )
-//                    Log.e("splash", "can Request Ads " + adsConsentManager.canRequestAds )
-
+                    Log.d("SplashActivity", "requestUMP: Consent not accepted or not shown")
                 }
 
-                // you will be notified when ads can be requested
                 if (adsConsentManager.canRequestAds()) {
-                    // moveToNext
-                    // onNextActionCalled()
-
-                    // onlyIfAvailable
-                    // showAppOpenAd()
-
-                    //force show app open
+                    Log.d("SplashActivity", "requestUMP: Can request ads after consent process")
                     forceLoadInterstitialAd()
                 }
 
 
             }
         }
-
-
     }
 
-
     private fun forceLoadInterstitialAd() {
-
         val adUnitId = "ca-app-pub-3940256099942544/2247696110"
+        Log.d("SplashActivity", "forceLoadInterstitialAd: Loading interstitial ad with unit ID: $adUnitId")
+
+        statusTextView.text = "Loading interstitial ad..."
 
         AdManager.getInstance().loadInterstitialAdForSplash(this,
             "ca-app-pub-3940256099942544/1033173712",
@@ -152,56 +107,80 @@ class SplashActivity : AppCompatActivity() {
             object : AdManagerCallback() {
                 override fun onNextAction() {
                     super.onNextAction()
-                    // ready to server ad
+                    Log.d("SplashActivity", "forceLoadInterstitialAd: Interstitial ad loaded, proceeding to show")
+                    statusTextView.text = "Interstitial ad loaded."
                     if (!AdManager.getInstance().isDisplayingAd() && !isFinishing && !isDestroyed) {
                         forceShowSplashInterstitialAd()
+                    }else{
+                        statusTextView.text = "Either displaying ad or Activity is finishing/destroyed."
+
+                        onNextActionCalled()
                     }
                 }
             })
     }
 
+    private fun onAdFailedToLoad(error: String) {
+        Log.e("SplashActivity", "onAdFailedToLoad: $error")
+        statusTextView.text = "Ad failed to load: $error}"
+    }
+
     private fun forceShowSplashInterstitialAd() {
+        Log.d("SplashActivity", "forceShowSplashAd: Attempting to show interstitial ad")
+        statusTextView.text = "Showing interstitial ad..."
+
         AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
             override fun onNextAction() {
                 super.onNextAction()
-                // ready to server ad
+                Log.d("SplashActivity", "forceShowSplashAd: Interstitial ad shown or dismissed")
+                statusTextView.text = "Interstitial ad completed."
                 onNextActionCalled()
             }
         })
     }
 
     private fun forceLoadAppOpen() {
-        val appOpenManager = MyApplication.instance.appOpenManager;
+        val appOpenManager = MyApplication.instance.appOpenManager
+        Log.d("SplashActivity", "forceLoadAppOpen: Loading app open ad")
+        statusTextView.text = "Loading app open ad..."
+
         appOpenManager?.fetchAd(object : AdLoadCallback() {
             override fun onAdLoaded() {
                 super.onAdLoaded()
+                Log.d("SplashActivity", "forceLoadAppOpen: App open ad loaded")
+                statusTextView.text = "App open ad loaded."
                 showAppOpenAd()
             }
 
             override fun onFailedToLoad(error: AdError?) {
                 super.onFailedToLoad(error)
+                Log.e("SplashActivity", "forceLoadAppOpen: Failed to load app open ad: ${error?.message}")
+                statusTextView.text = "Failed to load app open ad."
                 onNextActionCalled()
             }
         })
     }
 
     private fun showAppOpenAd() {
-
-        // make sure you have skipped SplashActivity on AppOpenManager in MyApplication to avoid default showAppOpenAd() behaviour
-        // appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
+        Log.d("SplashActivity", "showAppOpenAd: Attempting to show app open ad")
+        statusTextView.text = "Showing app open ad..."
 
         MyApplication.instance.appOpenManager?.forceShowAdIfAvailable(
             this,
             object : AdManagerCallback() {
                 override fun onNextAction() {
                     super.onNextAction()
+                    Log.d("SplashActivity", "showAppOpenAd: App open ad shown or dismissed")
+                    statusTextView.text = "App open ad completed."
                     onNextActionCalled()
                 }
             })
-
     }
 
     private fun onNextActionCalled() {
+        Log.d("SplashActivity", "onNextActionCalled: Navigating to InterstitialActivity")
+        statusTextView.text = "Navigating to next screen..."
+
         val nextIntent = Intent(this, InterstitialActivity::class.java)
         startActivity(nextIntent)
         finish()

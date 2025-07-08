@@ -5,14 +5,14 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.sample"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.i2hammad.admanagekit.sample"
         minSdk = 23
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "2.0"
 
     }
 

@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 23
@@ -67,7 +67,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "1.3.2"
+                version = "2.0.0-alpha01"
             }
 
 

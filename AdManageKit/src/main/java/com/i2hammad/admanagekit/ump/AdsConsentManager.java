@@ -16,17 +16,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public class AdsConsentManager {
 
-    // Logger tag
-    private static final String TAG = AdsConsentManager.class.getName();
+    private static final String TAG = "AdsConsentManager";
 
-    // Consent information object from UMP
-    private ConsentInformation consentInformation;
-
-    // Atomic flag to check if ads can be requested
-    public AtomicBoolean canRequestAds = new AtomicBoolean(false);
-
-    // Singleton instance of AdsConsentManager
-    private static AdsConsentManager instance;
+    private final ConsentInformation consentInformation;
+    private final AtomicBoolean canRequestAds = new AtomicBoolean(false);
+    private final AtomicBoolean isProcessingConsent = new AtomicBoolean(false); // New flag to prevent concurrent requests
+    private static volatile AdsConsentManager instance;
 
     /**
      * Private constructor to initialize AdsConsentManager with context.
@@ -34,8 +29,8 @@ public class AdsConsentManager {
      * @param context The application context.
      */
     private AdsConsentManager(Context context) {
-        this.canRequestAds = new AtomicBoolean(false);
         this.consentInformation = UserMessagingPlatform.getConsentInformation(context);
+        this.canRequestAds.set(false);
     }
 
     /**
@@ -46,7 +41,11 @@ public class AdsConsentManager {
      */
     public static AdsConsentManager getInstance(Context context) {
         if (instance == null) {
-            instance = new AdsConsentManager(context);
+            synchronized (AdsConsentManager.class) {
+                if (instance == null) {
+                    instance = new AdsConsentManager(context.getApplicationContext());
+                }
+            }
         }
         return instance;
     }
@@ -58,7 +57,9 @@ public class AdsConsentManager {
      * @return True if the user has consented to ads, false otherwise.
      */
     public static boolean getConsentResult(Context context) {
-        String consentString = context.getSharedPreferences(context.getPackageName() + "_preferences", 0).getString("IABTCF_PurposeConsents", "");
+        String consentString = context.getSharedPreferences(context.getPackageName() + "_preferences", 0)
+                .getString("IABTCF_PurposeConsents", "");
+        Log.d(TAG, "getConsentResult: Consent string = " + consentString);
         return consentString.isEmpty() || consentString.charAt(0) == '1';
     }
 
@@ -69,7 +70,7 @@ public class AdsConsentManager {
      * @param umpResultListener The listener to receive the result of the consent request.
      */
     public void requestUMP(Activity activity, UMPResultListener umpResultListener) {
-        this.requestUMP(activity, false, "", false, umpResultListener);
+        requestUMP(activity, false, "", false, umpResultListener);
     }
 
     /**
@@ -81,50 +82,76 @@ public class AdsConsentManager {
      * @param resetData         Whether to reset consent data.
      * @param umpResultListener The listener to receive the result of the consent request.
      */
-    public void requestUMP(Activity activity, Boolean enableDebug, String testDevice, Boolean resetData, UMPResultListener umpResultListener) {
+    public void requestUMP(Activity activity, boolean enableDebug, String testDevice, boolean resetData, UMPResultListener umpResultListener) {
+        // Prevent concurrent consent requests
+        if (isProcessingConsent.getAndSet(true)) {
+            Log.d(TAG, "requestUMP: Consent request already in progress, ignoring");
+            return;
+        }
+
+        Log.d(TAG, "requestUMP: Starting consent request, canRequestAds=" + canRequestAds.get());
+
+        // Reset consent data if requested
+        if (resetData) {
+            Log.d(TAG, "requestUMP: Resetting consent data");
+            consentInformation.reset();
+        }
+
+        // Check if ads can already be requested
+        if (consentInformation.canRequestAds() && canRequestAds.get()) {
+            Log.d(TAG, "requestUMP: Ads can already be requested, skipping consent form");
+            isProcessingConsent.set(false);
+            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
+            return;
+        }
 
         ConsentRequestParameters.Builder paramsBuilder = new ConsentRequestParameters.Builder();
 
         // Set debug settings if debugging is enabled
         if (enableDebug) {
-            paramsBuilder.setConsentDebugSettings(new ConsentDebugSettings.Builder(activity).setDebugGeography(ConsentDebugSettings.DebugGeography.DEBUG_GEOGRAPHY_EEA).addTestDeviceHashedId(testDevice).build());
+            Log.d(TAG, "requestUMP: Enabling debug mode with test device ID: " + testDevice);
+            paramsBuilder.setConsentDebugSettings(
+                    new ConsentDebugSettings.Builder(activity)
+                            .setDebugGeography(ConsentDebugSettings.DebugGeography.DEBUG_GEOGRAPHY_EEA)
+                            .addTestDeviceHashedId(testDevice)
+                            .build()
+            );
         }
 
-        // Build consent request parameters
         ConsentRequestParameters params = paramsBuilder.setTagForUnderAgeOfConsent(false).build();
-        this.consentInformation = UserMessagingPlatform.getConsentInformation(activity);
-
-        // Reset consent data if requested
-        if (resetData) {
-            this.consentInformation.reset();
-        }
 
         // Request consent information update
-        consentInformation.requestConsentInfoUpdate(activity, params, () -> {
-            // Load and show the consent form if required
-            UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, formError -> {
-                if (formError != null) {
-                    Log.e(TAG, "Error loading consent form: " + formError.getMessage());
-                } else {
-                    Log.d(TAG, "Consent form loaded and shown");
-                    if (!this.canRequestAds.getAndSet(true)) {
+        consentInformation.requestConsentInfoUpdate(
+                activity,
+                params,
+                () -> {
+                    Log.d(TAG, "requestUMP: Consent info updated successfully");
+                    // Load and show the consent form if required
+                    UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, formError -> {
+                        isProcessingConsent.set(false);
+                        if (formError != null) {
+                            Log.e(TAG, "requestUMP: Error loading consent form: " + formError.getMessage());
+                        } else {
+                            Log.d(TAG, "requestUMP: Consent form loaded and shown or not required");
+                        }
+
+                        // Update canRequestAds and notify listener
+                        if (!canRequestAds.getAndSet(consentInformation.canRequestAds())) {
+                            Log.d(TAG, "requestUMP: Notifying listener, canRequestAds=" + consentInformation.canRequestAds());
+                            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
+                        }
+                    });
+                },
+                requestConsentError -> {
+                    isProcessingConsent.set(false);
+                    Log.e(TAG, "requestUMP: Consent info update failed: " + requestConsentError.getMessage());
+                    // Update canRequestAds and notify listener
+                    if (!canRequestAds.getAndSet(consentInformation.canRequestAds())) {
+                        Log.d(TAG, "requestUMP: Notifying listener after error, canRequestAds=" + consentInformation.canRequestAds());
                         umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
                     }
                 }
-            });
-        }, requestConsentError -> {
-            // Handle consent info update failure
-            Log.e(TAG, "Consent info update failure: " + requestConsentError.getMessage());
-            if (!this.canRequestAds.getAndSet(true)) {
-                umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
-            }
-        });
-
-        // Check if ads can be requested and inform the listener
-        if (this.consentInformation.canRequestAds() && !this.canRequestAds.getAndSet(true)) {
-            Log.d(TAG, "Ads can be requested");
-            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
-        }
+        );
     }
 
     /**
@@ -134,8 +161,12 @@ public class AdsConsentManager {
      * @param umpResultListener The listener to receive the result after showing the form.
      */
     public void showPrivacyOption(Activity activity, UMPResultListener umpResultListener) {
+        Log.d(TAG, "showPrivacyOption: Showing privacy options form");
         UserMessagingPlatform.showPrivacyOptionsForm(activity, formError -> {
-            if (getConsentResult(activity)) {
+            if (formError != null) {
+                Log.e(TAG, "showPrivacyOption: Error showing privacy form: " + formError.getMessage());
+            } else {
+                Log.d(TAG, "showPrivacyOption: Privacy options form shown");
             }
             umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
         });
@@ -147,11 +178,20 @@ public class AdsConsentManager {
      * @return True if ads can be requested, false otherwise.
      */
     public boolean canRequestAds() {
-        return canRequestAds.get();
+        boolean canRequest = consentInformation.canRequestAds();
+        Log.d(TAG, "canRequestAds: Returning " + canRequest);
+        return canRequest;
     }
 
-
+    /**
+     * Checks if privacy options are required.
+     *
+     * @return True if privacy options are required, false otherwise.
+     */
     public boolean isPrivacyOptionsRequired() {
-        return consentInformation.getPrivacyOptionsRequirementStatus() == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED;
+        boolean required = consentInformation.getPrivacyOptionsRequirementStatus() == ConsentInformation.PrivacyOptionsRequirementStatus.REQUIRED;
+        Log.d(TAG, "isPrivacyOptionsRequired: Returning " + required);
+        return required;
     }
 }
+
