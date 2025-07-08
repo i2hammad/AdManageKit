@@ -57,14 +57,14 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
 
    For the stable version:
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:1.3.2'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.2'
    ```
 
    For the beta version (use cautiously in production):
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:2.0.0-alpha01'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:2.0.0-alpha01'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.0.0-alpha01'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.0.0-alpha01'
    ```
 
 2. **Sync your project** with Gradle.
