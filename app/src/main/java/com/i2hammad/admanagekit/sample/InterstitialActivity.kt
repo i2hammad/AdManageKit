@@ -21,6 +21,9 @@ import com.i2hammad.admanagekit.admob.BannerAdView
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeBannerSmall
+import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdDebugUtils
+import android.util.Log
 
 class InterstitialActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
@@ -42,10 +45,25 @@ class InterstitialActivity : AppCompatActivity() {
         }
 
 
-        // if   you want to use cached native ads if new ad is not available
-        NativeAdManager.enableCachingNativeAds = true
-        var nativeBannerMedium:NativeBannerMedium  =   findViewById(R.id.nativeBannerMedium)
-        nativeBannerMedium.loadNativeBannerAd(this,"ca-app-pub-3940256099942544/2247696110")
+        // Enable debug overlay for this activity if in debug mode
+        if (AdManageKitConfig.debugMode) {
+            AdDebugUtils.enableDebugOverlay(this, true)
+            Log.d("InterstitialActivity", "Debug overlay enabled for InterstitialActivity")
+        }
+        
+        // Native ad caching is now controlled by configuration
+        NativeAdManager.enableCachingNativeAds = AdManageKitConfig.enableSmartPreloading
+        var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
+        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110", 
+            useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
+                override fun onAdLoaded() {
+                    Log.d("InterstitialActivity", "✅ NativeBannerMedium loaded in InterstitialActivity")
+                }
+                
+                override fun onFailedToLoad(error: AdError?) {
+                    Log.e("InterstitialActivity", "❌ NativeBannerMedium failed in InterstitialActivity: ${error?.message}")
+                }
+            })
 
         statusTextView = findViewById<TextView>(R.id.statusTextView)
 

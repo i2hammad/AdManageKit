@@ -10,6 +10,10 @@ import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
 import com.i2hammad.admanagekit.billing.PurchaseItem
 import com.i2hammad.admanagekit.billing.PurchaseListener
 import com.i2hammad.admanagekit.core.NoPurchaseProvider
+import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdDebugUtils
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 
 class MyApplication : Application() {
 
@@ -22,10 +26,74 @@ class MyApplication : Application() {
         BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
         //If you do not want to use billing library for it
 //        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
+        
+        // Configure AdManageKit with comprehensive settings
+        configureAdManageKit()
+        
         initBilling()
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
 
+    }
+
+    /**
+     * Configure AdManageKit with comprehensive settings for testing all features
+     */
+    private fun configureAdManageKit() {
+        AdManageKitConfig.apply {
+            // =================== DEBUG AND TESTING ===================
+            debugMode = true // Enable debug mode for testing
+            testMode = true // Use test ads for testing
+            privacyCompliantMode = true
+            enableDebugOverlay = true // Show debug overlay for testing
+            
+            // =================== PERFORMANCE SETTINGS ===================
+            defaultAdTimeout = 15.seconds
+            appOpenAdTimeout = 4.seconds
+            nativeCacheExpiry = 2.hours
+            maxCachedAdsPerUnit = 3
+            maxCacheMemoryMB = 50
+            
+            // =================== RELIABILITY FEATURES ===================
+            autoRetryFailedAds = true
+            maxRetryAttempts = 3
+            circuitBreakerThreshold = 3 // Lower threshold for testing
+            circuitBreakerResetTimeout = 60.seconds // Shorter reset for testing
+            enableExponentialBackoff = true
+            baseRetryDelay = 1.seconds
+            maxRetryDelay = 10.seconds
+            
+            // =================== ADVANCED FEATURES ===================
+            enableSmartPreloading = true
+            enableAdaptiveIntervals = true
+            enablePerformanceMetrics = true
+            enableAutoCacheCleanup = true
+            enableLRUEviction = true
+            
+            // =================== AD-SPECIFIC SETTINGS ===================
+            defaultInterstitialInterval = 15.seconds
+            defaultBannerRefreshInterval = 60.seconds
+            enableCollapsibleBannersByDefault = false
+            
+            // =================== CACHE MANAGEMENT ===================
+            cacheCleanupInterval = (5 * 60).seconds // 5 minutes for testing
+        }
+        
+        // Validate configuration
+        if (!AdManageKitConfig.validate()) {
+            android.util.Log.w("MyApplication", "AdManageKit configuration validation failed")
+        }
+        
+        // Log configuration summary
+        android.util.Log.d("MyApplication", AdManageKitConfig.getConfigSummary())
+        
+        // Check production readiness
+        if (!AdManageKitConfig.isProductionReady()) {
+            android.util.Log.w("MyApplication", "AdManageKit configuration is not production ready!")
+        }
+        
+        // Enable debug overlay in debug mode
+        android.util.Log.d("MyApplication", "AdManageKit configured for TESTING mode with enhanced logging and debug features")
     }
 
 

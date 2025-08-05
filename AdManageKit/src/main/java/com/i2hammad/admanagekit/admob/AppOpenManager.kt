@@ -13,6 +13,8 @@ import com.google.android.gms.ads.*
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdDebugUtils
 
 //import com.i2hammad.admanagekit.billing.AppPurchase
 
@@ -29,6 +31,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
     private var skipNextAd = false
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
+    
+    // Retry and circuit breaker state
+    private var failureCount = 0
+    private var lastFailureTime = 0L
+    private var isCircuitBreakerOpen = false
 
     init {
         myApplication.registerActivityLifecycleCallbacks(this)
@@ -51,21 +58,26 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        if (!isShowingAd && isAdAvailable() && !skipNextAd && !AdManager.getInstance().isDisplayingAd()) {
+        if (!isShowingAd && isAdAvailable() && !skipNextAd && !AdManager.getInstance().isDisplayingAd() && shouldAttemptLoad()) {
             Log.e(LOG_TAG, "Will show ad.")
 
             val fullScreenContentCallback = object : FullScreenContentCallback() {
                 override fun onAdDismissedFullScreenContent() {
                     appOpenAd = null
                     isShowingAd = false
+                    AdDebugUtils.logEvent(adUnitId, "onAdDismissed", "App open ad dismissed", true)
                     fetchAd()
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "App open ad failed to show: ${adError.message}", false)
                     // Log Firebase event for ad failed to load
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                         putString("ad_error_code", adError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", adError.message)
+                        }
                     }
                     firebaseAnalytics.logEvent("ad_failed_to_load", params)
                 }
@@ -73,6 +85,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdShowedFullScreenContent() {
                     isShowingAd = true
                     isShownAd = true
+                    AdDebugUtils.logEvent(adUnitId, "onAdImpression", "App open ad shown", true)
 
                     // Log Firebase event for ad impression
                     val params = Bundle().apply {
@@ -118,16 +131,21 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdDismissedFullScreenContent() {
                     appOpenAd = null
                     isShowingAd = false
+                    AdDebugUtils.logEvent(adUnitId, "onAdDismissed", "App open ad dismissed (forced)", true)
                     fetchAd()
                     adManagerCallback.onNextAction()
 
                 }
 
                 override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "App open ad failed to show (forced): ${adError.message}", false)
                     // Log Firebase event for ad failed to load
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                         putString("ad_error_code", adError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", adError.message)
+                        }
                     }
                     firebaseAnalytics.logEvent("ad_failed_to_load", params)
                     adManagerCallback.onNextAction()
@@ -137,6 +155,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdShowedFullScreenContent() {
                     isShowingAd = true
                     isShownAd = true
+                    AdDebugUtils.logEvent(adUnitId, "onAdImpression", "App open ad shown (forced)", true)
                     adManagerCallback.onAdLoaded()
                     // Log Firebase event for ad impression
                     val params = Bundle().apply {
@@ -183,6 +202,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         if (isAdAvailable()) {
             return
         }
+        
+        if (!shouldAttemptLoad()) {
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad loading blocked by circuit breaker", false)
+            return
+        }
+        
+        if (AdManageKitConfig.testMode) {
+            AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for app open ads", true)
+        }
+        
         val request = getAdRequest()
         AppOpenAd.load(myApplication,
             adUnitId,
@@ -190,16 +219,23 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     appOpenAd = ad
+                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded successfully", true)
+                    handleAdSuccess()
 
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                     Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open ad failed to load: ${loadAdError.message}", false)
+                    handleAdFailure()
 
                     // Log Firebase event for ad failed to load
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                         putString("ad_error_code", loadAdError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", loadAdError.message)
+                        }
                     }
                     firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
@@ -213,10 +249,21 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * @param adLoadCallback The callback to be invoked when the ad is loaded or fails to load.
      * @param timeoutMillis The timeout duration in milliseconds. If the ad does not load within this time, it will trigger the onFailedToLoad callback.
      */
-    fun fetchAd(adLoadCallback: AdLoadCallback, timeoutMillis: Long = 5000) {
+    fun fetchAd(adLoadCallback: AdLoadCallback, timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds) {
         if (isAdAvailable()) {
             adLoadCallback.onAdLoaded()
             return
+        }
+        
+        if (!shouldAttemptLoad()) {
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad loading blocked by circuit breaker", false)
+            val circuitBreakerError = LoadAdError(3, "Circuit breaker is open", "AdManageKit", null, null)
+            adLoadCallback.onFailedToLoad(circuitBreakerError)
+            return
+        }
+        
+        if (AdManageKitConfig.testMode) {
+            AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for app open ads with timeout", true)
         }
 
         val request = getAdRequest()
@@ -243,6 +290,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         timeoutHandler.removeCallbacks(timeoutRunnable) // Cancel the timeout
                         appOpenAd = ad
+                        AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded with timeout", true)
+                        handleAdSuccess()
                         adLoadCallback.onAdLoaded()
                     }
                 }
@@ -251,11 +300,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         timeoutHandler.removeCallbacks(timeoutRunnable) // Cancel the timeout
                         Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
+                        AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open ad failed with timeout: ${loadAdError.message}", false)
+                        handleAdFailure()
 
                         // Log Firebase event for ad failed to load
                         val params = Bundle().apply {
                             putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                             putString("ad_error_code", loadAdError.code.toString())
+                            if (AdManageKitConfig.enablePerformanceMetrics) {
+                                putString("error_message", loadAdError.message)
+                            }
                         }
                         firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
@@ -322,5 +376,47 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             showAdIfAvailable()
             Log.d(LOG_TAG, "onStart")
         }
+    }
+    
+    /**
+     * Handle ad loading failure for circuit breaker logic
+     */
+    private fun handleAdFailure() {
+        failureCount++
+        lastFailureTime = System.currentTimeMillis()
+        
+        if (failureCount >= AdManageKitConfig.circuitBreakerThreshold) {
+            isCircuitBreakerOpen = true
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerOpen", "App open circuit breaker opened after $failureCount failures", false)
+        }
+    }
+    
+    /**
+     * Handle ad loading success for circuit breaker logic
+     */
+    private fun handleAdSuccess() {
+        if (failureCount > 0) {
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerReset", "App open circuit breaker reset after success", true)
+        }
+        failureCount = 0
+        isCircuitBreakerOpen = false
+    }
+    
+    /**
+     * Check if circuit breaker should allow ad loading
+     */
+    private fun shouldAttemptLoad(): Boolean {
+        if (!isCircuitBreakerOpen) return true
+        
+        val timeSinceLastFailure = System.currentTimeMillis() - lastFailureTime
+        if (timeSinceLastFailure > AdManageKitConfig.circuitBreakerResetTimeout.inWholeMilliseconds) {
+            isCircuitBreakerOpen = false
+            failureCount = 0
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerReset", "App open circuit breaker reset after timeout", true)
+            return true
+        }
+        
+        AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad blocked by circuit breaker, ${AdManageKitConfig.circuitBreakerResetTimeout.inWholeSeconds - (timeSinceLastFailure / 1000)}s remaining", false)
+        return false
     }
 }

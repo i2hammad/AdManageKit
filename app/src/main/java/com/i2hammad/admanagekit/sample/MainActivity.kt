@@ -6,13 +6,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.Observer
-import com.i2hammad.admanagekit.AdConfig
-import com.i2hammad.admanagekit.admob.AdState
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.admob.NativeLarge
+import com.i2hammad.admanagekit.admob.AdLoadCallback
+import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.google.android.gms.ads.AdError
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -25,9 +27,16 @@ class MainActivity : AppCompatActivity() {
             insets
         }
 
-        // Get the shared ViewModel
-
-
+        // Enable debug overlay to see real-time ad statistics
+        if (AdManageKitConfig.debugMode) {
+            AdDebugUtils.enableDebugOverlay(this, true)
+            Log.d("MainActivity", "Debug overlay enabled")
+        }
+        
+        // Log current configuration for testing
+        Log.d("MainActivity", "AdManageKit Configuration Summary:")
+        Log.d("MainActivity", AdManageKitConfig.getConfigSummary())
+        
         loadAds()
 
 
@@ -42,8 +51,26 @@ class MainActivity : AppCompatActivity() {
 //        NativeAdManager.preloadAd(this, adUnitId)
 
         var nativeBannerSmall: NativeBannerSmall = findViewById(R.id.nativeBannerSmall)
-            // to test cached native ad
-        nativeBannerSmall.loadNativeBannerAd(this,adUnitId,useCachedAd = true)
+        // Test native banner small with enhanced callback and smart preloading
+        nativeBannerSmall.loadNativeBannerAd(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
+            override fun onAdLoaded() {
+                Log.d("MainActivity", "✅ NativeBannerSmall loaded successfully")
+                Toast.makeText(this@MainActivity, "Small Native Ad Loaded", Toast.LENGTH_SHORT).show()
+            }
+            
+            override fun onFailedToLoad(error: AdError?) {
+                Log.e("MainActivity", "❌ NativeBannerSmall failed to load: ${error?.message}")
+                Toast.makeText(this@MainActivity, "Small Native Ad Failed: ${error?.code}", Toast.LENGTH_SHORT).show()
+            }
+            
+            override fun onAdImpression() {
+                Log.d("MainActivity", "👁️ NativeBannerSmall impression recorded")
+            }
+            
+            override fun onAdClicked() {
+                Log.d("MainActivity", "👆 NativeBannerSmall clicked")
+            }
+        })
 
 //        NativeAdManager.getAdLiveData(adUnitId).observe(this, { nativeAd ->
 //
@@ -82,11 +109,30 @@ class MainActivity : AppCompatActivity() {
 //        })
 
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
-        nativeBannerMedium.loadNativeBannerAd(this, adUnitId, useCachedAd = true)
-
+        // Test native banner medium with configuration-based caching
+        nativeBannerMedium.loadNativeBannerAd(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
+            override fun onAdLoaded() {
+                Log.d("MainActivity", "✅ NativeBannerMedium loaded successfully")
+                Toast.makeText(this@MainActivity, "Medium Native Ad Loaded", Toast.LENGTH_SHORT).show()
+            }
+            
+            override fun onFailedToLoad(error: AdError?) {
+                Log.e("MainActivity", "❌ NativeBannerMedium failed to load: ${error?.message}")
+            }
+        })
 
         var nativeLarge: NativeLarge = findViewById(R.id.nativeLarge)
-        nativeLarge.loadNativeAds(this, "ca-app-pub-3940256099942544/2247696110",useCachedAd = true)
+        // Test native large with configuration-based caching
+        nativeLarge.loadNativeAds(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
+            override fun onAdLoaded() {
+                Log.d("MainActivity", "✅ NativeLarge loaded successfully")
+                Toast.makeText(this@MainActivity, "Large Native Ad Loaded", Toast.LENGTH_SHORT).show()
+            }
+            
+            override fun onFailedToLoad(error: AdError?) {
+                Log.e("MainActivity", "❌ NativeLarge failed to load: ${error?.message}")
+            }
+        })
 
 
     }
@@ -141,8 +187,50 @@ class MainActivity : AppCompatActivity() {
 //        }
 //    }
 
+    override fun onResume() {
+        super.onResume()
+        
+        // Log cache statistics for testing
+        if (AdManageKitConfig.debugMode) {
+            logCacheStatistics()
+        }
+    }
+    
+    /**
+     * Log cache statistics and debug information for testing
+     */
+    private fun logCacheStatistics() {
+        try {
+            val cacheStats = NativeAdManager.getCacheStatistics()
+            Log.d("MainActivity", "📊 Cache Statistics:")
+            cacheStats.forEach { (adUnit, stats) ->
+                Log.d("MainActivity", "  $adUnit: $stats")
+            }
+            
+            val totalCacheSize = NativeAdManager.getTotalCacheSize()
+            Log.d("MainActivity", "📦 Total cache size: $totalCacheSize ads")
+            
+            // Log configuration validation
+            val isValid = AdManageKitConfig.validate()
+            Log.d("MainActivity", "✓ Configuration valid: $isValid")
+            
+            val isProductionReady = AdManageKitConfig.isProductionReady()
+            Log.d("MainActivity", "🚀 Production ready: $isProductionReady")
+            
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Could not retrieve cache statistics: ${e.message}")
+        }
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        
+        // Log final statistics before clearing
+        if (AdManageKitConfig.debugMode) {
+            Log.d("MainActivity", "🧹 Clearing all cached ads on destroy")
+            logCacheStatistics()
+        }
+        
         NativeAdManager.clearAllCachedAds()
     }
 }

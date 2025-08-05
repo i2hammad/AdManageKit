@@ -1,20 +1,97 @@
 # AdManageKit
 [![JitPack](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
+![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)
+![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-AdManageKit is an Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. Version `2.0.0-alpha01` (beta) introduces upgraded support for Google Play Billing Library version 8, with enhanced billing features and improved purchase handling. Version `1.3.2` remains the stable release, offering robust ad management, native ads caching, app open ads via `AppOpenManager`, and enhanced interstitial ad management via `AdManager`. The library includes a sample project with visual demonstrations of its features.
+AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. 
+
+**Latest Version `2.1.0`** introduces major performance improvements, enhanced reliability features, and comprehensive debugging tools while maintaining full backward compatibility.
+
+## What's New in 2.1.0 🚀
+
+### 🎯 **Centralized Configuration with AdManageKitConfig**
+- **Single Configuration Point**: Control all ad behavior from one place
+- **Environment-Specific Settings**: Easy debug vs production configuration
+- **Runtime Configuration**: Change settings without code modifications
+- **Configuration Validation**: Built-in validation and production readiness checks
+
+### 🚀 **Performance & Reliability**
+- **Smart Retry System**: Exponential backoff with configurable retry attempts
+- **Memory Leak Prevention**: WeakReference holders and lifecycle-aware components
+- **Enhanced Caching**: Screen-aware native ad caching with intelligent preloading
+- **Banner Ad Improvements**: Fixed display issues, better retry logic, enhanced auto-refresh
+
+### 🧠 **Intelligent Native Ad Management**
+- **NativeAdIntegrationManager**: Screen-specific caching prevents cache collisions
+- **Smart Preloading**: Usage pattern-based cache warming
+- **Cache Optimization**: LRU eviction, configurable sizes, automatic cleanup
+- **Multi-Screen Support**: Dedicated caching per screen type (Small/Medium/Large)
+
+### 🐛 **Advanced Debug & Testing Tools**
+- **AdDebugUtils**: Enhanced logging with event tracking and performance metrics
+- **Debug Overlays**: Real-time ad statistics and monitoring
+- **Test Ad Units**: Safe testing with automatic test ad unit switching
+- **Mock Ad Responses**: Unit testing support with injectable mock responses
+
+### 📊 **Enhanced Analytics & Monitoring**
+- **Performance Metrics**: Optional detailed analytics collection
+- **Circuit Breaker**: Prevents repeated failures and improves performance
+- **Debug Statistics**: Real-time monitoring of cache, retries, and ad states
+- **Configuration Summary**: Easy configuration debugging and validation
 
 ## Features
 
-- **AdMob Ads Management**: Seamlessly integrate banner, interstitial, app open, and native ads (small, medium, large formats).
-- **Native Ads Caching**: Cache native ads per ad unit ID with a 1-hour expiration and a `useCachedAd` option for optimized performance.
-- **App Open Ads**: Manage app open ads with lifecycle-aware loading and display using `AppOpenManager`.
-- **Interstitial Ads**: Flexible interstitial ad loading and display with time/count-based triggers and dialog support.
-- **Firebase Auto-Log Tracking, tROAS**: Automatically track tROAS for all ad types via Firebase Analytics.
-- **Billing Management (Separate Module)**:
-   - **Stable (v1.3.2)**: Handle in-app purchases and subscriptions using the Google Play Billing Library (prior to version 8).
-   - **Beta (v2.0.0-alpha01)**: Upgraded to Google Play Billing Library version 8 with enhanced purchase flows, subscription offer support, and thread-safe billing connection management.
-- **UMP Consent Management**: Manage user consent with Google's UMP for GDPR/CCPA compliance.
-- **Sample Project**: A fully functional sample project demonstrating ad management, caching, billing, and consent handling, updated to showcase new billing features in `2.0.0-alpha01`.
+### 🚀 **AdMob Ads Management**
+- **Banner Ads**: Enhanced BannerAdView with auto-refresh, collapsible banners, and smart retry logic
+- **Native Ads**: Three formats (Small, Medium, Large) with intelligent caching and screen-aware management
+- **Interstitial Ads**: Flexible loading with time/count-based triggers and dialog support
+- **App Open Ads**: Lifecycle-aware management with activity exclusion support
+
+### 🎯 **Centralized Configuration System**
+- **AdManageKitConfig**: Single configuration point for all ad behavior
+- **Environment-Specific Settings**: Easy debug vs production configuration switching
+- **Runtime Configuration**: Change settings without code modifications
+- **Validation & Monitoring**: Built-in configuration validation and production readiness checks
+
+### 🧠 **Intelligent Native Ad Caching**
+- **Screen-Aware Caching**: Prevents cache collisions between different screen contexts
+- **Smart Preloading**: Usage pattern-based cache warming with configurable preload strategies
+- **LRU Cache Management**: Automatic cleanup with configurable size limits and expiration
+- **Multi-Screen Support**: Dedicated caching per screen type (Small/Medium/Large)
+
+### 🛡️ **Enhanced Reliability & Performance**
+- **Smart Retry System**: Exponential backoff with configurable retry attempts and circuit breaker
+- **Memory Leak Prevention**: WeakReference holders and lifecycle-aware components
+- **Performance Monitoring**: Optional detailed analytics and real-time performance metrics
+- **Auto-Recovery**: Circuit breaker pattern prevents repeated failures and improves stability
+
+### 🐛 **Advanced Debug & Testing Tools**
+- **AdDebugUtils**: Enhanced logging with event tracking and performance metrics
+- **Debug Overlays**: Real-time ad statistics and monitoring dashboards
+- **Test Ad Units**: Safe testing environment with automatic test ad unit switching
+- **Mock Ad Responses**: Unit testing support with injectable mock responses and scenarios
+
+### 📊 **Analytics & Monitoring**
+- **Firebase Auto-Tracking**: Automatic tROAS tracking for all ad types via Firebase Analytics
+- **Performance Metrics**: Detailed analytics collection with configurable granularity
+- **Event Logging**: Comprehensive ad lifecycle event tracking and debugging
+- **Configuration Summary**: Easy configuration debugging and validation tools
+
+### 💰 **Billing Management (Multi-Module)**
+- **Core Module**: Shared interfaces and configuration management
+- **Stable (v1.3.2)**: Google Play Billing Library (prior to version 8)
+- **Beta (v2.0.0-alpha01)**: Google Play Billing Library v8 with enhanced purchase flows
+- **Purchase Provider Pattern**: Flexible billing implementations with easy switching
+
+### 🔒 **Privacy & Compliance**
+- **UMP Consent Management**: GDPR/CCPA compliance with Google's User Messaging Platform
+- **Privacy-Compliant Mode**: Configurable privacy settings for different markets
+- **Ad Blocking**: Automatic ad hiding for purchased users with custom error handling
+
+### 📱 **Sample Project & Documentation**
+- **Comprehensive Examples**: Fully functional sample demonstrating all features
+- **API Documentation**: Detailed usage guides and configuration examples
+- **Migration Guides**: Step-by-step upgrade instructions with backward compatibility notes
 
 ## Screenshots
 
@@ -55,19 +132,77 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
 
    In your app's `build.gradle`, add the dependencies:
 
-   For the stable version:
+   **Latest Stable Version (Recommended):**
+   ```groovy
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.1.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.1.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.1.0'
+   ```
+
+   **Previous Stable Version:**
    ```groovy
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.2'
    ```
 
-   For the beta version (use cautiously in production):
+   **Beta Version (for testing new features):**
    ```groovy
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.0.0-alpha01'
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.0.0-alpha01'
    ```
 
 2. **Sync your project** with Gradle.
+
+### Quick Configuration
+
+Configure AdManageKit in your Application class for optimal performance:
+
+```kotlin
+class MyApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
+        // Configure AdManageKit with new centralized configuration
+        AdManageKitConfig.apply {
+            debugMode = BuildConfig.DEBUG
+            enableSmartPreloading = true
+            autoRetryFailedAds = true
+            maxRetryAttempts = 3
+            enablePerformanceMetrics = true
+            
+            // Advanced features (new in 2.1.0)
+            enableAdaptiveIntervals = true
+            circuitBreakerThreshold = 5
+            nativeCacheExpiry = 2.hours
+            maxCachedAdsPerUnit = 3
+        }
+        
+        // Set up billing and ads
+        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+        
+        // Initialize app open ads
+        appOpenManager = AppOpenManager(this, "your-app-open-ad-unit-id")
+        
+        // Enable debug tools (development only)
+        if (BuildConfig.DEBUG) {
+            AdDebugUtils.enableDebugOverlay(this, true)
+        }
+    }
+}
+```
+
+### Enhanced Integration Verification
+
+AdManageKit 2.1.0 includes comprehensive integration across all ad components:
+
+✅ **AdManageKitConfig** - Integrated in all ad components (BannerAdView, NativeBannerSmall, NativeBannerMedium, NativeLarge)  
+✅ **NativeAdIntegrationManager** - Screen-aware caching in all native ad formats  
+✅ **AdDebugUtils** - Enhanced logging and monitoring across all components  
+
+The library automatically applies configuration settings to:
+- **BannerAdView**: Retry logic, auto-refresh intervals, and performance monitoring
+- **Native Ads**: Smart caching, preloading strategies, and screen-aware management
+- **All Components**: Debug logging, error handling, and analytics integration
 
 ### Usage
 
@@ -358,13 +493,13 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
    AppPurchase.getInstance().consumePurchase("your_product_id");
    ```
 
-5. **Query Product Details (Beta v2.0.0-alpha01)**:
+5. **Query Product Details ( v2.0.1)**:
 
    ```java
    AppPurchase.getInstance().queryProductDetails(Arrays.asList("your_product_id"), BillingClient.ProductType.INAPP);
    ```
 
-6. **Get Price Information (Beta v2.0.0-alpha01)**:
+6. **Get Price Information ( v2.0.1**:
 
    ```java
    String price = AppPurchase.getInstance().getPrice("your_product_id");
@@ -373,6 +508,160 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
    ```
 
 For detailed billing documentation, see the [Billing Management Wiki](docs/billing-management.md).
+
+## Advanced Features (New in 2.1.0)
+
+### Smart Configuration Management
+
+AdManageKit now provides centralized configuration for optimal performance:
+
+```kotlin
+// Configure in Application.onCreate()
+AdManageKitConfig.apply {
+    // Performance settings
+    defaultAdTimeout = 15.seconds
+    nativeCacheExpiry = 2.hours
+    maxCachedAdsPerUnit = 5
+    
+    // Reliability features
+    autoRetryFailedAds = true
+    maxRetryAttempts = 3
+    circuitBreakerThreshold = 5
+    
+    // Advanced features
+    enableSmartPreloading = true
+    enableAdaptiveIntervals = true
+    enablePerformanceMetrics = true
+    
+    // Debug and testing
+    debugMode = BuildConfig.DEBUG
+    testMode = false
+    privacyCompliantMode = true
+}
+```
+
+### Enhanced Error Handling with Circuit Breaker
+
+The library now includes automatic failure detection and recovery:
+
+```kotlin
+// Circuit breaker automatically handles failing ad units
+val circuitBreaker = AdCircuitBreaker.getInstance()
+
+// Check if an ad unit should be attempted
+if (circuitBreaker.shouldAttemptLoad("your-ad-unit-id")) {
+    // Load ad
+    loadAd()
+} else {
+    // Ad unit is temporarily blocked due to failures
+    showAlternativeContent()
+}
+
+// Manual circuit breaker control
+circuitBreaker.reset("your-ad-unit-id") // Reset a specific ad unit
+circuitBreaker.resetAll() // Reset all ad units
+```
+
+### Smart Retry System
+
+Automatic retry with exponential backoff:
+
+```kotlin
+// Retry system works automatically, but you can also use it manually
+val retryManager = AdRetryManager.getInstance()
+
+retryManager.scheduleRetry(
+    adUnitId = "your-ad-unit-id",
+    attempt = 0,
+    maxAttempts = 3
+) {
+    // Retry action - load ad again
+    loadAd()
+}
+```
+
+### Memory Leak Prevention
+
+Use WeakReference holders to prevent memory leaks:
+
+```kotlin
+class MyActivity : AppCompatActivity() {
+    private val activityHolder = weakActivity()
+    
+    private fun loadAd() {
+        // Safe activity access
+        activityHolder.withValidActivity { activity ->
+            bannerAdView.loadBanner(activity, "ad-unit-id")
+        }
+    }
+}
+```
+
+### Debug and Testing Tools
+
+Comprehensive debugging features for development:
+
+```kotlin
+// Enable debug overlay (shows real-time ad statistics)
+AdDebugUtils.enableDebugOverlay(this, true)
+
+// Set test ad units for safe testing
+AdDebugUtils.setTestAdUnits(mapOf(
+    "prod-banner-id" to "ca-app-pub-3940256099942544/6300978111",
+    "prod-interstitial-id" to "ca-app-pub-3940256099942544/1033173712"
+))
+
+// Inject mock ad responses for unit testing
+AdDebugUtils.injectMockAds(listOf(
+    MockAdResponse("test-ad-unit", shouldSucceed = true, delayMs = 1000),
+    MockAdResponse("failing-ad-unit", shouldSucceed = false, errorCode = 3)
+))
+
+// Enhanced logging with debug callbacks
+val debugCallback = AdDebugUtils.createDebugCallback("ad-unit-id") {
+    // Your original callback logic
+}
+bannerAdView.loadBanner(this, "ad-unit-id", debugCallback)
+```
+
+### Enhanced Native Ad Caching
+
+Improved caching with LRU eviction and statistics:
+
+```kotlin
+// Configure caching globally
+AdManageKitConfig.apply {
+    maxCachedAdsPerUnit = 3 // Limit cache size per ad unit
+    nativeCacheExpiry = 1.hours // Set expiry time
+}
+
+// Monitor cache performance
+val cacheStats = NativeAdManager.getCacheStatistics()
+cacheStats.forEach { (adUnit, stats) ->
+    Log.d("Cache", "$adUnit: $stats")
+}
+
+// Manual cache management
+NativeAdManager.performCleanup() // Clean expired ads
+val cacheSize = NativeAdManager.getTotalCacheSize()
+```
+
+### Performance Monitoring
+
+Built-in performance metrics and monitoring:
+
+```kotlin
+// Enable performance metrics (sent to Firebase Analytics)
+AdManageKitConfig.enablePerformanceMetrics = true
+
+// Get performance statistics
+val debugInfo = AdDebugUtils.exportDebugInfo()
+Log.d("Performance", debugInfo)
+
+// Monitor active retries and circuit breaker states
+val retryStats = AdRetryManager.getInstance().getActiveRetriesSummary()
+val circuitStats = AdCircuitBreaker.getInstance().getStateSummary()
+```
 
 #### User Messaging Platform (UMP) Consent
 
@@ -405,10 +694,52 @@ The sample project in the `app` directory demonstrates ad management (banner, in
 
 4. Run on a device or emulator.
 
+## Migration Guide
+
+### Migrating to 2.1.0
+
+Version 2.1.0 is **fully backward compatible**. All existing method signatures and behaviors are preserved. However, you can opt-in to new features:
+
+#### Optional: Enable New Features
+```kotlin
+// In your Application.onCreate()
+AdManageKitConfig.apply {
+    // Enable new performance features
+    autoRetryFailedAds = true
+    enableSmartPreloading = true
+    
+    // Configure for your needs
+    maxRetryAttempts = 3
+    defaultAdTimeout = 15.seconds
+}
+```
+
+#### Optional: Use Enhanced Callbacks
+```kotlin
+// Old way (still works)
+val callback = object : AdLoadCallback() {
+    override fun onAdLoaded() { /* handle */ }
+    override fun onFailedToLoad(error: AdError?) { /* handle */ }
+}
+
+// New way (with additional methods)
+val enhancedCallback = object : AdLoadCallback() {
+    override fun onAdLoaded() { /* handle */ }
+    override fun onFailedToLoad(error: AdError?) { /* handle */ }
+    override fun onPaidEvent(adValue: AdValue) { /* track revenue */ }
+    override fun onAdLoadStarted() { /* show loading */ }
+}
+```
+
+### Migrating from Beta Version (2.0.0-alpha01)
+- **Billing Compatibility**: All billing methods from 2.0.0-alpha01 are supported in 2.1.0
+- **New Core Module**: Add `ad-manage-kit-core` dependency for new features
+- **Configuration**: Replace manual configurations with `AdManageKitConfig`
+
 ### Notes for Beta Version (2.0.0-alpha01)
 - **Use with Caution**: The beta version introduces significant changes to the billing module with Google Play Billing Library version 8. Thoroughly test billing flows before deploying to production.
 - **Deprecated Methods**: Replace `initBilling(Application, List<String>, List<String>)`, `purchase(Activity)`, and `getPrice()` with their recommended counterparts (see [Billing Management Wiki](docs/billing-management.md)).
-- **Feedback**: Report issues or suggestions for `2.0.0-alpha01` via GitHub issues or email [hammadmughal0001@gmail.com](mailto:hammadmughal0001@gmail.com).
+- **Upgrade Path**: Consider upgrading to 2.1.0 for production apps with enhanced stability and new features.
 
 ### Contributing
 

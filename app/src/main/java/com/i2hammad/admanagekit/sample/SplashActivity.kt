@@ -139,7 +139,9 @@ class SplashActivity : AppCompatActivity() {
         })
     }
 
-    private fun forceLoadAppOpen() {
+
+
+/*    private fun forceLoadAppOpen() {
         val appOpenManager = MyApplication.instance.appOpenManager
         Log.d("SplashActivity", "forceLoadAppOpen: Loading app open ad")
         statusTextView.text = "Loading app open ad..."
@@ -175,7 +177,7 @@ class SplashActivity : AppCompatActivity() {
                     onNextActionCalled()
                 }
             })
-    }
+    }*/
 
     private fun onNextActionCalled() {
         Log.d("SplashActivity", "onNextActionCalled: Navigating to InterstitialActivity")

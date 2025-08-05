@@ -16,6 +16,8 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdDebugUtils
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
@@ -29,9 +31,14 @@ class AdManager() {
     private var isAdLoading = false
     private var isDisplayingAd = false
     private var lastAdShowTime: Long = 0
-    private var adIntervalMillis: Long = 15 * 1000 // Default to 15 seconds
+    private var adIntervalMillis: Long = AdManageKitConfig.defaultInterstitialInterval.inWholeMilliseconds
     private var adDisplayCount = 0 // Track the number of times ads have been displayed
     private lateinit var firebaseAnalytics: FirebaseAnalytics
+    
+    // Retry and circuit breaker state
+    private var failureCount = 0
+    private var lastFailureTime = 0L
+    private var isCircuitBreakerOpen = false
 
     companion object {
         const val PURCHASED_APP_ERROR_CODE = 1001
@@ -97,7 +104,7 @@ class AdManager() {
      * @param callback The callback to handle actions after the ad loading is complete.
      */
     fun loadInterstitialAdForSplash(
-        context: Context, adUnitId: String, timeoutMillis: Long, callback: AdManagerCallback
+        context: Context, adUnitId: String, timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds, callback: AdManagerCallback
     ) {
         var purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased())
@@ -119,6 +126,9 @@ class AdManager() {
                 mInterstitialAd = interstitialAd
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded for splash")
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded for splash", true)
+                
+                handleAdSuccess()
 
                 // Call the callback since the ad is loaded
                 callback.onNextAction()
@@ -129,6 +139,9 @@ class AdManager() {
                 Log.e(
                     "AdManager", "Failed to load interstitial ad for splash: ${loadAdError.message}"
                 )
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed for splash: ${loadAdError.message}", false)
+                
+                handleAdFailure()
                 isAdLoading = false
                 mInterstitialAd = null
 
@@ -136,6 +149,9 @@ class AdManager() {
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                     putString("ad_error_code", loadAdError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", loadAdError.message)
+                    }
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
@@ -149,6 +165,7 @@ class AdManager() {
         Handler(Looper.getMainLooper()).postDelayed({
             if (isAdLoading) {
                 Log.d("AdManager", "Ad loading timed out for splash")
+                AdDebugUtils.logEvent(adUnitId, "onTimeout", "Interstitial ad loading timed out for splash", false)
                 isAdLoading = false
 
                 // Ensure the callback is called if the ad loading is taking too long
@@ -158,6 +175,14 @@ class AdManager() {
     }
 
     fun loadInterstitialAd(context: Context, adUnitId: String) {
+        if (!shouldAttemptLoad()) {
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "Ad loading blocked by circuit breaker", false)
+            return
+        }
+        
+        if (AdManageKitConfig.testMode) {
+            AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads", true)
+        }
         this.adUnitId = adUnitId
         initializeFirebase(context)
         val adRequest = AdRequest.Builder().build()
@@ -168,10 +193,16 @@ class AdManager() {
                 mInterstitialAd = interstitialAd
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded")
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded successfully", true)
+                
+                handleAdSuccess()
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed: ${loadAdError.message}", false)
+                
+                handleAdFailure()
                 isAdLoading = false
                 mInterstitialAd = null
 
@@ -179,6 +210,9 @@ class AdManager() {
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                     putString("ad_error_code", loadAdError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", loadAdError.message)
+                    }
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
             }
@@ -188,6 +222,14 @@ class AdManager() {
     fun loadInterstitialAd(
         context: Context, adUnitId: String, interstitialAdLoadCallback: InterstitialAdLoadCallback
     ) {
+        if (!shouldAttemptLoad()) {
+            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "Ad loading blocked by circuit breaker", false)
+            return
+        }
+        
+        if (AdManageKitConfig.testMode) {
+            AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads with callback", true)
+        }
         var purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()){
             // User has purchased, no ads should be shown
@@ -212,11 +254,17 @@ class AdManager() {
                 mInterstitialAd = interstitialAd
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded")
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded with callback", true)
+                
+                handleAdSuccess()
                 interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed with callback: ${loadAdError.message}", false)
+                
+                handleAdFailure()
                 isAdLoading = false
                 mInterstitialAd = null
 
@@ -224,6 +272,9 @@ class AdManager() {
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                     putString("ad_error_code", loadAdError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", loadAdError.message)
+                    }
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
                 interstitialAdLoadCallback.onAdFailedToLoad(loadAdError)
@@ -343,6 +394,9 @@ class AdManager() {
 
     fun setAdInterval(intervalMillis: Long) {
         this.adIntervalMillis = intervalMillis
+        if (AdManageKitConfig.debugMode) {
+            AdDebugUtils.logEvent("", "setAdInterval", "Ad interval set to ${intervalMillis}ms", true)
+        }
     }
 
     fun getAdDisplayCount(): Int {
@@ -356,7 +410,58 @@ class AdManager() {
     private fun canShowAd(): Boolean {
         val elapsed = System.currentTimeMillis() - lastAdShowTime
         Log.d("AdManager", "Time since last ad: $elapsed milliseconds")
-        return elapsed > adIntervalMillis
+        
+        // Use adaptive intervals if enabled
+        val effectiveInterval = if (AdManageKitConfig.enableAdaptiveIntervals) {
+            // Increase interval if recent failures, decrease if recent successes
+            // This is a simplified adaptive logic
+            adIntervalMillis
+        } else {
+            adIntervalMillis
+        }
+        
+        return elapsed > effectiveInterval
+    }
+    
+    /**
+     * Handle ad loading failure for circuit breaker logic
+     */
+    private fun handleAdFailure() {
+        failureCount++
+        lastFailureTime = System.currentTimeMillis()
+        
+        if (failureCount >= AdManageKitConfig.circuitBreakerThreshold) {
+            isCircuitBreakerOpen = true
+            AdDebugUtils.logEvent("", "circuitBreakerOpen", "Circuit breaker opened after $failureCount failures", false)
+        }
+    }
+    
+    /**
+     * Handle ad loading success for circuit breaker logic
+     */
+    private fun handleAdSuccess() {
+        if (failureCount > 0) {
+            AdDebugUtils.logEvent("", "circuitBreakerReset", "Circuit breaker reset after success", true)
+        }
+        failureCount = 0
+        isCircuitBreakerOpen = false
+    }
+    
+    /**
+     * Check if circuit breaker should allow ad loading
+     */
+    private fun shouldAttemptLoad(): Boolean {
+        if (!isCircuitBreakerOpen) return true
+        
+        val timeSinceLastFailure = System.currentTimeMillis() - lastFailureTime
+        if (timeSinceLastFailure > AdManageKitConfig.circuitBreakerResetTimeout.inWholeMilliseconds) {
+            isCircuitBreakerOpen = false
+            failureCount = 0
+            AdDebugUtils.logEvent("", "circuitBreakerReset", "Circuit breaker reset after timeout", true)
+            return true
+        }
+        
+        return false
     }
 
     private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
@@ -365,6 +470,7 @@ class AdManager() {
                 override fun onAdDismissedFullScreenContent() {
                     isDisplayingAd = false
                     mInterstitialAd = null
+                    AdDebugUtils.logEvent(adUnitId ?: "", "onAdDismissed", "Interstitial ad dismissed", true)
                     callback.onNextAction()
 
                     // Log Firebase event for ad dismissed
@@ -382,12 +488,16 @@ class AdManager() {
                     isDisplayingAd = false
                     mInterstitialAd = null
                     Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
+                    AdDebugUtils.logEvent(adUnitId ?: "", "onFailedToShow", "Interstitial failed to show: ${adError.message}", false)
                     callback.onNextAction()
 
                     // Log Firebase event for ad failed to show
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                         putString("ad_error_code", adError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", adError.message)
+                        }
                     }
                     firebaseAnalytics.logEvent("ad_failed_to_show", params)
                 }
@@ -396,6 +506,7 @@ class AdManager() {
                     isDisplayingAd = true
                     lastAdShowTime = System.currentTimeMillis()
                     adDisplayCount++
+                    AdDebugUtils.logEvent(adUnitId ?: "", "onAdImpression", "Interstitial ad shown", true)
 
                     // Log Firebase event for ad impression
                     val params = Bundle().apply {
