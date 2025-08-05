@@ -15,6 +15,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.i2hammad.admanagekit.utils.AdRetryManager
 
 //import com.i2hammad.admanagekit.billing.AppPurchase
 
@@ -36,6 +37,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private var failureCount = 0
     private var lastFailureTime = 0L
     private var isCircuitBreakerOpen = false
+    private val retryAttempts = mutableMapOf<String, Int>()
 
     init {
         myApplication.registerActivityLifecycleCallbacks(this)

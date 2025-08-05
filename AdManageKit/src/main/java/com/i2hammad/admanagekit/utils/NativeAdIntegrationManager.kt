@@ -2,10 +2,12 @@ package com.i2hammad.admanagekit.utils
 
 import android.app.Activity
 import android.util.Log
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.NativeAd
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.utils.AdRetryManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -45,7 +47,7 @@ object NativeAdIntegrationManager {
     )
     
     /**
-     * Enhanced ad loading with screen-aware caching.
+     * Enhanced ad loading with screen-aware caching and retry support.
      * 
      * @param activity The activity context
      * @param baseAdUnitId The base ad unit ID (without screen suffix)
@@ -53,6 +55,7 @@ object NativeAdIntegrationManager {
      * @param useCachedAd Whether to use cached ads
      * @param callback Ad loading callback
      * @param loadNewAd Function to load a new ad if cache miss
+     * @param retryAttempt Current retry attempt (0-based, internal use)
      */
     fun loadNativeAdWithCaching(
         activity: Activity,
@@ -60,6 +63,7 @@ object NativeAdIntegrationManager {
         screenType: ScreenType,
         useCachedAd: Boolean = true,
         callback: AdLoadCallback?,
+        retryAttempt: Int = 0,
         loadNewAd: (String, AdLoadCallback?) -> Unit
     ) {
         val screenKey = "${activity.javaClass.simpleName}_${screenType.name}"
@@ -83,8 +87,11 @@ object NativeAdIntegrationManager {
             }
         }
         
-        // Load new ad with enhanced callback
-        val enhancedCallback = createEnhancedCallback(enhancedAdUnitId, screenKey, callback)
+        // Load new ad with enhanced callback that includes retry logic
+        val enhancedCallback = createEnhancedCallbackWithRetry(
+            activity, baseAdUnitId, screenType, enhancedAdUnitId, screenKey, 
+            callback, loadNewAd, retryAttempt
+        )
         loadNewAd(enhancedAdUnitId, enhancedCallback)
     }
     
@@ -161,6 +168,99 @@ object NativeAdIntegrationManager {
             override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
                 logDebug("Ad failed to load for $screenKey: ${error?.message}")
                 originalCallback?.onFailedToLoad(error)
+            }
+            
+            override fun onAdClicked() {
+                logDebug("Ad clicked for $screenKey")
+                originalCallback?.onAdClicked()
+            }
+            
+            override fun onAdClosed() {
+                originalCallback?.onAdClosed()
+            }
+            
+            override fun onAdImpression() {
+                logDebug("Ad impression for $screenKey")
+                originalCallback?.onAdImpression()
+            }
+            
+            override fun onAdOpened() {
+                originalCallback?.onAdOpened()
+            }
+            
+            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+                logDebug("Paid event for $screenKey: ${adValue.valueMicros}")
+                originalCallback?.onPaidEvent(adValue)
+            }
+        }
+    }
+    
+    /**
+     * Creates enhanced callback that handles caching with screen awareness and retry logic.
+     */
+    private fun createEnhancedCallbackWithRetry(
+        activity: Activity,
+        baseAdUnitId: String,
+        screenType: ScreenType,
+        enhancedAdUnitId: String,
+        screenKey: String,
+        originalCallback: AdLoadCallback?,
+        loadNewAd: (String, AdLoadCallback?) -> Unit,
+        retryAttempt: Int
+    ): AdLoadCallback {
+        return object : AdLoadCallback() {
+            override fun onAdLoaded() {
+                // Cancel any pending retry for this ad unit
+                AdRetryManager.getInstance().cancelRetry(enhancedAdUnitId)
+                
+                logDebug("Ad loaded successfully for $screenKey (attempt ${retryAttempt + 1})")
+                originalCallback?.onAdLoaded()
+            }
+            
+            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+                logDebug("Ad failed to load for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
+                
+                // Try to use cached ad as fallback before attempting retry
+                if (NativeAdManager.enableCachingNativeAds) {
+                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
+                    if (cachedAd != null) {
+                        logDebug("Using cached ad as fallback for $screenKey after load failure")
+                        originalCallback?.onAdLoaded()
+                        return
+                    }
+                }
+                
+                // Check if we should retry (only for network errors, not for no fill or invalid requests)
+                val shouldRetry = when (error) {
+                    is LoadAdError -> {
+                        // Retry for network errors and internal errors, but not for no fill or invalid requests
+                        // Error codes: 0=INTERNAL_ERROR, 2=NETWORK_ERROR
+                        error.code in listOf(0, 2)
+                    }
+                    else -> false
+                }
+                
+                if (shouldRetry) {
+                    // Schedule retry using AdRetryManager
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = enhancedAdUnitId,
+                        attempt = retryAttempt
+                    ) {
+                        // Recursive call with incremented retry attempt
+                        loadNativeAdWithCaching(
+                            activity = activity,
+                            baseAdUnitId = baseAdUnitId,
+                            screenType = screenType,
+                            useCachedAd = false, // Don't use cache on retry
+                            callback = originalCallback,
+                            retryAttempt = retryAttempt + 1,
+                            loadNewAd = loadNewAd
+                        )
+                    }
+                } else {
+                    // No retry - pass the error to original callback
+                    originalCallback?.onFailedToLoad(error)
+                }
             }
             
             override fun onAdClicked() {

@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.core"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 23

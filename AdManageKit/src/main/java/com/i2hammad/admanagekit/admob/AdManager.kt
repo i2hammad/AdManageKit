@@ -18,6 +18,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.i2hammad.admanagekit.utils.AdRetryManager
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
@@ -39,6 +40,7 @@ class AdManager() {
     private var failureCount = 0
     private var lastFailureTime = 0L
     private var isCircuitBreakerOpen = false
+    private val retryAttempts = mutableMapOf<String, Int>()
 
     companion object {
         const val PURCHASED_APP_ERROR_CODE = 1001
@@ -142,8 +144,24 @@ class AdManager() {
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed for splash: ${loadAdError.message}", false)
                 
                 handleAdFailure()
-                isAdLoading = false
-                mInterstitialAd = null
+                
+                // Attempt automatic retry if enabled
+                if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
+                    val currentAttempt = retryAttempts[adUnitId] ?: 0
+                    retryAttempts[adUnitId] = currentAttempt + 1
+                    
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = currentAttempt,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        // Retry loading the ad
+                        loadInterstitialAdForSplash(context, adUnitId, timeoutMillis, callback)
+                    }
+                } else {
+                    isAdLoading = false
+                    mInterstitialAd = null
+                }
 
                 // Log Firebase event for ad failed to load
                 val params = Bundle().apply {
@@ -203,8 +221,24 @@ class AdManager() {
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed: ${loadAdError.message}", false)
                 
                 handleAdFailure()
-                isAdLoading = false
-                mInterstitialAd = null
+                
+                // Attempt automatic retry if enabled
+                if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
+                    val currentAttempt = retryAttempts[adUnitId] ?: 0
+                    retryAttempts[adUnitId] = currentAttempt + 1
+                    
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = currentAttempt,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        // Retry loading the ad
+                        loadInterstitialAd(context, adUnitId)
+                    }
+                } else {
+                    isAdLoading = false
+                    mInterstitialAd = null
+                }
 
                 // Log Firebase event for ad failed to load
                 val params = Bundle().apply {
@@ -265,8 +299,24 @@ class AdManager() {
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed with callback: ${loadAdError.message}", false)
                 
                 handleAdFailure()
-                isAdLoading = false
-                mInterstitialAd = null
+                
+                // Attempt automatic retry if enabled
+                if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
+                    val currentAttempt = retryAttempts[adUnitId] ?: 0
+                    retryAttempts[adUnitId] = currentAttempt + 1
+                    
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = currentAttempt,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        // Retry loading the ad with callback
+                        loadInterstitialAd(context, adUnitId, interstitialAdLoadCallback)
+                    }
+                } else {
+                    isAdLoading = false
+                    mInterstitialAd = null
+                }
 
                 // Log Firebase event for ad failed to load
                 val params = Bundle().apply {
@@ -445,6 +495,15 @@ class AdManager() {
         }
         failureCount = 0
         isCircuitBreakerOpen = false
+        
+        // Reset retry attempts for the successful ad unit
+        adUnitId?.let { unitId ->
+            if (retryAttempts.containsKey(unitId)) {
+                AdDebugUtils.logEvent(unitId, "retryReset", "Retry attempts reset after successful load", true)
+                retryAttempts.remove(unitId)
+                AdRetryManager.getInstance().cancelRetry(unitId)
+            }
+        }
     }
     
     /**
@@ -530,5 +589,14 @@ class AdManager() {
         } else {
             callback.onNextAction()
         }
+    }
+    
+    /**
+     * Check if retry should be attempted for the given ad unit
+     */
+    private fun shouldAttemptRetry(adUnitId: String): Boolean {
+        val currentAttempts = retryAttempts[adUnitId] ?: 0
+        return currentAttempts < AdManageKitConfig.maxRetryAttempts && 
+               !AdRetryManager.getInstance().hasActiveRetry(adUnitId)
     }
 }

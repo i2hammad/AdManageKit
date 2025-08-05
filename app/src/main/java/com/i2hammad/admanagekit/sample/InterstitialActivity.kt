@@ -52,7 +52,7 @@ class InterstitialActivity : AppCompatActivity() {
         }
         
         // Native ad caching is now controlled by configuration
-        NativeAdManager.enableCachingNativeAds = AdManageKitConfig.enableSmartPreloading
+
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
         nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110", 
             useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {

@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.billing"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 23
