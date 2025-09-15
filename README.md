@@ -3,11 +3,17 @@
 ![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent. 
+AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.1.0`** introduces major performance improvements, enhanced reliability features, and comprehensive debugging tools while maintaining full backward compatibility.
+**Latest Version `2.2.0`** introduces **Jetpack Compose support**, major performance improvements, enhanced reliability features, and comprehensive debugging tools while maintaining full backward compatibility.
 
-## What's New in 2.1.0 🚀
+## What's New in 2.2.0 🚀
+
+### 🎨 **Jetpack Compose Support (NEW)**
+- **Native Compose Components**: Purpose-built Composables for all ad types
+- **Programmatic Loading**: Load ads without predefined layouts using new ProgrammaticNativeAdLoader
+- **Compose-Native State Management**: Proper state handling and lifecycle management
+- **Conditional Ad Display**: Built-in purchase status integration with ConditionalAd composable
 
 ### 🎯 **Centralized Configuration with AdManageKitConfig**
 - **Single Configuration Point**: Control all ad behavior from one place
@@ -41,7 +47,14 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ## Features
 
-### 🚀 **AdMob Ads Management**
+### 🎨 **Jetpack Compose Integration (NEW)**
+- **BannerAdCompose**: Native Compose banner ad component with automatic lifecycle management
+- **NativeAdCompose**: Small, Medium, and Large native ad Composables with caching integration
+- **ProgrammaticNativeAdCompose**: Load ads without predefined layouts (recommended for Compose)
+- **InterstitialAdCompose**: Declarative interstitial ad management with multiple show modes
+- **Compose Utilities**: AdManageKitInitEffect, ConditionalAd, CacheWarmingEffect, and more
+
+### 🚀 **AdMob Ads Management (Traditional Views)**
 - **Banner Ads**: Enhanced BannerAdView with auto-refresh, collapsible banners, and smart retry logic
 - **Native Ads**: Three formats (Small, Medium, Large) with intelligent caching and screen-aware management
 - **Interstitial Ads**: Flexible loading with time/count-based triggers and dialog support
@@ -77,10 +90,10 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 - **Event Logging**: Comprehensive ad lifecycle event tracking and debugging
 - **Configuration Summary**: Easy configuration debugging and validation tools
 
-### 💰 **Billing Management (Multi-Module)**
+### 💰 **Multi-Module Architecture**
 - **Core Module**: Shared interfaces and configuration management
-- **Stable (v1.3.2)**: Google Play Billing Library (prior to version 8)
-- **Beta (v2.0.0-alpha01)**: Google Play Billing Library v8 with enhanced purchase flows
+- **Compose Module**: Jetpack Compose integration with native Composables (NEW in v2.2.0)
+- **Billing Module**: Google Play Billing Library v8 with enhanced purchase flows
 - **Purchase Provider Pattern**: Flexible billing implementations with easy switching
 
 ### 🔒 **Privacy & Compliance**
@@ -134,22 +147,18 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
 
    **Latest Stable Version (Recommended):**
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.1.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.1.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.1.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.2.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.2.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.2.0'
+
+   // For Jetpack Compose support (NEW in v2.2.0)
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.2.0'
    ```
 
    **Previous Stable Version:**
    ```groovy
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v1.3.2'
    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v1.3.2'
-   ```
-
-   **Beta Version (for testing new features):**
-   ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.0.0-alpha01'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.0.0-alpha01'
-   ```
 
 2. **Sync your project** with Gradle.
 
@@ -170,7 +179,7 @@ class MyApp : Application() {
             maxRetryAttempts = 3
             enablePerformanceMetrics = true
             
-            // Advanced features (new in 2.1.0)
+            // Advanced features (new in 2.2.0)
             enableAdaptiveIntervals = true
             circuitBreakerThreshold = 5
             nativeCacheExpiry = 2.hours
@@ -193,7 +202,7 @@ class MyApp : Application() {
 
 ### Enhanced Integration Verification
 
-AdManageKit 2.1.0 includes comprehensive integration across all ad components:
+AdManageKit 2.2.0 includes comprehensive integration across all ad components:
 
 ✅ **AdManageKitConfig** - Integrated in all ad components (BannerAdView, NativeBannerSmall, NativeBannerMedium, NativeLarge)  
 ✅ **NativeAdIntegrationManager** - Screen-aware caching in all native ad formats  
@@ -203,6 +212,264 @@ The library automatically applies configuration settings to:
 - **BannerAdView**: Retry logic, auto-refresh intervals, and performance monitoring
 - **Native Ads**: Smart caching, preloading strategies, and screen-aware management
 - **All Components**: Debug logging, error handling, and analytics integration
+
+## 🎨 Jetpack Compose Usage (NEW)
+
+The new Compose module provides native Composables for seamless integration with Jetpack Compose applications.
+
+### Quick Start with Compose
+
+#### 1. Initialize AdManageKit in Compose
+
+```kotlin
+@Composable
+fun MyApp() {
+    // Initialize AdManageKit with Firebase Analytics
+    AdManageKitInitEffect()
+
+    // Your app content
+    MyAppContent()
+}
+```
+
+#### 2. Banner Ads in Compose
+
+```kotlin
+@Composable
+fun BannerAdExample() {
+    Column {
+        Text("Welcome to my app!")
+
+        // Simple banner ad
+        BannerAdCompose(
+            adUnitId = "ca-app-pub-3940256099942544/6300978111",
+            onAdLoaded = { println("Banner ad loaded") },
+            onAdFailedToLoad = { error -> println("Banner failed: ${error?.message}") }
+        )
+
+        Text("More content...")
+    }
+}
+```
+
+#### 3. Native Ads in Compose
+
+```kotlin
+@Composable
+fun NativeAdExamples() {
+    LazyColumn {
+        item {
+            // Small native ad
+            NativeBannerSmallCompose(
+                adUnitId = "ca-app-pub-3940256099942544/2247696110",
+                useCachedAd = true
+            )
+        }
+
+        item {
+            // Medium native ad
+            NativeBannerMediumCompose(
+                adUnitId = "ca-app-pub-3940256099942544/2247696110"
+            )
+        }
+
+        item {
+            // Large native ad
+            NativeLargeCompose(
+                adUnitId = "ca-app-pub-3940256099942544/2247696110"
+            )
+        }
+    }
+}
+```
+
+#### 4. Programmatic Native Ads (Recommended)
+
+```kotlin
+@Composable
+fun ProgrammaticNativeAds() {
+    Column {
+        // Programmatic small native ad with loading indicator
+        ProgrammaticNativeBannerSmallCompose(
+            adUnitId = "ca-app-pub-3940256099942544/2247696110",
+            showLoadingIndicator = true,
+            onAdLoaded = { nativeAdView, nativeAd ->
+                println("Programmatic ad loaded successfully")
+            },
+            onAdFailedToLoad = { error ->
+                println("Ad failed to load: ${error.message}")
+            }
+        )
+
+        // Medium programmatic native ad
+        ProgrammaticNativeBannerMediumCompose(
+            adUnitId = "ca-app-pub-3940256099942544/2247696110"
+        )
+
+        // Large programmatic native ad
+        ProgrammaticNativeLargeCompose(
+            adUnitId = "ca-app-pub-3940256099942544/2247696110"
+        )
+    }
+}
+```
+
+#### 5. Interstitial Ads in Compose
+
+```kotlin
+@Composable
+fun InterstitialAdExample() {
+    // Simple interstitial with automatic preloading
+    val showInterstitial = rememberInterstitialAd(
+        adUnitId = "ca-app-pub-3940256099942544/1033173712",
+        preloadAd = true,
+        onAdShown = { println("Interstitial shown") },
+        onAdDismissed = { println("Interstitial dismissed") }
+    )
+
+    Button(onClick = { showInterstitial() }) {
+        Text("Show Interstitial Ad")
+    }
+}
+
+@Composable
+fun AdvancedInterstitialExample() {
+    // Advanced interstitial with state management
+    val interstitialState = rememberInterstitialAdState(
+        adUnitId = "ca-app-pub-3940256099942544/1033173712",
+        autoLoad = true
+    )
+
+    Column {
+        Text("Ad Status: ${if (interstitialState.isLoaded) "Ready" else "Loading"}")
+
+        Button(
+            onClick = {
+                // Show with time-based logic
+                interstitialState.showAdByTime()
+            },
+            enabled = interstitialState.isLoaded
+        ) {
+            Text("Show Ad (Time-based)")
+        }
+
+        Button(
+            onClick = {
+                // Force show with dialog
+                interstitialState.forceShowAdWithDialog()
+            },
+            enabled = interstitialState.isLoaded
+        ) {
+            Text("Force Show with Dialog")
+        }
+
+        if (interstitialState.lastError != null) {
+            Text(
+                text = "Error: ${interstitialState.lastError}",
+                color = Color.Red
+            )
+        }
+    }
+}
+```
+
+#### 6. Conditional Ad Display
+
+```kotlin
+@Composable
+fun ConditionalAdExample() {
+    Column {
+        Text("My App Content")
+
+        // Only show ads if user hasn't purchased
+        ConditionalAd {
+            ProgrammaticNativeBannerMediumCompose(
+                adUnitId = "ca-app-pub-3940256099942544/2247696110"
+            )
+        }
+
+        Text("More content...")
+    }
+}
+```
+
+#### 7. Advanced Features
+
+```kotlin
+@Composable
+fun AdvancedComposeFeatures() {
+    // Cache warming for better performance
+    CacheWarmingEffect(
+        adUnits = mapOf(
+            "ca-app-pub-3940256099942544/2247696110" to 2,
+            "ca-app-pub-3940256099942544/6300978111" to 1
+        ),
+        onComplete = { warmedUnits, totalUnits ->
+            println("Warmed $warmedUnits out of $totalUnits ad units")
+        }
+    )
+
+    // Monitor purchase status
+    val isPurchased = rememberPurchaseStatus()
+
+    // Monitor performance
+    val cacheStats by rememberCacheStatistics()
+    val perfStats by rememberPerformanceStats()
+
+    Column {
+        Text("Purchase Status: ${if (isPurchased) "Purchased" else "Free"}")
+        Text("Cache Hit Rate: ${perfStats["hit_rate_percent"]}%")
+        Text("Total Ads Served: ${perfStats["total_ads_served"]}")
+
+        cacheStats.forEach { (adUnit, stats) ->
+            Text("$adUnit: $stats")
+        }
+    }
+}
+```
+
+### Compose Component Reference
+
+| Component | Description |
+|-----------|-------------|
+| `BannerAdCompose` | Banner ad with automatic lifecycle management |
+| `NativeBannerSmallCompose` | Small native banner (80dp height) |
+| `NativeBannerMediumCompose` | Medium native banner (120dp height) |
+| `NativeLargeCompose` | Large native ad (300dp height) |
+| `ProgrammaticNativeAdCompose` | Generic programmatic native ad (recommended) |
+| `ProgrammaticNativeBannerSmallCompose` | Small programmatic native banner |
+| `ProgrammaticNativeBannerMediumCompose` | Medium programmatic native banner |
+| `ProgrammaticNativeLargeCompose` | Large programmatic native ad |
+| `rememberInterstitialAd` | Returns function to show interstitial ads |
+| `rememberInterstitialAdState` | Advanced interstitial state management |
+| `InterstitialAdEffect` | Declarative interstitial ad management |
+| `AdManageKitInitEffect` | Initialize AdManageKit with Firebase Analytics |
+| `ConditionalAd` | Conditionally display ads based on purchase status |
+| `CacheWarmingEffect` | Pre-load ads for better performance |
+
+### Migration from Traditional Views to Compose
+
+```kotlin
+// Old View system
+val nativeBannerSmall = NativeBannerSmall(context)
+nativeBannerSmall.loadNativeBannerAd(activity, adUnitId)
+container.addView(nativeBannerSmall)
+
+// New Compose system
+@Composable
+fun MyScreen() {
+    NativeBannerSmallCompose(
+        adUnitId = adUnitId,
+        onAdLoaded = { /* handle success */ }
+    )
+}
+```
+
+---
+
+## Traditional View Usage
+
+For traditional Android View system integration, use the following approaches:
 
 ### Usage
 
@@ -452,12 +719,7 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
 
 1. **Initialize the Billing Client**:
 
-   For stable version (`1.3.2`):
-   ```java
-   AppPurchase.getInstance().initBilling(getApplication(), Arrays.asList(new PurchaseItem("your_product_id", AppPurchase.TYPE_IAP.PURCHASE)));
-   ```
-
-   For beta version (`2.0.0-alpha01`):
+   For current version:
    ```java
    AppPurchase.getInstance().initBilling(getApplication(), Arrays.asList(new PurchaseItem("your_product_id", "", AppPurchase.TYPE_IAP.PURCHASE)));
    ```
@@ -509,7 +771,7 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
 
 For detailed billing documentation, see the [Billing Management Wiki](docs/billing-management.md).
 
-## Advanced Features (New in 2.1.0)
+## Advanced Features (New in 2.2.0)
 
 ### Smart Configuration Management
 
@@ -696,9 +958,9 @@ The sample project in the `app` directory demonstrates ad management (banner, in
 
 ## Migration Guide
 
-### Migrating to 2.1.0
+### Migrating to 2.2.0
 
-Version 2.1.0 is **fully backward compatible**. All existing method signatures and behaviors are preserved. However, you can opt-in to new features:
+Version 2.2.0 is **fully backward compatible**. All existing method signatures and behaviors are preserved. However, you can opt-in to new features:
 
 #### Optional: Enable New Features
 ```kotlin
@@ -731,15 +993,11 @@ val enhancedCallback = object : AdLoadCallback() {
 }
 ```
 
-### Migrating from Beta Version (2.0.0-alpha01)
-- **Billing Compatibility**: All billing methods from 2.0.0-alpha01 are supported in 2.1.0
+### Migration Notes
+- **Billing Compatibility**: All billing methods are fully supported in 2.2.0
 - **New Core Module**: Add `ad-manage-kit-core` dependency for new features
 - **Configuration**: Replace manual configurations with `AdManageKitConfig`
-
-### Notes for Beta Version (2.0.0-alpha01)
-- **Use with Caution**: The beta version introduces significant changes to the billing module with Google Play Billing Library version 8. Thoroughly test billing flows before deploying to production.
-- **Deprecated Methods**: Replace `initBilling(Application, List<String>, List<String>)`, `purchase(Activity)`, and `getPrice()` with their recommended counterparts (see [Billing Management Wiki](docs/billing-management.md)).
-- **Upgrade Path**: Consider upgrading to 2.1.0 for production apps with enhanced stability and new features.
+- **Deprecated Methods**: Replace `initBilling(Application, List<String>, List<String>)`, `purchase(Activity)`, and `getPrice()` with their recommended counterparts (see [Billing Management Wiki](docs/billing-management.md))
 
 ### Contributing
 

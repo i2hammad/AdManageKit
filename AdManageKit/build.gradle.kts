@@ -56,6 +56,7 @@ dependencies {
     api(platform(libs.firebase.bom))
     api(libs.firebase.analytics)
     api(project(":admanagekit-core"))
+    implementation(libs.androidx.work.runtime)
 
 
 }
@@ -67,7 +68,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "2.0.1"
+                version = "2.2.0"
             }
 
 

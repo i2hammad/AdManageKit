@@ -510,4 +510,114 @@ object NativeAdManager {
             return adList != null && adList.isNotEmpty()
         }
     }
+
+    // =================== PROGRAMMATIC LOADING ===================
+
+    /**
+     * Loads a native ad programmatically without requiring a view to be added to layout first.
+     * This is a convenience method that delegates to ProgrammaticNativeAdLoader.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param size The native ad size (SMALL, MEDIUM, LARGE)
+     * @param useCachedAd Whether to try cached ads first
+     * @param callback Callback for ad events
+     */
+    fun loadNativeAdProgrammatically(
+        activity: android.app.Activity,
+        adUnitId: String,
+        size: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize,
+        useCachedAd: Boolean = true,
+        callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
+    ) {
+        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
+            activity, adUnitId, size, useCachedAd, callback
+        )
+    }
+
+    /**
+     * Loads a small native banner ad programmatically.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param useCachedAd Whether to try cached ads first
+     * @param callback Callback for ad events
+     */
+    fun loadSmallNativeAd(
+        activity: android.app.Activity,
+        adUnitId: String,
+        useCachedAd: Boolean = true,
+        callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
+    ) {
+        loadNativeAdProgrammatically(
+            activity, adUnitId,
+            com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.SMALL,
+            useCachedAd, callback
+        )
+    }
+
+    /**
+     * Loads a medium native banner ad programmatically.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param useCachedAd Whether to try cached ads first
+     * @param callback Callback for ad events
+     */
+    fun loadMediumNativeAd(
+        activity: android.app.Activity,
+        adUnitId: String,
+        useCachedAd: Boolean = true,
+        callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
+    ) {
+        loadNativeAdProgrammatically(
+            activity, adUnitId,
+            com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.MEDIUM,
+            useCachedAd, callback
+        )
+    }
+
+    /**
+     * Loads a large native ad programmatically.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param useCachedAd Whether to try cached ads first
+     * @param callback Callback for ad events
+     */
+    fun loadLargeNativeAd(
+        activity: android.app.Activity,
+        adUnitId: String,
+        useCachedAd: Boolean = true,
+        callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
+    ) {
+        loadNativeAdProgrammatically(
+            activity, adUnitId,
+            com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.LARGE,
+            useCachedAd, callback
+        )
+    }
+
+    /**
+     * Loads a native ad and automatically adds it to the specified ViewGroup.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param size The native ad size
+     * @param container The ViewGroup to add the ad to
+     * @param useCachedAd Whether to try cached ads first
+     * @param callback Optional callback for ad events
+     */
+    fun loadNativeAdIntoContainer(
+        activity: android.app.Activity,
+        adUnitId: String,
+        size: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize,
+        container: android.view.ViewGroup,
+        useCachedAd: Boolean = true,
+        callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback? = null
+    ) {
+        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAdIntoContainer(
+            activity, adUnitId, size, container, useCachedAd, callback
+        )
+    }
 }
