@@ -35,6 +35,26 @@ object NativeAdIntegrationManager {
     // Ad request tracking
     private val screenAdRequests = ConcurrentHashMap<String, AtomicLong>()
     private val activeScreens = ConcurrentHashMap<String, ScreenContext>()
+
+    // Temporary cache for passing cached ads to callers
+    private var temporarilyCachedAd: NativeAd? = null
+    private var cachedAdScreenKey: String? = null
+
+    /**
+     * Retrieves and clears a temporarily cached ad if available.
+     * This is used when the integration manager finds a cached ad and needs to pass it to the caller.
+     */
+    fun getAndClearTemporaryCachedAd(screenKey: String): NativeAd? {
+        return if (cachedAdScreenKey == screenKey) {
+            val ad = temporarilyCachedAd
+            temporarilyCachedAd = null
+            cachedAdScreenKey = null
+            logDebug("Retrieved temporarily cached ad for $screenKey")
+            ad
+        } else {
+            null
+        }
+    }
     
     /**
      * Context information for each screen using native ads.
@@ -77,11 +97,16 @@ object NativeAdIntegrationManager {
         // Try to get cached ad first if requested and caching is enabled
         if (useCachedAd && NativeAdManager.enableCachingNativeAds && AdManageKitConfig.enableSmartPreloading) {
             val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
-            
+
             if (cachedAd != null) {
                 logDebug("Cache hit for $screenKey: serving cached ad")
-                callback?.onAdLoaded()
-                return
+
+                // ❌ REMOVED: callback?.onAdLoaded() - This was the bug!
+                // ✅ NEW: Store the cached ad so the caller can access it and display it
+                temporarilyCachedAd = cachedAd
+                cachedAdScreenKey = screenKey
+
+                return // Let the caller handle displaying the cached ad
             } else {
                 logDebug("Cache miss for $screenKey: loading new ad")
             }

@@ -30,12 +30,12 @@ class MainActivity : AppCompatActivity() {
         // Enable debug overlay to see real-time ad statistics
         if (AdManageKitConfig.debugMode) {
             AdDebugUtils.enableDebugOverlay(this, true)
-            Log.d("MainActivity", "Debug overlay enabled")
+            Log.d("AdManageKit", "Debug overlay enabled")
         }
         
         // Log current configuration for testing
-        Log.d("MainActivity", "AdManageKit Configuration Summary:")
-        Log.d("MainActivity", AdManageKitConfig.getConfigSummary())
+        Log.d("AdManageKit", "AdManageKit Configuration Summary:")
+        Log.d("AdManageKit", AdManageKitConfig.getConfigSummary())
         
         loadAds()
 
@@ -54,21 +54,21 @@ class MainActivity : AppCompatActivity() {
         // Test native banner small with enhanced callback and smart preloading
         nativeBannerSmall.loadNativeBannerAd(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
             override fun onAdLoaded() {
-                Log.d("MainActivity", "✅ NativeBannerSmall loaded successfully")
+                Log.d("AdManageKit", "✅ NativeBannerSmall loaded successfully")
                 Toast.makeText(this@MainActivity, "Small Native Ad Loaded", Toast.LENGTH_SHORT).show()
             }
             
             override fun onFailedToLoad(error: AdError?) {
-                Log.e("MainActivity", "❌ NativeBannerSmall failed to load: ${error?.message}")
+                Log.e("AdManageKit", "❌ NativeBannerSmall failed to load: ${error?.message}")
                 Toast.makeText(this@MainActivity, "Small Native Ad Failed: ${error?.code}", Toast.LENGTH_SHORT).show()
             }
             
             override fun onAdImpression() {
-                Log.d("MainActivity", "👁️ NativeBannerSmall impression recorded")
+                Log.d("AdManageKit", "👁️ NativeBannerSmall impression recorded")
             }
             
             override fun onAdClicked() {
-                Log.d("MainActivity", "👆 NativeBannerSmall clicked")
+                Log.d("AdManageKit", "👆 NativeBannerSmall clicked")
             }
         })
 
@@ -80,12 +80,12 @@ class MainActivity : AppCompatActivity() {
         // Test native banner medium with configuration-based caching
         nativeBannerMedium.loadNativeBannerAd(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
             override fun onAdLoaded() {
-                Log.d("MainActivity", "✅ NativeBannerMedium loaded successfully")
+                Log.d("AdManageKit", "✅ NativeBannerMedium loaded successfully")
                 Toast.makeText(this@MainActivity, "Medium Native Ad Loaded", Toast.LENGTH_SHORT).show()
             }
             
             override fun onFailedToLoad(error: AdError?) {
-                Log.e("MainActivity", "❌ NativeBannerMedium failed to load: ${error?.message}")
+                Log.e("AdManageKit", "❌ NativeBannerMedium failed to load: ${error?.message}")
             }
         })
 
@@ -93,12 +93,12 @@ class MainActivity : AppCompatActivity() {
         // Test native large with configuration-based caching
         nativeLarge.loadNativeAds(this, adUnitId, useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
             override fun onAdLoaded() {
-                Log.d("MainActivity", "✅ NativeLarge loaded successfully")
+                Log.d("AdManageKit", "✅ NativeLarge loaded successfully")
                 Toast.makeText(this@MainActivity, "Large Native Ad Loaded", Toast.LENGTH_SHORT).show()
             }
             
             override fun onFailedToLoad(error: AdError?) {
-                Log.e("MainActivity", "❌ NativeLarge failed to load: ${error?.message}")
+                Log.e("AdManageKit", "❌ NativeLarge failed to load: ${error?.message}")
             }
         })
 
@@ -120,23 +120,23 @@ class MainActivity : AppCompatActivity() {
     private fun logCacheStatistics() {
         try {
             val cacheStats = NativeAdManager.getCacheStatistics()
-            Log.d("MainActivity", "📊 Cache Statistics:")
+            Log.d("AdManageKit", "📊 Cache Statistics:")
             cacheStats.forEach { (adUnit, stats) ->
-                Log.d("MainActivity", "  $adUnit: $stats")
+                Log.d("AdManageKit", "  $adUnit: $stats")
             }
             
             val totalCacheSize = NativeAdManager.getTotalCacheSize()
-            Log.d("MainActivity", "📦 Total cache size: $totalCacheSize ads")
+            Log.d("AdManageKit", "📦 Total cache size: $totalCacheSize ads")
             
             // Log configuration validation
             val isValid = AdManageKitConfig.validate()
-            Log.d("MainActivity", "✓ Configuration valid: $isValid")
+            Log.d("AdManageKit", "✓ Configuration valid: $isValid")
             
             val isProductionReady = AdManageKitConfig.isProductionReady()
-            Log.d("MainActivity", "🚀 Production ready: $isProductionReady")
+            Log.d("AdManageKit", "🚀 Production ready: $isProductionReady")
             
         } catch (e: Exception) {
-            Log.w("MainActivity", "Could not retrieve cache statistics: ${e.message}")
+            Log.w("AdManageKit", "Could not retrieve cache statistics: ${e.message}")
         }
     }
 
@@ -145,7 +145,7 @@ class MainActivity : AppCompatActivity() {
         
         // Log final statistics before clearing
         if (AdManageKitConfig.debugMode) {
-            Log.d("MainActivity", "🧹 Clearing all cached ads on destroy")
+            Log.d("AdManageKit", "🧹 Clearing all cached ads on destroy")
             logCacheStatistics()
         }
         

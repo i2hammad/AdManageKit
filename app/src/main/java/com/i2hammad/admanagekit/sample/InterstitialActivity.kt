@@ -55,9 +55,9 @@ class InterstitialActivity : AppCompatActivity() {
 
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
         nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110", 
-            useCachedAd = AdManageKitConfig.enableSmartPreloading, object : AdLoadCallback() {
+            useCachedAd = true, object : AdLoadCallback() {
                 override fun onAdLoaded() {
-                    Log.d("InterstitialActivity", "✅ NativeBannerMedium loaded in InterstitialActivity")
+                    Log.d("AdManageKit", "✅ NativeBannerMedium loaded in InterstitialActivity")
                 }
                 
                 override fun onFailedToLoad(error: AdError?) {

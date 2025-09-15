@@ -88,6 +88,8 @@ class NativeLarge @JvmOverloads constructor(
 
         // Use enhanced integration manager for smart caching
         if (context is Activity) {
+            val screenKey = "${context.javaClass.simpleName}_LARGE"
+
             com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.loadNativeAdWithCaching(
                 activity = context,
                 baseAdUnitId = adUnitId,
@@ -95,30 +97,30 @@ class NativeLarge @JvmOverloads constructor(
                 useCachedAd = useCachedAd,
                 callback = object : AdLoadCallback() {
                     override fun onAdLoaded() {
-                        // Ad was served from cache
+                        // Ad was served from cache or newly loaded
                         callback?.onAdLoaded()
                     }
-                    
+
                     override fun onFailedToLoad(error: AdError?) {
                         callback?.onFailedToLoad(error)
                     }
-                    
+
                     override fun onAdClicked() {
                         callback?.onAdClicked()
                     }
-                    
+
                     override fun onAdClosed() {
                         callback?.onAdClosed()
                     }
-                    
+
                     override fun onAdImpression() {
                         callback?.onAdImpression()
                     }
-                    
+
                     override fun onAdOpened() {
                         callback?.onAdOpened()
                     }
-                    
+
                     override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
                         callback?.onPaidEvent(adValue)
                     }
@@ -126,6 +128,13 @@ class NativeLarge @JvmOverloads constructor(
             ) { enhancedAdUnitId, enhancedCallback ->
                 // Load new ad if cache miss
                 loadNewAdInternal(context, enhancedAdUnitId, enhancedCallback, useCachedAd)
+            }
+
+            // 🔧 FIX: Check if integration manager found a cached ad and display it
+            val temporaryCachedAd = com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.getAndClearTemporaryCachedAd(screenKey)
+            if (temporaryCachedAd != null) {
+                AdDebugUtils.logEvent(adUnitId, "foundCachedAd", "Found cached ad from integration manager - displaying it", true)
+                displayAd(temporaryCachedAd)
             }
         } else {
             // Fallback to original loading for non-Activity contexts
