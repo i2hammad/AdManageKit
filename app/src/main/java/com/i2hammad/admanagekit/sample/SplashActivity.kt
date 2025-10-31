@@ -14,6 +14,7 @@ import com.i2hammad.admanagekit.AdConfig
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
+import com.i2hammad.admanagekit.admob.AppOpenManager
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.billing.AppPurchase
 import com.i2hammad.admanagekit.billing.BillingListener
@@ -141,7 +142,7 @@ class SplashActivity : AppCompatActivity() {
 
 
 
-/*    private fun forceLoadAppOpen() {
+   private fun forceLoadAppOpen() {
         val appOpenManager = MyApplication.instance.appOpenManager
         Log.d("SplashActivity", "forceLoadAppOpen: Loading app open ad")
         statusTextView.text = "Loading app open ad..."
@@ -172,12 +173,14 @@ class SplashActivity : AppCompatActivity() {
             object : AdManagerCallback() {
                 override fun onNextAction() {
                     super.onNextAction()
-                    Log.d("SplashActivity", "showAppOpenAd: App open ad shown or dismissed")
-                    statusTextView.text = "App open ad completed."
-                    onNextActionCalled()
+                    if (!AppOpenManager.isShowingAd()){
+                        Log.d("SplashActivity", "showAppOpenAd: App open ad shown or dismissed")
+                        statusTextView.text = "App open ad completed."
+                        onNextActionCalled()
+                    }
                 }
             })
-    }*/
+    }
 
     private fun onNextActionCalled() {
         Log.d("SplashActivity", "onNextActionCalled: Navigating to InterstitialActivity")

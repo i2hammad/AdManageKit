@@ -206,47 +206,55 @@ object NativeAdManager {
     
     /**
      * Retrieves a cached native ad for the specified ad unit with enhanced tracking.
-     * 
+     *
      * @param adUnitId The ad unit ID
+     * @param enableFallbackToAnyAd If true, returns any available cached ad when specific ad unit has no cache
      * @return A cached native ad, or null if none available
      */
-    fun getCachedNativeAd(adUnitId: String): NativeAd? {
+    @JvmOverloads
+    fun getCachedNativeAd(adUnitId: String, enableFallbackToAnyAd: Boolean = false): NativeAd? {
         if (!enableCachingNativeAds) {
             cacheMisses.incrementAndGet()
             return null
         }
-        
+
         synchronized(getLockForAdUnit(adUnitId)) {
             val adList = cachedAds[adUnitId]
             if (adList == null || adList.isEmpty()) {
-                cacheMisses.incrementAndGet()
                 logDebug("Cache miss for $adUnitId: no cached ads")
+
+                // Fallback: try to find any cached ad from other ad units
+                if (enableFallbackToAnyAd) {
+                    return getFallbackCachedAd(adUnitId)
+                }
+
+                cacheMisses.incrementAndGet()
                 return null
             }
-            
+
             val currentTime = System.currentTimeMillis()
-            
+
             // Clean up expired ads
             cleanupExpiredAds(adUnitId, adList, currentTime)
-            
+
             // Find the most recently cached valid ad (LIFO for freshest ad)
             val validAd = adList.lastOrNull()
-            
+
             return if (validAd != null) {
                 // Update access statistics for LRU tracking
                 validAd.lastAccessTime = currentTime
                 validAd.accessCount++
-                
+
                 // Remove from cache since it's being used
                 adList.remove(validAd)
-                
+
                 // Update performance counters
                 cacheHits.incrementAndGet()
                 totalAdsServed.incrementAndGet()
-                
+
                 val ageMs = validAd.getAgeMs(currentTime)
                 logDebug("Cache hit for $adUnitId: served ad aged ${ageMs}ms, access count: ${validAd.accessCount}")
-                
+
                 // Track analytics
                 trackEvent("native_ad_served", mapOf(
                     "ad_unit_id" to adUnitId,
@@ -254,14 +262,86 @@ object NativeAdManager {
                     "access_count" to validAd.accessCount,
                     "source" to "cache"
                 ))
-                
+
                 validAd.ad
             } else {
-                cacheMisses.incrementAndGet()
                 logDebug("Cache miss for $adUnitId: no valid ads after cleanup")
+
+                // Fallback: try to find any cached ad from other ad units
+                if (enableFallbackToAnyAd) {
+                    return getFallbackCachedAd(adUnitId)
+                }
+
+                cacheMisses.incrementAndGet()
                 null
             }
         }
+    }
+
+    /**
+     * Fallback mechanism to retrieve any available cached ad from other ad units.
+     * This is useful when the requested ad unit has no cached ads but other ad units do.
+     *
+     * @param requestedAdUnitId The originally requested ad unit ID (for logging)
+     * @return A cached native ad from any available ad unit, or null if no ads are cached
+     */
+    private fun getFallbackCachedAd(requestedAdUnitId: String): NativeAd? {
+        logDebug("Attempting fallback for $requestedAdUnitId: searching all cached ad units")
+
+        val currentTime = System.currentTimeMillis()
+        val availableAdUnits = cachedAds.keys.toList()
+
+        // Sort by ad units with most cached ads (prioritize well-stocked units)
+        val sortedAdUnits = availableAdUnits.sortedByDescending { adUnitId ->
+            cachedAds[adUnitId]?.size ?: 0
+        }
+
+        for (fallbackAdUnitId in sortedAdUnits) {
+            if (fallbackAdUnitId == requestedAdUnitId) continue // Skip the originally requested unit
+
+            synchronized(getLockForAdUnit(fallbackAdUnitId)) {
+                val adList = cachedAds[fallbackAdUnitId]
+                if (adList != null && adList.isNotEmpty()) {
+                    // Clean up expired ads first
+                    cleanupExpiredAds(fallbackAdUnitId, adList, currentTime)
+
+                    // Get the most recent valid ad
+                    val validAd = adList.lastOrNull()
+
+                    if (validAd != null) {
+                        // Update access statistics
+                        validAd.lastAccessTime = currentTime
+                        validAd.accessCount++
+
+                        // Remove from cache
+                        adList.remove(validAd)
+
+                        // Update performance counters (partial hit)
+                        cacheHits.incrementAndGet()
+                        totalAdsServed.incrementAndGet()
+
+                        val ageMs = validAd.getAgeMs(currentTime)
+                        logDebug("Fallback cache hit: requested $requestedAdUnitId, served from $fallbackAdUnitId (age: ${ageMs}ms)")
+
+                        // Track analytics with fallback flag
+                        trackEvent("native_ad_served", mapOf(
+                            "ad_unit_id" to requestedAdUnitId,
+                            "fallback_ad_unit_id" to fallbackAdUnitId,
+                            "age_ms" to ageMs,
+                            "access_count" to validAd.accessCount,
+                            "source" to "cache_fallback"
+                        ))
+
+                        return validAd.ad
+                    }
+                }
+            }
+        }
+
+        // No cached ads found in any ad unit
+        cacheMisses.incrementAndGet()
+        logDebug("Fallback failed for $requestedAdUnitId: no cached ads available in any ad unit")
+        return null
     }
     
     /**

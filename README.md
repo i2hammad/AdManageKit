@@ -735,7 +735,7 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
    ```java
    AppPurchase.getInstance().setPurchaseListener(new PurchaseListener() {
        @Override
-       public void onProductPurchased(String orderId, String originalJson) {
+       public void onProductPurchased(String productId, String originalJson) {
            // Handle successful purchase
        }
        @Override

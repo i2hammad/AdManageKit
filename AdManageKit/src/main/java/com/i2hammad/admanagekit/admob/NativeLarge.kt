@@ -214,8 +214,10 @@ class NativeLarge @JvmOverloads constructor(
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 // Try to use cached ad if available and not explicitly requesting a new ad
                 if (NativeAdManager.enableCachingNativeAds && !useCachedAd) {
-                    val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId)
+                    // First try specific ad unit, then fallback to any cached ad
+                    val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId, enableFallbackToAnyAd = true)
                     if (cachedAd != null) {
+                        AdDebugUtils.logEvent(adUnitId, "usedFallbackCache", "Used fallback cached ad after network failure", true)
                         displayAd(cachedAd)
                         callback?.onAdLoaded()
                         return

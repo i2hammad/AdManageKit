@@ -56,7 +56,7 @@ public class AppPurchase {
     private final Map<String, ProductDetails> inAppProductDetailsMap = new HashMap<>();
     private final Map<String, ProductDetails> subProductDetailsMap = new HashMap<>();
 
-    private boolean isBillingAvailable;
+    public boolean isBillingAvailable;
     public Boolean isBillingInitialized = Boolean.FALSE;
 
     private List<PurchaseResult> purchaseResultList = new ArrayList<>();
@@ -760,7 +760,7 @@ public class AppPurchase {
         });
     }
 
-    private void connectToGooglePlayBilling() {
+    public void connectToGooglePlayBilling() {
         if (!isServiceConnected.get()) {
             billingClient.startConnection(new BillingClientStateListener() {
                 @Override
