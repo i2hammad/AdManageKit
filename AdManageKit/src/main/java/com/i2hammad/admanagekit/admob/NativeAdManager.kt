@@ -286,15 +286,19 @@ object NativeAdManager {
      * @return A cached native ad from any available ad unit, or null if no ads are cached
      */
     private fun getFallbackCachedAd(requestedAdUnitId: String): NativeAd? {
-        logDebug("Attempting fallback for $requestedAdUnitId: searching all cached ad units")
+        val requestedBaseId = extractBaseAdUnitId(requestedAdUnitId)
+
+        logDebug("Attempting fallback for $requestedAdUnitId (base: $requestedBaseId)")
 
         val currentTime = System.currentTimeMillis()
         val availableAdUnits = cachedAds.keys.toList()
 
-        // Sort by ad units with most cached ads (prioritize well-stocked units)
-        val sortedAdUnits = availableAdUnits.sortedByDescending { adUnitId ->
-            cachedAds[adUnitId]?.size ?: 0
-        }
+        // Sort by ad units with most cached ads but restrict to same base ad unit
+        val sortedAdUnits = availableAdUnits
+            .filter { extractBaseAdUnitId(it) == requestedBaseId }
+            .sortedByDescending { adUnitId ->
+                cachedAds[adUnitId]?.size ?: 0
+            }
 
         for (fallbackAdUnitId in sortedAdUnits) {
             if (fallbackAdUnitId == requestedAdUnitId) continue // Skip the originally requested unit
@@ -329,7 +333,7 @@ object NativeAdManager {
                             "fallback_ad_unit_id" to fallbackAdUnitId,
                             "age_ms" to ageMs,
                             "access_count" to validAd.accessCount,
-                            "source" to "cache_fallback"
+                            "source" to "cache_fallback_same_unit"
                         ))
 
                         return validAd.ad
@@ -338,10 +342,34 @@ object NativeAdManager {
             }
         }
 
-        // No cached ads found in any ad unit
+        // No cached ads found for the same ad unit
         cacheMisses.incrementAndGet()
-        logDebug("Fallback failed for $requestedAdUnitId: no cached ads available in any ad unit")
+        logDebug("Fallback failed for $requestedAdUnitId: no cached ads available for the same ad unit")
         return null
+    }
+
+    /**
+     * Extracts the base ad unit ID by removing known screen suffixes.
+     */
+    private fun extractBaseAdUnitId(adUnitId: String): String {
+        ScreenSuffix.values().forEach { suffix ->
+            if (adUnitId.endsWith(suffix.value)) {
+                return adUnitId.removeSuffix(suffix.value)
+            }
+        }
+        return adUnitId
+    }
+
+    /**
+     * Known suffixes appended for screen-aware caching.
+     */
+    private enum class ScreenSuffix(val value: String) {
+        SMALL("_SMALL"),
+        MEDIUM("_MEDIUM"),
+        LARGE("_LARGE"),
+        SMALL_LOWER("_small"),
+        MEDIUM_LOWER("_medium"),
+        LARGE_LOWER("_large")
     }
     
     /**

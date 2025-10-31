@@ -51,22 +51,22 @@ dependencies {
     api(project(":admanagekit-core"))
 
     // Compose BOM
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation(platform(libs.androidx.compose.bom))
 
     // Compose dependencies
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.compose.foundation:foundation")
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.foundation)
 
     // Activity Compose
-    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation(libs.androidx.activity.compose)
 
     // Lifecycle
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // AndroidX Core
     implementation(libs.androidx.core.ktx)
@@ -83,7 +83,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-compose"
-                version = "2.3.0"
+                version = "2.4.0"
             }
         }
     }

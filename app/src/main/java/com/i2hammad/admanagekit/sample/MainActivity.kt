@@ -145,10 +145,10 @@ class MainActivity : AppCompatActivity() {
         
         // Log final statistics before clearing
         if (AdManageKitConfig.debugMode) {
-            Log.d("AdManageKit", "🧹 Clearing all cached ads on destroy")
+//            Log.d("AdManageKit", "🧹 Clearing all cached ads on destroy")
             logCacheStatistics()
         }
         
-        NativeAdManager.clearAllCachedAds()
+//        NativeAdManager.clearAllCachedAds()
     }
 }
