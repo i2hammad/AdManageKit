@@ -1,221 +1,182 @@
-# Native Ads Caching - AdManageKit v1.3.2
+# Native Ads Caching · AdManageKit v2.5.0
 
 ## Overview
-The `AdManageKit` library (version `v1.3.2`) provides a robust native ads caching system in the `com.i2hammad.admanagekit.admob` package. This feature enables efficient ad delivery by caching native ads per ad unit ID, with a 1-hour expiration policy and a `useCachedAd` boolean option to choose between cached or new ads. It reduces network requests, improves ad load times, and ensures reliable ad display across `NativeBannerSmall`, `NativeBannerMedium`, and `NativeLarge` ad formats. The caching logic is centrally managed by the `NativeAdManager` class, shipped as part of the library.
+AdManageKit 2.5.0 combines `NativeAdManager`, `NativeAdIntegrationManager`, and Compose-first components to deliver screen-aware caching, retry-aware loading, and runtime analytics for every native ad format (Small/Medium/Large banners + programmatic layouts). The system keeps backward compatibility with the original APIs while layering on multi-screen cache segregation, LRU eviction, and Compose wrappers.
 
-**Library Version**: v1.3.2  
-**Last Updated**: May 22, 2025
+---
 
-## Features
-- **Per-Ad-Unit Caching**: Caches one `NativeAd` per `adUnitId`, supporting multiple ad units with independent caches.
-- **1-Hour Ad Expiration**: Cached ads expire after 1 hour (3600 seconds) to ensure freshness, with automatic cleanup of expired ads.
-- **Boolean Control**: The `useCachedAd` parameter (default: `false`) allows developers to prioritize cached ads (if valid) or fetch new ones.
-- **Fallback Mechanism**: If a new ad fails to load and `useCachedAd` is `false`, a valid cached ad for the same `adUnitId` is served if available.
-- **Memory Management**: Automatically destroys old or expired ads to prevent memory leaks.
-- **Unified Caching**: `NativeAdManager` ensures consistent caching behavior across all supported ad formats.
+## What’s New Since v1.x
+- **Screen-aware caching** with `NativeAdIntegrationManager` to prevent cache collisions across activities, fragments, or Compose destinations.
+- **Config-driven behavior** via `AdManageKitConfig` (cache expiry, max ads per unit, cleanup interval, smart preloading toggle).
+- **Programmatic + Compose components** (`ProgrammaticNativeAdCompose`, `NativeAdCompose`) that automatically use the same cache and debug hooks.
+- **Performance telemetry** through `NativeAdManager.getPerformanceStats()` / `rememberPerformanceStats()` for dashboards and QA tooling.
+- **Cache warming API**: `NativeAdManager.warmCache(...)` to prefetch multiple ad units concurrently.
+- **Retry integration**: built-in `AdRetryManager` support when cached ads fail and a fresh load is required.
 
-## Components
-### NativeAdManager
-The `NativeAdManager` singleton, included in the `v1.3.2` library, manages ad caching:
-- **Key Methods**:
-    - `setCachedNativeAd(adUnitId: String, ad: NativeAd)`: Stores a `NativeAd` for the specified `adUnitId` with a timestamp.
-    - `getCachedNativeAd(adUnitId: String): NativeAd?`: Retrieves a cached ad if it exists and is not expired.
-    - `clearCachedAd(adUnitId: String)`: Removes and destroys the cached ad for a specific `adUnitId`.
-    - `clearAllCachedAds()`: Clears and destroys all cached ads.
-- **Configuration**:
-    - `enableCachingNativeAds: Boolean`: Globally enables or disables caching (default: `true`).
-- **Expiration Logic**:
-    - Ads older than 3600 seconds are destroyed and removed from the cache when accessed via `getCachedNativeAd`.
-- **Storage**:
-    - Uses a `MutableMap<String, CachedAd>` where `CachedAd` is an internal data class storing the `NativeAd` and its cache timestamp.
+---
 
-### Ad Classes
-The library includes three ad format classes:
-- **`NativeBannerSmall`**: For small native banner ads.
-- **`NativeBannerMedium`**: For medium native banner ads.
-- **`NativeLarge`**: For large native ads with media content.
-
-Each class supports:
-- Loading ads with the `useCachedAd` option via `loadNativeBannerAd` (`NativeBannerSmall`, `NativeBannerMedium`) or `loadNativeAds` (`NativeLarge`).
-- Displaying cached ads using `displayAd`.
-- Fallback to cached ads on load failure.
-- Integration with `NativeAdManager` for caching and expiration.
-
-## Integration
-### Adding the Library
-Add `AdManageKit v1.3.2` to your project via your build system (e.g., Gradle):
+## Installation
 ```groovy
-implementation 'com.i2hammad.admanagekit:admob:1.3.2'
+dependencies {
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.5.0" // for Compose
+}
 ```
 
-Ensure the following dependencies are included in your app:
-- Google AdMob SDK
-- Firebase Analytics (for event logging)
-- Shimmer (for loading placeholders)
+---
 
-### Usage
-#### Loading Ads
-Use the `loadNativeBannerAd` or `loadNativeAds` method to load ads, specifying whether to use a cached ad.
+## Configuration
+Control caching from one place:
 
 ```kotlin
-// Initialize NativeBannerSmall
-val nativeBannerSmall = NativeBannerSmall(context)
-nativeBannerSmall.loadNativeBannerAd(
-    activity = activity,
-    adNativeBanner = "your-ad-unit-id",
-    useCachedAd = false, // Fetch new ad
-    adCallBack = object : AdLoadCallback {
-        override fun onAdLoaded() { Log.d("Ad", "Ad loaded") }
-        override fun onFailedToLoad(adError: LoadAdError) { Log.d("Ad", "Ad failed: ${adError.message}") }
-        override fun onAdImpression() { Log.d("Ad", "Ad impression") }
-        override fun onAdClicked() { Log.d("Ad", "Ad clicked") }
-        override fun onAdClosed() { Log.d("Ad", "Ad closed") }
-        override fun onAdOpened() { Log.d("Ad", "Ad opened") }
+AdManageKitConfig.apply {
+    nativeCacheExpiry = 2.hours
+    maxCachedAdsPerUnit = 4
+    enableSmartPreloading = true           // unlocks screen-aware cache hits
+    enableAutoCacheCleanup = true
+    enablePerformanceMetrics = BuildConfig.DEBUG
+    maxCacheMemoryMB = 64
+}
+```
+
+Optional: initialize analytics for cache metrics.
+
+```kotlin
+AdManageKitInitEffect() // Compose
+// or
+NativeAdManager.initialize(FirebaseAnalytics.getInstance(this))
+```
+
+---
+
+## Core Components
+
+| Component | Purpose |
+|-----------|---------|
+| `NativeAdManager` | LRU cache, cleanup scheduler, analytics hooks, cache statistics. |
+| `NativeAdIntegrationManager` | Screen-aware loader that stitches together caching + retry logic for `NativeBannerSmall/Medium`, `NativeLarge`, and programmatic views. |
+| `NativeBannerSmall/Medium`, `NativeLarge` | Traditional views that opt into caching via `useCachedAd` and integration-manager hooks. |
+| `ProgrammaticNativeAdCompose`, `NativeAdCompose` | Compose wrappers that load/cycle native ads without XML templates. |
+| `CacheWarmingEffect` | Compose helper that warms multiple ad units declaratively. |
+
+---
+
+## Usage Examples
+
+### XML / ViewBinding (NativeBannerSmall)
+```kotlin
+class FeedFragment : Fragment(R.layout.fragment_feed) {
+    private val nativeSmall by lazy { requireView().findViewById<NativeBannerSmall>(R.id.nativeSmall) }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        nativeSmall.loadNativeBannerAd(
+            activity = requireActivity(),
+            adNativeBanner = getString(R.string.native_feed),
+            useCachedAd = AdManageKitConfig.enableSmartPreloading,
+            adCallBack = object : AdLoadCallback() {
+                override fun onAdLoaded() = log("feed native ready")
+                override fun onFailedToLoad(error: AdError?) = log("feed failed ${error?.message}")
+            }
+        )
     }
+}
+```
+
+### Screen-Aware Loading
+```kotlin
+NativeAdIntegrationManager.loadNativeAdWithCaching(
+    activity = this,
+    baseAdUnitId = getString(R.string.native_article),
+    screenType = NativeAdIntegrationManager.ScreenType.MEDIUM,
+    useCachedAd = true,
+    callback = AdDebugUtils.createDebugCallback("article_native")
+) { enhancedUnitId, enhancedCallback ->
+    nativeBannerMedium.loadNativeBannerAd(
+        activity = this,
+        adNativeBanner = enhancedUnitId,
+        useCachedAd = true,
+        adCallBack = enhancedCallback
+    )
+}
+```
+
+### Compose – Programmatic Native Layout
+```kotlin
+@Composable
+fun ArticleNativeAdCard() {
+    AdManageKitInitEffect()
+
+    ProgrammaticNativeAdCompose(
+        adUnitId = stringResource(R.string.native_article),
+        screenType = NativeAdIntegrationManager.ScreenType.MEDIUM,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        onAdFailedToLoad = { reason -> Log.w("NativeAd", reason) }
+    )
+}
+```
+
+### Cache Warming
+```kotlin
+CacheWarmingEffect(
+    adUnits = mapOf(
+        getString(R.string.native_feed) to 3,
+        getString(R.string.native_article) to 2
+    ),
+    onComplete = { warmed, total -> Log.d("CacheWarm", "$warmed/$total warmed") }
 )
-
-// Load cached ad if available and not expired
-nativeBannerSmall.loadNativeBannerAd(activity, "your-ad-unit-id", useCachedAd = true)
 ```
 
-#### Configuring Caching
-Control caching globally via `NativeAdManager`:
+---
+
+## Operational APIs
 
 ```kotlin
-// Enable caching (default)
+// Control caching
 NativeAdManager.enableCachingNativeAds = true
-
-// Disable caching
-NativeAdManager.enableCachingNativeAds = false
-```
-
-#### Clearing Cache
-Clear cached ads to manage memory:
-
-```kotlin
-// Clear cache for a specific ad unit
-NativeAdManager.clearCachedAd("your-ad-unit-id")
-
-// Clear all cached ads
+NativeAdManager.clearCachedAd(adUnitId)
 NativeAdManager.clearAllCachedAds()
+
+// Observability
+val stats = NativeAdManager.getCacheStatistics()
+val performance = NativeAdManager.getPerformanceStats()
+
+// Compose debugging
+val cacheStats by rememberCacheStatistics()
+val perfStats by rememberPerformanceStats()
+
+// Smart preloading
+NativeAdManager.warmCache(
+    adUnits = mapOf("feed_native" to 3, "article_native" to 2)
+) { warmed, total -> Log.d("Warm", "$warmed/$total") }
 ```
 
-### Example: Loading Different Ad Formats
-```kotlin
-// NativeBannerMedium
-val nativeBannerMedium = NativeBannerMedium(context)
-nativeBannerMedium.loadNativeBannerAd(activity, "medium-ad-unit-id", useCachedAd = true)
+---
 
-// NativeLarge
-val nativeLarge = NativeLarge(context)
-nativeLarge.loadNativeAds(activity, "large-ad-unit-id", useCachedAd = false, object : AdLoadCallback {
-    override fun onAdLoaded() { Log.d("Ad", "Large Ad loaded") }
-    override fun onFailedToLoad(adError: LoadAdError) { Log.d("Ad", "Large Ad failed") }
-    override fun onAdImpression() { Log.d("Ad", "Large Ad impression") }
-    override fun onAdClicked() { Log.d("Ad", "Large Ad clicked") }
-    override fun onAdClosed() { Log.d("Ad", "Large Ad closed") }
-    override fun onAdOpened() { Log.d("Ad", "Large Ad opened") }
-})
-```
+## How Screen-Aware Caching Works
+1. **Request arrives:** `NativeAdIntegrationManager` builds a `screenKey` (e.g., `MainActivity_SMALL`) and chooses the right `ScreenType`.
+2. **Cache lookup:** tries screen-specific key → base ad unit → generic key per screen type.
+3. **Temporary handoff:** when a cached ad is found, it’s placed in a temp slot so the caller can immediately display it (fix for earlier onAdLoaded bug).
+4. **Network fallback:** cache miss triggers a fresh load with enhanced callbacks that automatically cache results and schedule retries through `AdRetryManager`.
+5. **Cleanup:** `NativeAdManager` periodically removes expired entries, enforces `maxCachedAdsPerUnit`, and logs eviction statistics.
 
-## Technical Details
-### Caching Workflow
-1. **Ad Loading**:
-    - If `useCachedAd` is `true` and a valid cached ad exists (via `NativeAdManager.getCachedNativeAd(adUnitId)`), it is displayed using `displayAd`.
-    - Otherwise, a new ad is fetched using `AdLoader`.
-    - On successful load, the ad is cached via `NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)` if `enableCachingNativeAds` is `true`.
-2. **Expiration Check**:
-    - `getCachedNativeAd` checks the ad’s age. If older than 3600 seconds, the ad is destroyed, removed from the cache, and `null` is returned.
-3. **Fallback Logic**:
-    - If a new ad fails to load and `useCachedAd` is `false`, a valid cached ad is served before triggering `onFailedToLoad`.
-4. **Memory Management**:
-    - Old ads are destroyed when replaced or expired.
-    - `clearAllCachedAds` ensures all ads are destroyed during cleanup.
+---
 
-### Key Code Snippets
-#### NativeAdManager
-```kotlin
-package com.i2hammad.admanagekit.admob
+## Debugging & Monitoring
+- **`AdDebugUtils.createDebugCallback(...)`** surfaces cache hits/misses and onPaid events in Logcat.
+- **`rememberPerformanceStats()`** + Compose preview = live dashboard of cache hit rate, memory freed, and active units.
+- **Firebase Analytics** – enable `AdManageKitConfig.enablePerformanceMetrics` and call `NativeAdManager.initialize(FirebaseAnalytics.getInstance(context))` to log cache events automatically (`native_ad_cached`, `native_ad_evicted`, etc.).
 
-object NativeAdManager {
-    var enableCachingNativeAds: Boolean = true
-    private data class CachedAd(val ad: NativeAd, val cachedTime: Long)
-    private val cachedAds: MutableMap<String, CachedAd> = mutableMapOf()
-
-    fun setCachedNativeAd(adUnitId: String, ad: NativeAd) {
-        if (enableCachingNativeAds) {
-            cachedAds[adUnitId]?.ad?.destroy()
-            cachedAds[adUnitId] = CachedAd(ad, System.currentTimeMillis())
-        }
-    }
-
-    fun getCachedNativeAd(adUnitId: String): NativeAd? {
-        if (!enableCachingNativeAds) return null
-        val cachedAd = cachedAds[adUnitId] ?: return null
-        val adAgeSeconds = (System.currentTimeMillis() - cachedAd.cachedTime) / 1000
-        return if (adAgeSeconds <= 3600) cachedAd.ad else {
-            cachedAd.ad.destroy()
-            cachedAds.remove(adUnitId)
-            null
-        }
-    }
-}
-```
-
-#### Loading Logic (e.g., NativeBannerSmall)
-```kotlin
-fun loadAd(context: Context, adUnitId: String, useCachedAd: Boolean, callback: AdLoadCallback?) {
-    this.adUnitId = adUnitId
-    if (useCachedAd && NativeAdManager.enableCachingNativeAds) {
-        val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId)
-        if (cachedAd != null) {
-            displayAd(cachedAd)
-            callback?.onAdLoaded()
-            return
-        }
-    }
-    // Proceed to load new ad
-}
-```
+---
 
 ## Best Practices
-- **Thread Safety**: For concurrent ad loading, make `NativeAdManager.cachedAds` thread-safe:
-  ```kotlin
-  private val cachedAds: MutableMap<String, CachedAd> = Collections.synchronizedMap(mutableMapOf())
-  ```
-- **Lifecycle Management**: Call `NativeAdManager.clearAllCachedAds()` in `Activity.onDestroy` or `Application.onTerminate` to free resources.
-- **Testing**:
-    - Test ad expiration by waiting past 1 hour.
-    - Verify fallback behavior when new ads fail.
-    - Test multiple `adUnitId` values for per-ad-unit caching.
-    - Toggle `useCachedAd` and `enableCachingNativeAds`.
-- **Logging**: Enable verbose logging (via `Log.d`) to debug caching and expiration issues.
-- **Ad Provider Compliance**: Check AdMob policies for caching and expiration constraints.
+- Enable `enableSmartPreloading` for production builds to unlock screen-aware caching; keep it off in QA if you need deterministic testing.
+- Call `NativeAdManager.clearAllCachedAds()` on logout or account switch to avoid cross-user targeting issues.
+- Pair Compose content with `ConditionalAd` to avoid rendering ads for purchased users.
+- Warm caches during app start for the first screen to reduce jank.
+- Monitor `maxCacheMemoryMB` + `maxCachedAdsPerUnit` when running on low-memory devices; adjust through config rather than custom code.
 
-## Limitations
-- **Manual Expiration**: The 1-hour expiration is managed manually, as `NativeAd` lacks built-in expiration metadata.
-- **Single Ad per Unit**: Only one ad is cached per `adUnitId`. For multiple ads, extend `NativeAdManager`.
-- **No Auto-Refresh**: Apps must manually request new ads when needed.
-
-## Dependencies
-- **Google AdMob SDK**: For ad loading and rendering.
-- **Firebase Analytics**: For logging ad events (impressions, paid events, failures).
-- **Shimmer**: For loading placeholders.
-- **Project Resources**: Layouts (`layout_native_banner_small`, `layout_native_banner_medium`, `layout_native_large`), `BillingConfig`, `AdManager`.
-
-## Troubleshooting
-- **Cached Ad Not Displaying**: Ensure `enableCachingNativeAds` is `true` and the ad is not expired.
-- **Memory Leaks**: Call `clearAllCachedAds` during app cleanup.
-- **Ad Load Failures**: Verify `adUnitId`, network connectivity, and AdMob configuration.
-- **AdChoices Issues**: Ensure `adChoicesView` is defined in layout files and properly handled.
-
-## Future Improvements
-- Support for multiple cached ads per `adUnitId`.
-- Configurable expiration durations.
-- Automatic cache refresh based on app-specific policies.
-- Enhanced analytics for cache hit/miss rates.
-
-## References
-- [AdMob Native Ads Documentation](https://developers.google.com/admob/android/native/start)
-- [Firebase Analytics Documentation](https://firebase.google.com/docs/analytics)
-- [AdManageKit v1.3.2 Release Notes](release-notes-v1.3.2.md)
+With these updates, native ads load faster, remain consistent across XML and Compose surfaces, and expose the telemetry you need to tune caching strategies release-over-release.

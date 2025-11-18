@@ -1,203 +1,205 @@
-# Interstitial Ads - AdManageKit v1.3.2
+# Interstitial Ads · AdManageKit v2.5.0
 
 ## Overview
-The `AdManageKit` library (version `v1.3.2`) provides robust management of interstitial ads through the `AdManager` class in the `com.i2hammad.admanagekit.admob` package. Interstitial ads are full-screen ads displayed at natural transition points in your app, such as between activities or during pauses in gameplay. The `AdManager` singleton supports loading, caching, and displaying interstitial ads with flexible options like time-based or count-based triggers, dialog support, and Firebase Analytics integration for tracking ad events.
+`AdManageKit` 2.5.0 ships a complete interstitial stack that spans `AdManager`, the fluent `InterstitialAdBuilder`, and brand-new Jetpack Compose utilities. The stack now includes automatic retry with exponential backoff, lifecycle-safe splash loading, fallback ad units, activity-aware purchase gating, and Compose state helpers. Everything is fully backward compatible with the traditional view-based APIs while enabling declarative use in Compose apps.
 
-**Library Version**: v1.3.2  
-**Last Updated**: May 22, 2025
+**What’s new since v1.x**  
+- Jetpack Compose helpers: `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState`  
+- Fluent builder with frequency controls (`everyNthTime`, `maxShows`, `minInterval`, `.force()`) and fallback chains  
+- Automatic retry via `AdRetryManager` (circuit breaker removed to maximize show rate)  
+- Splash-friendly `loadInterstitialAdForSplash(...)` with timeouts and callbacks  
+- Debug overlays, aggressive pre-loading helpers, and test-mode overrides wired through `AdManageKitConfig`
 
-## Features
-- **Ad Loading and Caching**: Load interstitial ads and cache them for later use, with automatic reload after display.
-- **Flexible Display Options**:
-  - Immediate display with or without a loading dialog.
-  - Time-based display (e.g., show every 15 seconds).
-  - Count-based display (e.g., show up to a maximum number of times).
-- **Purchase Check**: Automatically skips ad display if the user has purchased the app (via `BillingConfig`).
-- **Firebase Analytics**: Logs ad impressions, paid events, failures, and dismissals.
-- **Dialog Support**: Optional loading dialog to improve user experience during ad display.
+---
 
-## Components
-### AdManager
-The `AdManager` singleton manages interstitial ads:
-- **Key Methods**:
-  - `loadInterstitialAd(context: Context, adUnitId: String)`: Loads an interstitial ad for later use.
-  - `loadInterstitialAd(context: Context, adUnitId: String, callback: InterstitialAdLoadCallback)`: Loads an ad with a custom callback.
-  - `forceShowInterstitial(activity: Activity, callback: AdManagerCallback)`: Displays an ad immediately.
-  - `forceShowInterstitialWithDialog(activity: Activity, callback: AdManagerCallback, isReload: Boolean)`: Displays an ad with a loading dialog.
-  - `showInterstitialAdByTime(activity: Activity, callback: AdManagerCallback)`: Displays an ad if the time interval has elapsed.
-  - `showInterstitialAdByCount(activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int)`: Displays an ad if the display count is below the limit.
-  - `isReady(): Boolean`: Checks if an ad is loaded and ready to display.
-  - `setAdInterval(intervalMillis: Long)`: Sets the minimum time interval between ad displays.
-  - `setAdDisplayCount(count: Int)`: Sets the current ad display count.
-- **Configuration**:
-  - Default ad interval: 15 seconds (`adIntervalMillis`).
-  - Tracks display count (`adDisplayCount`) and last ad show time (`lastAdShowTime`).
-- **Callbacks**:
-  - Uses `AdManagerCallback` for handling ad dismissal (`onNextAction`) and other events.
-  - Supports `InterstitialAdLoadCallback` for custom load handling.
-
-## Usage
-### Integration
-Add `AdManageKit v1.3.2` to your project via Gradle:
+## Installation
+Add the v2.5.0 artifacts plus Compose (if needed):
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:1.3.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:1.3.2'
-```
-
-Ensure dependencies are included:
-- Google AdMob SDK
-- Firebase Analytics
-- Material Components (for loading dialogs)
-- Project resources (`BillingConfig`)
-
-### Loading Interstitial Ads
-Load an interstitial ad to cache it for later display:
-
-```kotlin
-AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-3940256099942544/1033173712")
-```
-
-Load with a custom callback:
-
-```kotlin
-AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-3940256099942544/1033173712", object : InterstitialAdLoadCallback() {
-    override fun onAdLoaded(interstitialAd: InterstitialAd) {
-        Log.d("AdManager", "Interstitial ad loaded")
-    }
-    override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-        Log.e("AdManager", "Failed to load: ${loadAdError.message}")
-    }
-})
-```
-
-### Displaying Interstitial Ads
-#### Immediate Display
-Show an ad immediately:
-
-```kotlin
-AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
-    override fun onNextAction() {
-        startActivity(Intent(this@CurrentActivity, NextActivity::class.java))
-    }
-})
-```
-
-#### With Loading Dialog
-Show an ad with a 500ms loading dialog:
-
-```kotlin
-AdManager.getInstance().forceShowInterstitialWithDialog(this, object : AdManagerCallback() {
-    override fun onNextAction() {
-        startActivity(Intent(this@CurrentActivity, NextActivity::class.java))
-    }
-})
-```
-
-#### Time-Based Display
-Show an ad if at least 15 seconds have passed since the last ad (configurable via `setAdInterval`):
-
-```kotlin
-AdManager.getInstance().setAdInterval(30_000) // 30 seconds
-AdManager.getInstance().showInterstitialAdByTime(this, object : AdManagerCallback() {
-    override fun onNextAction() {
-        startActivity(Intent(this@CurrentActivity, NextActivity::class.java))
-    }
-})
-```
-
-#### Count-Based Display
-Show an ad up to a maximum number of times:
-
-```kotlin
-AdManager.getInstance().showInterstitialAdByCount(this, object : AdManagerCallback() {
-    override fun onNextAction() {
-        startActivity(Intent(this@CurrentActivity, NextActivity::class.java))
-    }, maxDisplayCount = 3)
-```
-
-### Checking Ad Availability
-Verify if an ad is ready to display:
-
-```kotlin
-if (AdManager.getInstance().isReady()) {
-    Log.d("AdManager", "Interstitial ad is ready")
-} else {
-    Log.d("AdManager", "No interstitial ad available")
+dependencies {
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.5.0"
+    // Optional – Jetpack Compose helpers:
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.5.0"
 }
 ```
 
-### Managing Ad Frequency
-Set a custom time interval:
+---
+
+## Configure Once
+Set the new centralized config inside `Application.onCreate()`:
 
 ```kotlin
-AdManager.getInstance().setAdInterval(60_000) // 60 seconds
-```
+class MyApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
 
-Set or reset the display count:
+        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
 
-```kotlin
-AdManager.getInstance().setAdDisplayCount(0) // Reset count
-```
-
-## Implementation Details
-### Ad Loading Workflow
-1. **Loading**:
-   - `loadInterstitialAd` initiates an ad request using `InterstitialAd.load`.
-   - The ad is cached in `mInterstitialAd` if loaded successfully.
-   - If the user has purchased the app (`BillingConfig.getPurchaseProvider().isPurchased()`), loading is skipped.
-2. **Error Handling**:
-   - Failed loads are logged to Firebase Analytics with the ad unit ID and error code.
-   - Custom errors are triggered for purchased apps (`PURCHASED_APP_ERROR_CODE`).
-3. **Callbacks**:
-   - `InterstitialAdLoadCallback` handles load success or failure.
-   - `AdManagerCallback` ensures the app proceeds (`onNextAction`) after ad display or failure.
-
-### Ad Display Workflow
-1. **Display Check**:
-   - `isReady()` verifies a loaded ad exists and the user hasn’t purchased the app.
-   - Time-based display checks if `adIntervalMillis` has elapsed since `lastAdShowTime`.
-   - Count-based display checks if `adDisplayCount` is below `maxDisplayCount`.
-2. **Dialog Support**:
-   - `forceShowInterstitialWithDialog` shows a non-cancelable Material AlertDialog for 500ms before displaying the ad.
-3. **Ad Events**:
-   - `FullScreenContentCallback` handles ad show, dismissal, and failure events.
-   - `OnPaidEventListener` logs revenue data to Firebase Analytics.
-   - Analytics events include impressions (`AD_IMPRESSION`), dismissals (`ad_dismissed`), and failures (`ad_failed_to_show`).
-4. **Reload**:
-   - By default, a new ad is loaded after display (`reloadAd = true`), ensuring availability for future displays.
-
-### Key Code Snippet
-#### AdManager
-```kotlin
-fun loadInterstitialAd(context: Context, adUnitId: String) {
-    this.adUnitId = adUnitId
-    initializeFirebase(context)
-    val adRequest = AdRequest.Builder().build()
-    isAdLoading = true
-    InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
-        override fun onAdLoaded(interstitialAd: InterstitialAd) {
-            mInterstitialAd = interstitialAd
-            isAdLoading = false
-            Log.d("AdManager", "Interstitial ad loaded")
+        AdManageKitConfig.apply {
+            debugMode = BuildConfig.DEBUG
+            defaultInterstitialInterval = 20.seconds
+            autoRetryFailedAds = true
+            maxRetryAttempts = 3
+            enableAdaptiveIntervals = true
+            enablePerformanceMetrics = BuildConfig.DEBUG
         }
-        override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-            Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
-            isAdLoading = false
-            mInterstitialAd = null
-            val params = Bundle().apply {
-                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                putString("ad_error_code", loadAdError.code.toString())
-            }
-            firebaseAnalytics.logEvent("ad_failed_to_load", params)
+    }
+}
+```
+
+`AdManageKitConfig` now drives retry timing, adaptive intervals, analytics, and debug overlays for every interstitial entry-point.
+
+---
+
+## Option 1 · Direct `AdManager`
+
+`AdManager` lives in `com.i2hammad.admanagekit.admob` and exposes imperative control with smart defaults.
+
+```kotlin
+private val adManager = AdManager.getInstance()
+
+fun preloadInterstitial(activity: Activity) {
+    adManager.loadInterstitialAd(activity, AD_UNIT_INTERSTITIAL)
+}
+
+fun showInterstitial(activity: Activity) {
+    adManager.showInterstitialAdByTime(activity, object : AdManagerCallback() {
+        override fun onNextAction() {
+            navigateNext()
         }
     })
 }
+```
 
-fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
-    showAd(activity, callback, true)
+### Key APIs
+- `loadInterstitialAdForSplash(context, unit, timeoutMs, callback)` – timeouts + callback chain for splash flows
+- `forceShowInterstitial(activity, callback, reloadAd)` – immediate show with optional reload
+- `showInterstitialAdByTime(...)` & `showInterstitialAdByCount(...)` – throttle via interval or count
+- `forceShowInterstitialWithDialog(...)` – built-in loading dialog for smoother UX
+- `preloadAd(context, adUnitId)` – kicks off background loading for next screen
+- `enableAggressiveAdLoading()` / `resetAdThrottling()` – quick helpers for tuning show rate
+
+### Advanced Behavior
+- **Purchase-aware**: `BillingConfig` short-circuits loading/showing when a user owns the IAP/subscription.
+- **Auto retry**: Failed loads automatically use `AdRetryManager` with exponential backoff based on `AdManageKitConfig`.
+- **Analytics**: All impressions, failures, dismissals, and paid events are logged through Firebase Analytics when configured.
+
+### Splash Screen Example
+```kotlin
+AdManager.getInstance().loadInterstitialAdForSplash(
+    context = this,
+    adUnitId = getString(R.string.interstitial_splash),
+    timeoutMillis = 7_000,
+    callback = object : AdManagerCallback() {
+        override fun onAdLoaded() { startMainFlow() }
+        override fun onFailedToLoad(error: AdError?) { startMainFlow() }
+        override fun onNextAction() { startMainFlow() }
+    }
+)
+```
+
+---
+
+## Option 2 · `InterstitialAdBuilder`
+
+The builder (also under `admob`) wraps `AdManager` with a fluent API, fallback chains, loading dialogs, and frequency controls.
+
+```kotlin
+InterstitialAdBuilder.with(this)
+    .adUnit(getString(R.string.interstitial_home))
+    .fallbacks(
+        getString(R.string.interstitial_backup_a),
+        getString(R.string.interstitial_backup_b)
+    )
+    .everyNthTime(2)         // show every 2nd invocation
+    .maxShows(12)            // cap session exposure
+    .minIntervalSeconds(45)  // respect UX
+    .withLoadingDialog()
+    .onAdShown { analytics.logEvent("interstitial_shown", null) }
+    .onFailed { error -> Log.w("Ads", "Failed: ${error.message}") }
+    .show { continueToNextScreen() }
+```
+
+### Highlights
+- `.everyNthTime(n)` – enforce cadence per trigger point
+- `.maxShows(count)` – share the global `AdManager` counter to cap exposure
+- `.minInterval(millis)` / `.minIntervalSeconds(seconds)` – override global interval without touching config
+- `.force()` or `.respectInterval(false)` – bypass timers when needed (e.g., exit flows)
+- `.fallback()` / `.fallbacks()` – try multiple ad units automatically
+- `.preload()` – warm up future screens without showing
+
+Builder callbacks have Java-friendly interfaces (`OnAdCompleteListener`, `OnAdShownListener`, etc.), so the same API works across Kotlin and Java modules.
+
+---
+
+## Option 3 · Jetpack Compose
+
+The Compose module brings stateful helpers that wrap the same business logic.
+
+```kotlin
+@Composable
+fun ContentWithInterstitial() {
+    val showAd = rememberInterstitialAd(
+        adUnitId = stringResource(R.string.interstitial_feed),
+        preloadAd = true,
+        onAdShown = { analytics.logEvent("feed_interstitial_shown", null) },
+        onAdDismissed = { navigateNext() },
+        onAdFailedToLoad = { reason -> Log.w("Ads", reason) }
+    )
+
+    Button(onClick = showAd) {
+        Text("Open next article")
+    }
 }
 ```
+
+Additional helpers:
+
+| Helper | Purpose |
+|--------|---------|
+| `InterstitialAdEffect(adUnitId, showMode, maxDisplayCount)` | Declarative effect that respects TIME / COUNT / FORCE modes. |
+| `rememberInterstitialAdState(adUnitId)` | Mutable state holder exposing `isLoaded`, `loadAd()`, `showAdByTime()`, `forceShowAd()` for custom UI flows. |
+| `AdManageKitInitEffect()` | Initializes NativeAdManager/FirebaseAnalytics inside Compose entry points so cache stats stay accurate. |
+
+Compose helpers automatically reload on lifecycle events and integrate with `BillingConfig` purchase checks.
+
+---
+
+## Advanced Controls
+
+- **Retry Tuning** – `AdManageKitConfig.autoRetryFailedAds`, `maxRetryAttempts`, `baseRetryDelay`, `maxRetryDelay`, and `enableExponentialBackoff` control how `AdRetryManager` behaves per ad unit.
+- **Aggressive Mode** – call `AdManager.enableAggressiveAdLoading()` during experiments to drop the interval to 5 seconds, then `resetAdThrottling()` before going live.
+- **Debug Overlay** – enable via `AdManageKitConfig.debugMode = true` and `AdDebugUtils.enableDebugOverlay(activity, true)` to inspect attempts, cache hits, and paid events in-app.
+- **Testing** – set `AdManageKitConfig.testMode = true` or map production IDs to test IDs with `AdDebugUtils.setTestAdUnits(mapOf(prodId to testId))`.
+
+---
+
+## API Cheat Sheet
+
+| API | Description |
+|-----|-------------|
+| `AdManager.loadInterstitialAd(context, adUnitId)` | Preloads and caches one interstitial per unit. |
+| `AdManager.loadInterstitialAd(context, unit, callback)` | Same as above but surfaces `InterstitialAdLoadCallback`. |
+| `AdManager.loadInterstitialAdForSplash(...)` | Splash-friendly load with timeout + callback. |
+| `AdManager.forceShowInterstitial` / `showInterstitialAdByTime` / `showInterstitialAdByCount` | Choose show strategy – time, count, or forced. |
+| `AdManager.forceShowInterstitialWithDialog` | Uses built-in `MaterialAlertDialog` to shield loading. |
+| `AdManager.preloadAd` / `resetAdThrottling` / `enableAggressiveAdLoading` | Utility helpers for show-rate tuning. |
+| `InterstitialAdBuilder.with(activity)` | Entry point for the fluent API (Kotlin + Java). |
+| `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState` | Compose-first APIs for declarative UI. |
+
+---
+
+## Best Practices
+
+- **Configure once** in `Application` and rely on builder/Compose APIs per screen—don’t sprinkle config logic in activities.
+- **Always preload** on the previous screen (builder `.preload()` or `AdManager.preloadAd`) for maximum fill rate.
+- **Use frequency controls** (`everyNthTime`, `maxShows`, `minInterval`) plus `AdManageKitConfig.defaultInterstitialInterval` to protect UX.
+- **Respect purchases** by always wiring a `BillingPurchaseProvider` before loading—`AdManager` skips ads automatically.
+- **Enable debug overlay** in QA builds to verify retries, cache state, and paid events before shipping.
+
+With these updates, interstitial integration stays identical for legacy XML screens, gains new fluent APIs for Java/Kotlin, and becomes fully declarative in Compose-heavy codebases—all powered by the same resilient core.
 
 ## Best Practices
 - **Purchase Integration**: Ensure `BillingConfig.setPurchaseProvider` is called in your `Application` class to respect in-app purchases.
@@ -235,5 +237,5 @@ fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
 ## References
 - [AdMob Interstitial Ads Documentation](https://developers.google.com/admob/android/interstitial)
 - [Firebase Analytics Documentation](https://firebase.google.com/docs/analytics)
-- [AdManageKit v1.3.2 Release Notes](release-notes-v1.3.2.md)
+- [AdManageKit v2.5.0 Release Notes](../RELEASE_NOTES_v2.5.0.md)
 - [Native Ads Caching Wiki](native-ads-caching.md)

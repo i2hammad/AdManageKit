@@ -1,0 +1,476 @@
+package com.i2hammad.admanagekit.admob
+
+import android.app.Activity
+import com.google.android.gms.ads.LoadAdError
+
+/**
+ * Modern, fluent API for loading and showing interstitial ads.
+ *
+ * Usage:
+ * ```kotlin
+ * // Simple usage
+ * InterstitialAd.with(activity)
+ *     .adUnit("ca-app-pub-xxxxx/yyyyy")
+ *     .show { /* next action */ }
+ *
+ * // With callbacks
+ * InterstitialAd.with(activity)
+ *     .adUnit("ca-app-pub-xxxxx/yyyyy")
+ *     .onAdShown { /* track */ }
+ *     .onFailed { error -> /* handle */ }
+ *     .show { /* next action */ }
+ *
+ * // With fallbacks
+ * InterstitialAd.with(activity)
+ *     .adUnit("primary-unit")
+ *     .fallback("backup-unit")
+ *     .show { /* next action */ }
+ *
+ * // Force show immediately
+ * InterstitialAd.with(activity)
+ *     .adUnit("ca-app-pub-xxxxx/yyyyy")
+ *     .force()
+ *     .show { /* next action */ }
+ * ```
+ */
+class InterstitialAdBuilder private constructor(private val activity: Activity) {
+
+    private var primaryAdUnit: String? = null
+    private val fallbackAdUnits = mutableListOf<String>()
+    private var forceShow = false
+    private var respectInterval = true
+    private var autoReload = true
+    private var onAdShownCallback: (() -> Unit)? = null
+    private var onAdFailedCallback: ((LoadAdError) -> Unit)? = null
+    private var onAdLoadedCallback: (() -> Unit)? = null
+    private var showLoadingDialog = false
+    private var debugMode = false
+
+    // Count/Time configurations
+    private var everyNthCall: Int? = null       // Show ad every Nth time show() is called
+    private var maxShows: Int? = null           // Maximum total times to show ad
+    private var minIntervalMs: Long? = null     // Minimum milliseconds between shows
+    private var callCount = 0                   // Track calls to show() method
+
+    companion object {
+        /**
+         * Start building an interstitial ad configuration
+         */
+        @JvmStatic
+        fun with(activity: Activity): InterstitialAdBuilder {
+            return InterstitialAdBuilder(activity)
+        }
+    }
+
+    /**
+     * Set the primary ad unit ID
+     */
+    fun adUnit(adUnitId: String): InterstitialAdBuilder {
+        this.primaryAdUnit = adUnitId
+        return this
+    }
+
+    /**
+     * Add a fallback ad unit in case primary fails
+     */
+    fun fallback(adUnitId: String): InterstitialAdBuilder {
+        fallbackAdUnits.add(adUnitId)
+        return this
+    }
+
+    /**
+     * Add multiple fallback ad units
+     */
+    fun fallbacks(vararg adUnitIds: String): InterstitialAdBuilder {
+        fallbackAdUnits.addAll(adUnitIds)
+        return this
+    }
+
+    /**
+     * Force show the ad regardless of time interval
+     */
+    fun force(): InterstitialAdBuilder {
+        this.forceShow = true
+        return this
+    }
+
+    /**
+     * Respect the configured time interval (default: true)
+     */
+    fun respectInterval(respect: Boolean = true): InterstitialAdBuilder {
+        this.respectInterval = respect
+        return this
+    }
+
+    /**
+     * Automatically reload ad after showing (default: true)
+     */
+    fun autoReload(reload: Boolean = true): InterstitialAdBuilder {
+        this.autoReload = reload
+        return this
+    }
+
+    /**
+     * Callback when ad is successfully shown (Kotlin lambda)
+     */
+    fun onAdShown(callback: () -> Unit): InterstitialAdBuilder {
+        this.onAdShownCallback = callback
+        return this
+    }
+
+    /**
+     * Callback when ad is successfully shown (Java-friendly)
+     */
+    fun onAdShown(listener: OnAdShownListener): InterstitialAdBuilder {
+        this.onAdShownCallback = { listener.onAdShown() }
+        return this
+    }
+
+    /**
+     * Callback when ad fails to load or show (Kotlin lambda)
+     */
+    fun onFailed(callback: (LoadAdError) -> Unit): InterstitialAdBuilder {
+        this.onAdFailedCallback = callback
+        return this
+    }
+
+    /**
+     * Callback when ad fails to load or show (Java-friendly)
+     */
+    fun onFailed(listener: OnAdFailedListener): InterstitialAdBuilder {
+        this.onAdFailedCallback = { error -> listener.onAdFailed(error) }
+        return this
+    }
+
+    /**
+     * Callback when ad is loaded and ready (Kotlin lambda)
+     */
+    fun onAdLoaded(callback: () -> Unit): InterstitialAdBuilder {
+        this.onAdLoadedCallback = callback
+        return this
+    }
+
+    /**
+     * Callback when ad is loaded and ready (Java-friendly)
+     */
+    fun onAdLoaded(listener: OnAdLoadedListener): InterstitialAdBuilder {
+        this.onAdLoadedCallback = { listener.onAdLoaded() }
+        return this
+    }
+
+    /**
+     * Show a loading dialog while ad is being fetched
+     */
+    fun withLoadingDialog(): InterstitialAdBuilder {
+        this.showLoadingDialog = true
+        return this
+    }
+
+    /**
+     * Show ad only every Nth time show() is called.
+     * Example: .everyNthTime(3) means show on 3rd, 6th, 9th call, etc.
+     *
+     * @param n Show ad every Nth call (must be > 0)
+     */
+    fun everyNthTime(n: Int): InterstitialAdBuilder {
+        require(n > 0) { "everyNthTime must be greater than 0" }
+        this.everyNthCall = n
+        return this
+    }
+
+    /**
+     * Limit maximum number of times ad can be shown globally.
+     * Uses AdManager's global counter.
+     *
+     * @param max Maximum times to show ad
+     */
+    fun maxShows(max: Int): InterstitialAdBuilder {
+        require(max > 0) { "maxShows must be greater than 0" }
+        this.maxShows = max
+        return this
+    }
+
+    /**
+     * Set minimum time interval between ad shows.
+     * Ad won't show if less time has passed since last show.
+     *
+     * @param millis Minimum milliseconds between shows
+     */
+    fun minInterval(millis: Long): InterstitialAdBuilder {
+        require(millis > 0) { "minInterval must be greater than 0" }
+        this.minIntervalMs = millis
+        return this
+    }
+
+    /**
+     * Set minimum time interval between ad shows (convenience method).
+     *
+     * @param seconds Minimum seconds between shows
+     */
+    fun minIntervalSeconds(seconds: Int): InterstitialAdBuilder {
+        return minInterval(seconds * 1000L)
+    }
+
+    /**
+     * Enable debug logging for this ad
+     */
+    fun debug(): InterstitialAdBuilder {
+        this.debugMode = true
+        return this
+    }
+
+    /**
+     * Show the ad and execute next action when done (Kotlin lambda)
+     */
+    fun show(onComplete: () -> Unit) {
+        showInternal(onComplete)
+    }
+
+    /**
+     * Show the ad and execute next action when done (Java-friendly)
+     */
+    fun show(listener: OnAdCompleteListener) {
+        showInternal { listener.onComplete() }
+    }
+
+    /**
+     * Show the ad with combined callback (Java-friendly)
+     */
+    fun show(callback: InterstitialAdCallback) {
+        this.onAdLoadedCallback = { callback.onAdLoaded() }
+        this.onAdShownCallback = { callback.onAdShown() }
+        this.onAdFailedCallback = { error -> callback.onAdFailed(error) }
+        showInternal { callback.onComplete() }
+    }
+
+    /**
+     * Internal show implementation
+     */
+    private fun showInternal(onComplete: () -> Unit) {
+        require(primaryAdUnit != null) { "Ad unit ID must be set using adUnit()" }
+
+        val adManager = AdManager.getInstance()
+        callCount++  // Increment call counter
+
+        // Check everyNthTime - skip if not Nth call
+        everyNthCall?.let { nth ->
+            if (callCount % nth != 0) {
+                if (debugMode) {
+                    android.util.Log.d("InterstitialBuilder",
+                        "Not Nth time (call #$callCount, showing every ${nth}th), skipping ad")
+                }
+                onComplete()
+                return
+            }
+        }
+
+        // Check maxShows limit
+        maxShows?.let { max ->
+            if (adManager.getAdDisplayCount() >= max) {
+                if (debugMode) {
+                    android.util.Log.d("InterstitialBuilder",
+                        "Max shows limit reached (${adManager.getAdDisplayCount()}/$max), skipping ad")
+                }
+                onComplete()
+                return
+            }
+        }
+
+        // Check minimum interval
+        minIntervalMs?.let { minInterval ->
+            val lastShowTime = adManager.getLastAdShowTime()
+            val timeSinceLastAd = System.currentTimeMillis() - lastShowTime
+            if (!forceShow && timeSinceLastAd < minInterval) {
+                if (debugMode) {
+                    val remainingMs = minInterval - timeSinceLastAd
+                    android.util.Log.d("InterstitialBuilder",
+                        "Min interval not met (${timeSinceLastAd}ms < ${minInterval}ms, ${remainingMs}ms remaining), skipping ad")
+                }
+                onComplete()
+                return
+            }
+        }
+
+        // Create callback for showing the ad
+        val showCallback = object : AdManagerCallback() {
+            override fun onAdLoaded() {
+                if (debugMode) android.util.Log.d("InterstitialBuilder", "Ad shown successfully")
+                onAdShownCallback?.invoke()
+            }
+
+            override fun onNextAction() {
+                onComplete()
+            }
+
+            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+                if (debugMode) android.util.Log.e("InterstitialBuilder", "Ad failed: ${error?.message}")
+                error?.let {
+                    val loadError = LoadAdError(it.code, it.message, it.domain, it.cause, null)
+                    onAdFailedCallback?.invoke(loadError)
+                }
+                onComplete()
+            }
+        }
+
+        // Show with loading dialog if requested
+        if (showLoadingDialog && !adManager.isReady()) {
+            showWithDialog(showCallback, onComplete)
+        } else {
+            // Ensure ad is loaded, then show it
+            ensureAdLoaded(
+                onSuccess = {
+                    // Ad loaded successfully, now show it
+                    if (forceShow || !respectInterval) {
+                        adManager.forceShowInterstitial(activity, showCallback, autoReload)
+                    } else {
+                        adManager.showInterstitialAdByTime(activity, showCallback, autoReload)
+                    }
+                },
+                onFailure = { error ->
+                    // Failed to load, still invoke callback
+                    onAdFailedCallback?.invoke(error)
+                    onComplete()
+                }
+            )
+        }
+    }
+
+    /**
+     * Show ad with loading dialog
+     */
+    private fun showWithDialog(callback: AdManagerCallback, onComplete: () -> Unit) {
+        if (debugMode) android.util.Log.d("InterstitialBuilder", "Showing ad with loading dialog")
+
+        AdManager.getInstance().forceShowInterstitialWithDialog(
+            activity,
+            callback,
+            autoReload
+        )
+    }
+
+    /**
+     * Just preload the ad without showing
+     */
+    fun preload() {
+        require(primaryAdUnit != null) { "Ad unit ID must be set using adUnit()" }
+
+        ensureAdLoaded(
+            onSuccess = {
+                // Ad preloaded successfully
+                onAdLoadedCallback?.invoke()
+            },
+            onFailure = { error ->
+                // Failed to preload
+                onAdFailedCallback?.invoke(error)
+            }
+        )
+    }
+
+    /**
+     * Ensure ad is loaded, with fallback support
+     */
+    private fun ensureAdLoaded(onSuccess: () -> Unit, onFailure: (LoadAdError) -> Unit) {
+        val adManager = AdManager.getInstance()
+
+        // If ad already loaded, use it immediately
+        if (adManager.isReady()) {
+            onSuccess()
+            return
+        }
+
+        // Load with fallback chain
+        loadWithFallback(0, onSuccess, onFailure)
+    }
+
+    /**
+     * Load ad with fallback chain
+     */
+    private fun loadWithFallback(
+        index: Int,
+        onSuccess: () -> Unit,
+        onFailure: (LoadAdError) -> Unit
+    ) {
+        val adManager = AdManager.getInstance()
+        val allUnits = listOf(primaryAdUnit!!) + fallbackAdUnits
+
+        if (index >= allUnits.size) {
+            // All ad units failed
+            val error = LoadAdError(
+                0,
+                "All ad units failed to load (tried ${allUnits.size} units)",
+                "AdManageKit",
+                null,
+                null
+            )
+            onFailure(error)
+            return
+        }
+
+        val currentUnit = allUnits[index]
+        val isLastUnit = index == allUnits.size - 1
+
+        adManager.loadInterstitialAd(
+            activity,
+            currentUnit,
+            object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
+                override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) {
+                    // Ad loaded successfully
+                    onAdLoadedCallback?.invoke()
+                    onSuccess()
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    if (isLastUnit) {
+                        // This was the last fallback, fail completely
+                        onFailure(error)
+                    } else {
+                        // Try next fallback
+                        loadWithFallback(index + 1, onSuccess, onFailure)
+                    }
+                }
+            }
+        )
+    }
+}
+
+/**
+ * Extension function for even cleaner syntax
+ */
+fun Activity.showInterstitialAd(
+    adUnitId: String,
+    force: Boolean = false,
+    onComplete: () -> Unit
+) {
+    val builder = InterstitialAdBuilder.with(this)
+        .adUnit(adUnitId)
+
+    if (force) {
+        builder.force()
+    }
+
+    builder.show(onComplete)
+}
+
+/**
+ * Extension function with fallback support
+ */
+fun Activity.showInterstitialAdWithFallback(
+    primaryUnit: String,
+    fallbackUnit: String,
+    onComplete: () -> Unit
+) {
+    InterstitialAdBuilder.with(this)
+        .adUnit(primaryUnit)
+        .fallback(fallbackUnit)
+        .force()
+        .show(onComplete)
+}
+
+/**
+ * Simple preload extension
+ */
+fun Activity.preloadInterstitialAd(adUnitId: String) {
+    InterstitialAdBuilder.with(this)
+        .adUnit(adUnitId)
+        .preload()
+}

@@ -247,7 +247,7 @@ This release doesn't add any new dependencies - it's purely a bug fix and enhanc
 
 ## 🔮 **What's Next**
 
-### **Upcoming Features (v2.4.0 Preview)**
+### **Upcoming Features (v2.5.0 Preview)**
 - **Enhanced Subscription Management** - Advanced offer handling and discount management
 - **App Open Ad Compose** - Complete Compose support for app open ads
 - **Rewarded Ad Compose** - Declarative rewarded ad integration

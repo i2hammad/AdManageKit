@@ -40,13 +40,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val skipNextAd = AtomicBoolean(false)
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
 
-    // Enhanced retry and circuit breaker state with thread safety
-    private val failureCount = AtomicInteger(0)
-    @Volatile
-    private var lastFailureTime = 0L
-    private val isCircuitBreakerOpen = AtomicBoolean(false)
-    private val retryAttempts = mutableMapOf<String, Int>()
-
     // Reusable handler for timeouts
     private val timeoutHandler = Handler(Looper.getMainLooper())
     private val pendingTimeouts = mutableSetOf<Runnable>()
@@ -108,7 +101,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isDisplayingAd() && shouldAttemptLoad()) {
+        if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isDisplayingAd()) {
             Log.e(LOG_TAG, "Will show ad.")
 
             val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
@@ -341,11 +334,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        if (!shouldAttemptLoad()) {
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad loading blocked by circuit breaker", false)
-            return
-        }
-
         if (retryCount >= maxRetryAttempts) {
             AdDebugUtils.logEvent(adUnitId, "maxRetriesExceeded", "App open ad max retry attempts exceeded", false)
             return
@@ -375,7 +363,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     }
 
                     AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded successfully (${loadTime}ms, retry: $retryCount)", true)
-                    handleAdSuccess()
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -392,8 +379,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         scheduleTimeout(retryDelay) {
                             fetchAdWithRetry(retryCount + 1)
                         }
-                    } else {
-                        handleAdFailure()
                     }
                 }
             })
@@ -424,22 +409,24 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      *
      * @param adLoadCallback The callback to be invoked when the ad is loaded or fails to load.
      * @param timeoutMillis The timeout duration in milliseconds. If the ad does not load within this time, it will trigger the onFailedToLoad callback.
+     * @param customAdUnitId Optional custom ad unit ID. If null, uses the default ad unit ID passed in constructor.
      */
-    fun fetchAd(adLoadCallback: AdLoadCallback, timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds) {
+    @JvmOverloads
+    fun fetchAd(
+        adLoadCallback: AdLoadCallback,
+        timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds,
+        customAdUnitId: String? = null
+    ) {
+        // Use custom ad unit if provided, otherwise use default
+        val effectiveAdUnitId = customAdUnitId ?: adUnitId
+
         if (isAdAvailable()) {
             adLoadCallback.onAdLoaded()
             return
         }
 
-        if (!shouldAttemptLoad()) {
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad loading blocked by circuit breaker", false)
-            val circuitBreakerError = LoadAdError(3, "Circuit breaker is open", "AdManageKit", null, null)
-            adLoadCallback.onFailedToLoad(circuitBreakerError)
-            return
-        }
-
         if (AdManageKitConfig.testMode) {
-            AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for app open ads with timeout", true)
+            AdDebugUtils.logEvent(effectiveAdUnitId, "testMode", "Using test mode for app open ads with timeout", true)
         }
 
         lastLoadStartTime = System.currentTimeMillis()
@@ -451,13 +438,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             hasTimedOut = true
             val loadAdError = LoadAdError(3, "Ad load timed out", "Google", null, null)
             Log.e(LOG_TAG, "onAdFailedToLoad: timeout after $timeoutMillis ms")
-            handleAdFailure()
             adLoadCallback.onFailedToLoad(loadAdError)
         }
 
         AppOpenAd.load(
             myApplication,
-            adUnitId,
+            effectiveAdUnitId,
             request,
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
@@ -474,8 +460,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             }
                         }
 
-                        AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded with timeout (${loadTime}ms)", true)
-                        handleAdSuccess()
+                        AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded with timeout (${loadTime}ms)", true)
                         adLoadCallback.onAdLoaded()
                     }
                 }
@@ -484,8 +469,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
-                        AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open ad failed with timeout: ${loadAdError.message}", false)
-                        handleAdFailure()
+                        AdDebugUtils.logEvent(effectiveAdUnitId, "onFailedToLoad", "App open ad failed with timeout: ${loadAdError.message}", false)
                         logFailedToLoadEvent(loadAdError)
                         adLoadCallback.onFailedToLoad(loadAdError)
                     }
@@ -518,10 +502,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         return synchronized(loadTimes) {
             mapOf(
                 "averageLoadTime" to if (loadTimes.isNotEmpty()) loadTimes.average() else 0.0,
-                "totalLoads" to loadTimes.size,
-                "failureCount" to failureCount.get(),
-                "circuitBreakerOpen" to isCircuitBreakerOpen.get(),
-                "lastFailureTime" to lastFailureTime
+                "totalLoads" to loadTimes.size
             )
         }
     }
@@ -556,7 +537,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             !isAdAvailable() -> AdShowResult.CANNOT_SHOW("No ad available")
             skipNextAd.get() -> AdShowResult.CANNOT_SHOW("Next ad skipped")
             AdManager.getInstance().isDisplayingAd() -> AdShowResult.CANNOT_SHOW("Other ad displaying")
-            !shouldAttemptLoad() -> AdShowResult.CANNOT_SHOW("Circuit breaker open")
             else -> AdShowResult.CAN_SHOW
         }
     }
@@ -632,45 +612,4 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
     }
 
-    /**
-     * Handle ad loading failure for circuit breaker logic
-     */
-    private fun handleAdFailure() {
-        val currentFailures = failureCount.incrementAndGet()
-        lastFailureTime = System.currentTimeMillis()
-
-        if (currentFailures >= AdManageKitConfig.circuitBreakerThreshold) {
-            isCircuitBreakerOpen.set(true)
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerOpen", "App open circuit breaker opened after $currentFailures failures", false)
-        }
-    }
-
-    /**
-     * Handle ad loading success for circuit breaker logic
-     */
-    private fun handleAdSuccess() {
-        if (failureCount.get() > 0) {
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerReset", "App open circuit breaker reset after success", true)
-        }
-        failureCount.set(0)
-        isCircuitBreakerOpen.set(false)
-    }
-
-    /**
-     * Check if circuit breaker should allow ad loading
-     */
-    private fun shouldAttemptLoad(): Boolean {
-        if (!isCircuitBreakerOpen.get()) return true
-
-        val timeSinceLastFailure = System.currentTimeMillis() - lastFailureTime
-        if (timeSinceLastFailure > AdManageKitConfig.circuitBreakerResetTimeout.inWholeMilliseconds) {
-            isCircuitBreakerOpen.set(false)
-            failureCount.set(0)
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerReset", "App open circuit breaker reset after timeout", true)
-            return true
-        }
-
-        AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "App open ad blocked by circuit breaker, ${AdManageKitConfig.circuitBreakerResetTimeout.inWholeSeconds - (timeSinceLastFailure / 1000)}s remaining", false)
-        return false
-    }
 }

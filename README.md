@@ -5,9 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.4.0`** introduces **Jetpack Compose support**, major performance improvements, enhanced reliability features, and comprehensive debugging tools while maintaining full backward compatibility.
+**Latest Version `2.5.0`** introduces **Jetpack Compose support**, major performance improvements, enhanced reliability features, and comprehensive debugging tools while maintaining full backward compatibility.
 
-## What's New in 2.4.0 🚀
+## What's New in 2.5.0 🚀
 
 ### 🎨 **Jetpack Compose Support (NEW)**
 - **Native Compose Components**: Purpose-built Composables for all ad types
@@ -92,7 +92,7 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ### 💰 **Multi-Module Architecture**
 - **Core Module**: Shared interfaces and configuration management
-- **Compose Module**: Jetpack Compose integration with native Composables (NEW in v2.4.0)
+- **Compose Module**: Jetpack Compose integration with native Composables (NEW in v2.5.0)
 - **Billing Module**: Google Play Billing Library v8 with enhanced purchase flows
 - **Purchase Provider Pattern**: Flexible billing implementations with easy switching
 
@@ -147,12 +147,12 @@ Watch a short demo of `AdManageKit` in action, showcasing ad loading, caching, a
 
    **Latest Stable Version (Recommended):**
    ```groovy
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.4.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.4.0'
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.4.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.5.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.5.0'
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.5.0'
 
-   // For Jetpack Compose support (NEW in v2.4.0)
-   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.4.0'
+   // For Jetpack Compose support (NEW in v2.5.0)
+   implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.5.0'
    ```
 
    **Previous Stable Version:**
@@ -179,7 +179,7 @@ class MyApp : Application() {
             maxRetryAttempts = 3
             enablePerformanceMetrics = true
             
-            // Advanced features (new in 2.4.0)
+            // Advanced features (new in 2.5.0)
             enableAdaptiveIntervals = true
             circuitBreakerThreshold = 5
             nativeCacheExpiry = 2.hours
@@ -202,7 +202,7 @@ class MyApp : Application() {
 
 ### Enhanced Integration Verification
 
-AdManageKit 2.4.0 includes comprehensive integration across all ad components:
+AdManageKit 2.5.0 includes comprehensive integration across all ad components:
 
 ✅ **AdManageKitConfig** - Integrated in all ad components (BannerAdView, NativeBannerSmall, NativeBannerMedium, NativeLarge)  
 ✅ **NativeAdIntegrationManager** - Screen-aware caching in all native ad formats  
@@ -771,7 +771,7 @@ For detailed documentation, see the [App Open Ads Wiki](docs/app-open-ads.md).
 
 For detailed billing documentation, see the [Billing Management Wiki](docs/billing-management.md).
 
-## Advanced Features (New in 2.4.0)
+## Advanced Features (New in 2.5.0)
 
 ### Smart Configuration Management
 
@@ -958,9 +958,9 @@ The sample project in the `app` directory demonstrates ad management (banner, in
 
 ## Migration Guide
 
-### Migrating to 2.4.0
+### Migrating to 2.5.0
 
-Version 2.4.0 is **fully backward compatible**. All existing method signatures and behaviors are preserved. However, you can opt-in to new features:
+Version 2.5.0 is **fully backward compatible**. All existing method signatures and behaviors are preserved. However, you can opt-in to new features:
 
 #### Optional: Enable New Features
 ```kotlin
@@ -994,7 +994,7 @@ val enhancedCallback = object : AdLoadCallback() {
 ```
 
 ### Migration Notes
-- **Billing Compatibility**: All billing methods are fully supported in 2.4.0
+- **Billing Compatibility**: All billing methods are fully supported in 2.5.0
 - **New Core Module**: Add `ad-manage-kit-core` dependency for new features
 - **Configuration**: Replace manual configurations with `AdManageKitConfig`
 - **Deprecated Methods**: Replace `initBilling(Application, List<String>, List<String>)`, `purchase(Activity)`, and `getPrice()` with their recommended counterparts (see [Billing Management Wiki](docs/billing-management.md))

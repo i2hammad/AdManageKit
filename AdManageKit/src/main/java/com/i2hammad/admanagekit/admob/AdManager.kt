@@ -35,11 +35,8 @@ class AdManager() {
     private var adIntervalMillis: Long = AdManageKitConfig.defaultInterstitialInterval.inWholeMilliseconds
     private var adDisplayCount = 0 // Track the number of times ads have been displayed
     private lateinit var firebaseAnalytics: FirebaseAnalytics
-    
-    // Retry and circuit breaker state
-    private var failureCount = 0
-    private var lastFailureTime = 0L
-    private var isCircuitBreakerOpen = false
+
+    // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
 
     companion object {
@@ -129,8 +126,6 @@ class AdManager() {
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded for splash")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded for splash", true)
-                
-                handleAdSuccess()
 
                 // Call the callback since the ad is loaded
                 callback.onNextAction()
@@ -142,9 +137,7 @@ class AdManager() {
                     "AdManager", "Failed to load interstitial ad for splash: ${loadAdError.message}"
                 )
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed for splash: ${loadAdError.message}", false)
-                
-                handleAdFailure()
-                
+
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
@@ -193,11 +186,6 @@ class AdManager() {
     }
 
     fun loadInterstitialAd(context: Context, adUnitId: String) {
-        if (!shouldAttemptLoad()) {
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "Ad loading blocked by circuit breaker", false)
-            return
-        }
-        
         if (AdManageKitConfig.testMode) {
             AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads", true)
         }
@@ -212,16 +200,12 @@ class AdManager() {
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded successfully", true)
-                
-                handleAdSuccess()
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed: ${loadAdError.message}", false)
-                
-                handleAdFailure()
-                
+
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
@@ -253,14 +237,16 @@ class AdManager() {
         })
     }
 
+    /**
+     * Load an interstitial ad with custom ad unit support and callbacks.
+     *
+     * @param context The context
+     * @param adUnitId The ad unit ID (can be different from the default)
+     * @param interstitialAdLoadCallback Callback for ad loading events
+     */
     fun loadInterstitialAd(
         context: Context, adUnitId: String, interstitialAdLoadCallback: InterstitialAdLoadCallback
     ) {
-        if (!shouldAttemptLoad()) {
-            AdDebugUtils.logEvent(adUnitId, "circuitBreakerBlocked", "Ad loading blocked by circuit breaker", false)
-            return
-        }
-        
         if (AdManageKitConfig.testMode) {
             AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads with callback", true)
         }
@@ -289,17 +275,14 @@ class AdManager() {
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded with callback", true)
-                
-                handleAdSuccess()
+
                 interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed with callback: ${loadAdError.message}", false)
-                
-                handleAdFailure()
-                
+
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
@@ -473,56 +456,6 @@ class AdManager() {
         return elapsed > effectiveInterval
     }
     
-    /**
-     * Handle ad loading failure for circuit breaker logic
-     */
-    private fun handleAdFailure() {
-        failureCount++
-        lastFailureTime = System.currentTimeMillis()
-        
-        if (failureCount >= AdManageKitConfig.circuitBreakerThreshold) {
-            isCircuitBreakerOpen = true
-            AdDebugUtils.logEvent("", "circuitBreakerOpen", "Circuit breaker opened after $failureCount failures", false)
-        }
-    }
-    
-    /**
-     * Handle ad loading success for circuit breaker logic
-     */
-    private fun handleAdSuccess() {
-        if (failureCount > 0) {
-            AdDebugUtils.logEvent("", "circuitBreakerReset", "Circuit breaker reset after success", true)
-        }
-        failureCount = 0
-        isCircuitBreakerOpen = false
-        
-        // Reset retry attempts for the successful ad unit
-        adUnitId?.let { unitId ->
-            if (retryAttempts.containsKey(unitId)) {
-                AdDebugUtils.logEvent(unitId, "retryReset", "Retry attempts reset after successful load", true)
-                retryAttempts.remove(unitId)
-                AdRetryManager.getInstance().cancelRetry(unitId)
-            }
-        }
-    }
-    
-    /**
-     * Check if circuit breaker should allow ad loading
-     */
-    private fun shouldAttemptLoad(): Boolean {
-        if (!isCircuitBreakerOpen) return true
-        
-        val timeSinceLastFailure = System.currentTimeMillis() - lastFailureTime
-        if (timeSinceLastFailure > AdManageKitConfig.circuitBreakerResetTimeout.inWholeMilliseconds) {
-            isCircuitBreakerOpen = false
-            failureCount = 0
-            AdDebugUtils.logEvent("", "circuitBreakerReset", "Circuit breaker reset after timeout", true)
-            return true
-        }
-        
-        return false
-    }
-
     private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
         if (isReady()) {
             mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
@@ -538,7 +471,11 @@ class AdManager() {
                     }
                     firebaseAnalytics.logEvent("ad_dismissed", params)
 
+                    // CRITICAL: Preload next ad immediately for better show rate
                     if (reloadAd) {
+                        // Reset retry attempts for fresh start
+                        adUnitId?.let { retryAttempts.remove(it) }
+                        // Load immediately in background
                         loadInterstitialAd(activity, adUnitId ?: "")
                     }
                 }
@@ -596,7 +533,63 @@ class AdManager() {
      */
     private fun shouldAttemptRetry(adUnitId: String): Boolean {
         val currentAttempts = retryAttempts[adUnitId] ?: 0
-        return currentAttempts < AdManageKitConfig.maxRetryAttempts && 
+        return currentAttempts < AdManageKitConfig.maxRetryAttempts &&
                !AdRetryManager.getInstance().hasActiveRetry(adUnitId)
+    }
+
+    /**
+     * Proactively preload an interstitial ad to improve show rate.
+     * Call this during natural pauses in your app (after user actions, screen loads, etc.)
+     *
+     * @param context The context
+     * @param adUnitId The ad unit ID to preload
+     */
+    fun preloadAd(context: Context, adUnitId: String) {
+        if (!isReady()) {
+            loadInterstitialAd(context, adUnitId)
+            if (AdManageKitConfig.debugMode) {
+                AdDebugUtils.logEvent(adUnitId, "preload", "Preloading interstitial ad", true)
+            }
+        }
+    }
+
+    /**
+     * Reset ad display counters and intervals for fresh start.
+     * Useful when you want to show ads more frequently.
+     */
+    fun resetAdThrottling() {
+        lastAdShowTime = 0
+        adDisplayCount = 0
+        retryAttempts.clear()
+        if (AdManageKitConfig.debugMode) {
+            AdDebugUtils.logEvent("", "resetThrottling", "Ad throttling reset", true)
+        }
+    }
+
+    /**
+     * Configure more aggressive ad loading for maximum show rate.
+     * Call this in Application onCreate() or before first ad load.
+     */
+    fun enableAggressiveAdLoading() {
+        // Reduce interval to minimum (5 seconds)
+        setAdInterval(5000L)
+
+        if (AdManageKitConfig.debugMode) {
+            AdDebugUtils.logEvent("", "aggressiveMode", "Aggressive ad loading enabled (5s interval)", true)
+        }
+    }
+
+    /**
+     * Get timestamp of last ad show
+     */
+    fun getLastAdShowTime(): Long {
+        return lastAdShowTime
+    }
+
+    /**
+     * Get time elapsed since last ad show in milliseconds
+     */
+    fun getTimeSinceLastAd(): Long {
+        return System.currentTimeMillis() - lastAdShowTime
     }
 }

@@ -4,6 +4,7 @@ import android.app.Application
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.i2hammad.admanagekit.admob.AppOpenManager
+import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
 import com.i2hammad.admanagekit.billing.AppPurchase
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.billing.BillingPurchaseProvider

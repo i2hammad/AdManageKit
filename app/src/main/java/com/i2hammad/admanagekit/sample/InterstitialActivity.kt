@@ -24,6 +24,7 @@ import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import android.util.Log
+import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
 
 class InterstitialActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView

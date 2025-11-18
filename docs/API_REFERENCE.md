@@ -1,12 +1,12 @@
 # AdManageKit API Reference
 
-This document provides comprehensive API documentation for AdManageKit library version 2.1.0.
+This document provides comprehensive API documentation for AdManageKit library version 2.5.0.
 
 ## Table of Contents
 - [Core Configuration](#core-configuration)
 - [Ad Management](#ad-management)
 - [Billing Management](#billing-management)
-- [Circuit Breaker & Retry](#circuit-breaker--retry)
+- [Retry Logic](#retry-logic)
 - [Caching System](#caching-system)
 - [Debug & Testing](#debug--testing)
 - [Callbacks & Listeners](#callbacks--listeners)
@@ -25,24 +25,22 @@ object AdManageKitConfig {
     var defaultAdTimeout: Duration
     var nativeCacheExpiry: Duration
     var maxCachedAdsPerUnit: Int
-    
-    // Reliability Features
+
+    // Reliability Features (v2.5.0: Circuit breaker removed)
     var autoRetryFailedAds: Boolean
     var maxRetryAttempts: Int
     var baseRetryDelay: Duration
-    var circuitBreakerThreshold: Int
-    var circuitBreakerRecoveryTimeout: Duration
-    
+
     // Advanced Features
     var enableSmartPreloading: Boolean
     var enableAdaptiveIntervals: Boolean
     var enablePerformanceMetrics: Boolean
-    
+
     // Testing & Debug
     var testMode: Boolean
     var testDeviceId: String?
     var privacyCompliantMode: Boolean
-    
+
     // Utility Methods
     fun resetToDefaults()
     fun validate()
@@ -286,37 +284,9 @@ data class PurchaseItem(
 )
 ```
 
-## Circuit Breaker & Retry
+## Retry Logic
 
-### AdCircuitBreaker
-
-Implements circuit breaker pattern for ad loading.
-
-```kotlin
-class AdCircuitBreaker {
-    companion object {
-        fun getInstance(): AdCircuitBreaker
-    }
-    
-    // State Management
-    fun shouldAttemptLoad(adUnitId: String): Boolean
-    fun recordSuccess(adUnitId: String)
-    fun recordFailure(adUnitId: String)
-    
-    // Information
-    fun getState(adUnitId: String): State
-    fun getFailureCount(adUnitId: String): Int
-    fun getStateSummary(): Map<String, String>
-    
-    // Control
-    fun reset(adUnitId: String)
-    fun resetAll()
-    
-    enum class State {
-        CLOSED, OPEN, HALF_OPEN
-    }
-}
-```
+**Note**: Circuit breaker pattern was removed in v2.5.0 to maximize ad show rates. Retry logic with exponential backoff is still available.
 
 ### AdRetryManager
 
@@ -580,8 +550,9 @@ enum class TYPE_IAP {
 
 ### Error Handling
 - Always implement `onFailedToLoad()` in callbacks
-- Use circuit breaker for automatic failure handling
+- Configure retry logic with exponential backoff (circuit breaker removed in v2.5.0)
 - Monitor retry statistics in debug builds
+- Rely on automatic retry system for failed loads
 
 ### Testing
 - Use `AdManageKitConfig.testMode = true` for development
@@ -589,4 +560,13 @@ enum class TYPE_IAP {
 - Enable debug overlay for real-time monitoring
 - Use mock responses for unit testing
 
-This API reference covers all major components of AdManageKit 2.1.0. For more detailed examples and usage patterns, refer to the main README and sample project.
+## Changelog
+
+### v2.5.0
+- Removed circuit breaker to maximize ad show rates
+- Added custom ad unit support to AppOpenManager
+- Enhanced retry logic with configurable exponential backoff
+- Added performance metrics tracking
+- Improved thread safety across all components
+
+This API reference covers all major components of AdManageKit 2.5.0. For more detailed examples and usage patterns, refer to the main README and sample project.

@@ -2,7 +2,7 @@
 
 ## 🚀 **Overview**
 
-The BannerAdView has been significantly enhanced in version 2.1.0 with **complete backward compatibility**. All existing method signatures remain unchanged while adding powerful new features.
+`AdManageKit` v2.5.0 delivers another round of BannerAdView upgrades on top of the 2.1.0 refactor: Jetpack Compose wrappers, smarter refresh cadence driven by `AdManageKitConfig`, collapsible banners by default, and unified debugging hooks. All XML, ViewBinding, and Compose entry points remain backward compatible.
 
 ## 📊 **Key Improvements Implemented**
 
@@ -71,7 +71,7 @@ val params = Bundle().apply {
 ```
 
 ### 5. **Auto-Refresh Capability**
-- **Configurable Intervals**: Minimum 30 seconds, customizable up to any duration
+- **Configurable Intervals**: Minimum 30 seconds, customizable up to any duration via `AdManageKitConfig.defaultBannerRefreshInterval`
 - **Lifecycle-aware**: Pauses during background, resumes on foreground
 - **Memory Efficient**: Proper cleanup prevents resource leaks
 
@@ -86,6 +86,13 @@ bannerAdView.disableAutoRefresh() // Stop auto-refresh
 - **Debug Integration**: Real-time debug overlays and logging
 - **Flexible Ad Sizes**: Improved adaptive sizing logic
 - **Privacy Controls**: GDPR/CCPA compliance support
+- **Compose Wrappers (NEW)**: `BannerAdCompose` + programmatic loaders for Compose-first apps
+
+### 7. **Jetpack Compose + Programmatic Loading (NEW in 2.5.0)**
+- **`BannerAdCompose`**: Wraps `BannerAdView` inside an `AndroidView` so Compose layouts get full retry + shimmer behavior.
+- **Programmatic loaders**: Compose apps can combine `ProgrammaticNativeAdCompose` with `AdManageKitInitEffect` for consistent caching.
+- **Conditional display utilities**: `ConditionalAd` hides Compose banners when purchases are detected via `BillingConfig`.
+- **Shared configuration**: Compose entry points respect the same `AdManageKitConfig` refresh interval, collapsible defaults, and debug settings without extra work.
 
 ## 🔄 **Backward Compatibility**
 
@@ -213,6 +220,32 @@ class DebugActivity : AppCompatActivity() {
 }
 ```
 
+### Jetpack Compose Usage (v2.5.0)
+```kotlin
+@Composable
+fun FeedBanner() {
+    AdManageKitInitEffect()  // optional – wires Firebase analytics for caching
+
+    BannerAdCompose(
+        adUnitId = stringResource(R.string.banner_feed),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+    )
+}
+```
+
+```kotlin
+@Composable
+fun PurchaseAwareBanner(content: @Composable () -> Unit) {
+    ConditionalAd {
+        Card {
+            BannerAdCompose(adUnitId = stringResource(R.string.banner_feed))
+        }
+    }
+}
+```
+
 ## 🔍 **Debugging Features**
 
 ### Real-time Debug Overlay
@@ -250,18 +283,22 @@ if (AdManageKitConfig.enablePerformanceMetrics) {
 3. **Gradual adoption** - enable features one by one as needed
 
 ### Recommended Migration Steps
-1. Update to version 2.1.0
-2. Test existing functionality (should work unchanged)
-3. Optionally enable new features:
+1. Update to version **2.5.0** (or later 2.x tag) to unlock Compose wrappers + config-driven refresh.
+2. Test existing XML/ViewBinding screens (APIs remain backward compatible).
+3. Opt-in to the new runtime features:
    ```kotlin
    AdManageKitConfig.apply {
        autoRetryFailedAds = true
        enablePerformanceMetrics = true
+       defaultBannerRefreshInterval = 45.seconds
+       enableCollapsibleBannersByDefault = true
    }
    ```
-4. Add auto-refresh where beneficial:
+4. Enable auto-refresh and Compose entry points where needed:
    ```kotlin
-   bannerAdView.enableAutoRefresh(60)
+   bannerAdView.enableAutoRefresh(
+       AdManageKitConfig.defaultBannerRefreshInterval.inWholeSeconds.toInt()
+   )
    ```
 
 ## 📊 **Expected Results**

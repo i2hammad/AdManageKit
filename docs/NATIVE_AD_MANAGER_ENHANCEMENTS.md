@@ -2,7 +2,7 @@
 
 ## 🚀 **Overview**
 
-The NativeAdManager has been significantly enhanced in version 2.1.0 with advanced caching, performance monitoring, and memory management features while maintaining **complete backward compatibility**.
+`NativeAdManager` got another large round of upgrades in AdManageKit v2.5.0: screen-aware caching (`NativeAdIntegrationManager`), Compose-first helpers, smarter cleanup that follows `AdManageKitConfig`, and richer performance telemetry. Everything stays backward compatible with the original API surface.
 
 ## 📊 **Key Improvements Implemented**
 
@@ -80,6 +80,12 @@ NativeAdManager.warmCache(adUnitsToWarm) { warmedUnits, totalUnits ->
 - **Daemon Threads**: Non-blocking background operations
 - **Error Handling**: Robust exception handling in cleanup operations
 - **Resource Management**: Proper executor service lifecycle management
+
+### 7. **Screen-Aware Caching & Compose Hooks (NEW in 2.5.0)**
+- **`NativeAdIntegrationManager`**: Generates per-screen cache keys (Small/Medium/Large) and prevents cache collisions across activities/fragments.
+- **Intelligent cache routing**: Looks up cached ads using screen-specific keys, shared unit IDs, and generic fallbacks before hitting the network.
+- **Retry-aware loaders**: Integrates tightly with `AdRetryManager` so Compose and XML widgets automatically inherit exponential backoff.
+- **Compose components**: `NativeAdCompose`, `ProgrammaticNativeAdCompose`, and `ConditionalAd` reuse the same cache, so declarative UIs get all caching and analytics without custom glue.
 
 ## 🔄 **Backward Compatibility**
 
@@ -202,6 +208,45 @@ class PerformanceMonitor {
 }
 ```
 
+### Screen-Aware Loading via `NativeAdIntegrationManager`
+```kotlin
+NativeAdIntegrationManager.loadNativeAdWithCaching(
+    activity = this,
+    baseAdUnitId = getString(R.string.native_feed),
+    screenType = NativeAdIntegrationManager.ScreenType.MEDIUM,
+    useCachedAd = AdManageKitConfig.enableSmartPreloading,
+    callback = object : AdLoadCallback() {
+        override fun onAdLoaded() { log("feed ad ready") }
+        override fun onFailedToLoad(error: AdError?) { log("feed failed: ${error?.message}") }
+    }
+) { enhancedUnitId, enhancedCallback ->
+    nativeBannerMedium.loadNativeBannerAd(
+        activity = this,
+        adNativeBanner = enhancedUnitId,
+        useCachedAd = true,
+        adCallBack = enhancedCallback
+    )
+}
+```
+
+### Jetpack Compose Native Ad (v2.5.0)
+```kotlin
+@Composable
+fun ArticleNativeAd(
+    adUnitId: String = stringResource(R.string.native_article)
+) {
+    AdManageKitInitEffect()
+
+    ProgrammaticNativeAdCompose(
+        adUnitId = adUnitId,
+        screenType = NativeAdIntegrationManager.ScreenType.MEDIUM,
+        modifier = Modifier.fillMaxWidth(),
+        onAdLoaded = { analytics.logEvent("article_native_loaded", null) },
+        onPaidEvent = { value -> logRevenue(value) }
+    )
+}
+```
+
 ### Dynamic Configuration
 ```kotlin
 class AdConfigManager {
@@ -257,18 +302,18 @@ cacheStats.forEach { (adUnitId, stats) ->
 3. **Gradual adoption** - enable features one by one as needed
 
 ### Recommended Migration Steps
-1. Update to version 2.1.0
-2. Test existing functionality (should work unchanged)
-3. Optionally enable new features:
+1. Update to **v2.5.0** to gain screen-aware caching + Compose helpers.
+2. Call `NativeAdManager.initialize(FirebaseAnalytics.getInstance(context))` once so analytics + performance stats are populated.
+3. Configure cache behavior via `AdManageKitConfig` (instead of mutating static fields):
    ```kotlin
-   NativeAdManager.initialize(firebaseAnalytics)
-   NativeAdManager.enableAnalytics = true
+   AdManageKitConfig.apply {
+       nativeCacheExpiry = 90.minutes
+       maxCachedAdsPerUnit = 4
+       enableSmartPreloading = true
+       enableAutoCacheCleanup = true
+   }
    ```
-4. Configure cache settings for your app:
-   ```kotlin
-   NativeAdManager.cacheExpiryMs = desiredExpiryTime
-   NativeAdManager.maxCachedAdsPerUnit = desiredCacheSize
-   ```
+4. Swap direct `NativeAdManager` calls with `NativeAdIntegrationManager.loadNativeAdWithCaching` to enable per-screen keys and retry-aware loads (Compose and XML share the same API surface).
 
 ## 📊 **Expected Results**
 

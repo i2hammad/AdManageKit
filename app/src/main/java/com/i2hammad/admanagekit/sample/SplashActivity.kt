@@ -68,7 +68,7 @@ class SplashActivity : AppCompatActivity() {
             MyApplication.instance.initAds()
             runOnUiThread {
                 Log.d("SplashActivity", "requestUMP: Forcing interstitial ad load")
-                forceLoadInterstitialAd()
+                forceLoadAppOpen()
             }
         } else {
             Log.d("SplashActivity", "requestUMP: Requesting consent")
@@ -88,7 +88,7 @@ class SplashActivity : AppCompatActivity() {
 
                 if (adsConsentManager.canRequestAds()) {
                     Log.d("SplashActivity", "requestUMP: Can request ads after consent process")
-                    forceLoadInterstitialAd()
+                    forceLoadAppOpen()
                 }
 
 
