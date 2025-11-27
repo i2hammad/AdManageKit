@@ -555,40 +555,163 @@ object NativeAdManager {
         logDebug("Performance stats reset")
     }
     
-    // =================== CACHE WARMING ===================
-    
+    // =================== CACHE WARMING & PRELOADING ===================
+
+    /**
+     * Preloads (force-caches) a native ad without displaying it.
+     * This loads a fresh ad from the network and stores it in cache for later use.
+     *
+     * Use this method to preload ads during app initialization or between screens
+     * to ensure ads are ready when needed (ONLY_CACHE/HYBRID strategies).
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID to preload
+     * @param size The native ad size (SMALL, MEDIUM, LARGE)
+     * @param onSuccess Called when ad is successfully preloaded and cached
+     * @param onFailure Called if ad fails to load
+     *
+     * @since 2.2.0
+     */
+    fun preloadNativeAd(
+        activity: android.app.Activity,
+        adUnitId: String,
+        size: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize,
+        onSuccess: (() -> Unit)? = null,
+        onFailure: ((String) -> Unit)? = null
+    ) {
+        if (!enableCachingNativeAds) {
+            logDebug("Preload skipped for $adUnitId: caching disabled")
+            onFailure?.invoke("Caching is disabled")
+            return
+        }
+
+        logDebug("🔄 Preloading native ad for $adUnitId (size: $size)")
+
+        // Use ProgrammaticNativeAdLoader but don't display the ad
+        // The loader will automatically cache it when loaded (line 207)
+        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
+            activity = activity,
+            adUnitId = adUnitId,
+            size = size,
+            useCachedAd = false, // Force fresh load
+            callback = object : com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback {
+                override fun onAdLoaded(nativeAdView: com.google.android.gms.ads.nativead.NativeAdView, nativeAd: com.google.android.gms.ads.nativead.NativeAd) {
+                    // Ad is automatically cached by ProgrammaticNativeAdLoader
+                    logDebug("✅ Preloaded and cached native ad for $adUnitId (cache size: ${getCacheSize(adUnitId)})")
+                    onSuccess?.invoke()
+                }
+
+                override fun onAdFailedToLoad(error: com.google.android.gms.ads.AdError) {
+                    logDebug("❌ Failed to preload native ad for $adUnitId: ${error.message}")
+                    onFailure?.invoke(error.message)
+                }
+
+                override fun onAdClicked() {}
+                override fun onAdImpression() {}
+                override fun onAdOpened() {}
+                override fun onAdClosed() {}
+                override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {}
+            }
+        )
+    }
+
+    /**
+     * Preloads multiple native ads of the same size for a single ad unit.
+     * Useful for building up cache before displaying ads.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param size The native ad size
+     * @param count Number of ads to preload (default: 2)
+     * @param onComplete Called when all preloading attempts complete (successCount, failureCount)
+     *
+     * @since 2.2.0
+     */
+    fun preloadMultipleNativeAds(
+        activity: android.app.Activity,
+        adUnitId: String,
+        size: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize,
+        count: Int = 2,
+        onComplete: ((successCount: Int, failureCount: Int) -> Unit)? = null
+    ) {
+        if (!enableCachingNativeAds) {
+            logDebug("Multiple preload skipped: caching disabled")
+            onComplete?.invoke(0, count)
+            return
+        }
+
+        logDebug("🔄 Preloading $count native ads for $adUnitId")
+
+        var completed = 0
+        var successCount = 0
+        var failureCount = 0
+
+        repeat(count) { index ->
+            // Stagger requests to avoid rate limiting (200ms between each)
+            mainHandler.postDelayed({
+                preloadNativeAd(
+                    activity = activity,
+                    adUnitId = adUnitId,
+                    size = size,
+                    onSuccess = {
+                        successCount++
+                        completed++
+                        if (completed == count) {
+                            logDebug("✅ Preloaded $successCount/$count native ads for $adUnitId")
+                            onComplete?.invoke(successCount, failureCount)
+                        }
+                    },
+                    onFailure = { error ->
+                        failureCount++
+                        completed++
+                        if (completed == count) {
+                            logDebug("⚠️ Preloaded $successCount/$count native ads for $adUnitId ($failureCount failed)")
+                            onComplete?.invoke(successCount, failureCount)
+                        }
+                    }
+                )
+            }, index * 200L) // 200ms delay between each request
+        }
+    }
+
     /**
      * Warms up the cache by pre-loading ads for specified ad units.
      * This is useful for improving user experience by having ads ready.
-     * 
+     *
      * @param adUnits Map of ad unit ID to number of ads to pre-cache
      * @param onComplete Callback when warming is complete
+     *
+     * @deprecated Use preloadNativeAd() or preloadMultipleNativeAds() instead for actual cache warming
      */
+    @Deprecated(
+        message = "This method only checks cache status. Use preloadNativeAd() or preloadMultipleNativeAds() for actual preloading.",
+        replaceWith = ReplaceWith("preloadNativeAd(activity, adUnitId, size, onSuccess, onFailure)")
+    )
     fun warmCache(adUnits: Map<String, Int>, onComplete: ((Int, Int) -> Unit)? = null) {
         if (!enableCachingNativeAds) {
             logDebug("Cache warming skipped: caching disabled")
             onComplete?.invoke(0, 0)
             return
         }
-        
+
         val totalUnits = adUnits.size
         var warmedUnits = 0
-        
+
         logDebug("Starting cache warming for $totalUnits ad units")
-        
+
         adUnits.forEach { (adUnitId, count) ->
             val currentSize = getCacheSize(adUnitId)
             val neededAds = maxOf(0, count - currentSize)
-            
+
             if (neededAds > 0) {
                 logDebug("Cache warming: $adUnitId needs $neededAds more ads (current: $currentSize)")
-                // In a real implementation, you would trigger ad loading here
-                // For now, we just log the need
+                // NOTE: This method only logs. Use preloadNativeAd() or preloadMultipleNativeAds()
+                // to actually load and cache ads
             }
-            
+
             warmedUnits++
         }
-        
+
         logDebug("Cache warming completed: $warmedUnits units processed")
         onComplete?.invoke(warmedUnits, totalUnits)
     }

@@ -27,9 +27,22 @@
             android:exported="true">
         </activity>
 
+        <activity
+            android:name=".LoadingStrategyTestActivity"
+            android:exported="false"
+            android:label="Loading Strategy Tester"
+            android:theme="@style/Theme.AdManageKit" />
+
+        <activity
+            android:name=".NativeTemplateTestActivity"
+            android:exported="false"
+            android:label="Native Template Tester"
+            android:theme="@style/Theme.AdManageKit" />
 
 
 
+        <meta-data android:name="com.google.android.gms.ads.flag.NATIVE_AD_DEBUGGER_ENABLED"
+            android:value="false" />
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-3940256099942544~3347511713" />

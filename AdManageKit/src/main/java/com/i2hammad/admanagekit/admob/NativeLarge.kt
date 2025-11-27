@@ -36,21 +36,24 @@ class NativeLarge @JvmOverloads constructor(
     private var firebaseAnalytics: FirebaseAnalytics? = null
     private lateinit var adUnitId: String
 
+    // =================== DEPRECATED METHODS (use loadingStrategy instead) ===================
+
+    @Deprecated(
+        message = "Use loadNativeAds with loadingStrategy parameter instead",
+        replaceWith = ReplaceWith("loadNativeAds(activity, adNativeLarge, loadingStrategy = AdLoadingStrategy.HYBRID)")
+    )
     fun loadNativeAds(
         activity: Context,
         adNativeLarge: String,
         useCachedAd: Boolean = false
     ) {
-        loadAd(activity, adNativeLarge, useCachedAd, callback)
+        loadAd(activity, adNativeLarge, useCachedAd, callback, null)
     }
 
-    fun loadNativeAds(
-        activity: Context,
-        adNativeLarge: String
-    ) {
-        loadAd(activity, adNativeLarge, false, callback)
-    }
-
+    @Deprecated(
+        message = "Use loadNativeAds with loadingStrategy parameter instead",
+        replaceWith = ReplaceWith("loadNativeAds(activity, adNativeLarge, callback, loadingStrategy = AdLoadingStrategy.HYBRID)")
+    )
     fun loadNativeAds(
         activity: Context,
         adNativeLarge: String,
@@ -58,14 +61,55 @@ class NativeLarge @JvmOverloads constructor(
         callback: AdLoadCallback
     ) {
         this.callback = callback
-        loadAd(activity, adNativeLarge, useCachedAd, callback)
+        loadAd(activity, adNativeLarge, useCachedAd, callback, null)
+    }
+
+    // =================== NEW METHODS (recommended) ===================
+
+    /**
+     * Load native ad using default global strategy from AdManageKitConfig.nativeLoadingStrategy
+     */
+    fun loadNativeAds(
+        activity: Context,
+        adNativeLarge: String
+    ) {
+        loadAd(activity, adNativeLarge, false, callback, null)
+    }
+
+    /**
+     * Load native ad with custom loading strategy override
+     *
+     * @param loadingStrategy Strategy to use (ON_DEMAND, ONLY_CACHE, or HYBRID)
+     */
+    fun loadNativeAds(
+        activity: Context,
+        adNativeLarge: String,
+        loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy
+    ) {
+        loadAd(activity, adNativeLarge, false, callback, loadingStrategy)
+    }
+
+    /**
+     * Load native ad with custom loading strategy and callback
+     *
+     * @param loadingStrategy Strategy to use (ON_DEMAND, ONLY_CACHE, or HYBRID)
+     */
+    fun loadNativeAds(
+        activity: Context,
+        adNativeLarge: String,
+        callback: AdLoadCallback,
+        loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
+    ) {
+        this.callback = callback
+        loadAd(activity, adNativeLarge, false, callback, loadingStrategy)
     }
 
     private fun loadAd(
         context: Context,
         adUnitId: String,
         useCachedAd: Boolean,
-        callback: AdLoadCallback?
+        callback: AdLoadCallback?,
+        loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
         val nativeAdView: NativeAdView = binding.nativeAdView
@@ -95,6 +139,7 @@ class NativeLarge @JvmOverloads constructor(
                 baseAdUnitId = adUnitId,
                 screenType = com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.ScreenType.LARGE,
                 useCachedAd = useCachedAd,
+                loadingStrategy = loadingStrategy,
                 callback = object : AdLoadCallback() {
                     override fun onAdLoaded() {
                         // Ad was served from cache or newly loaded
@@ -102,6 +147,10 @@ class NativeLarge @JvmOverloads constructor(
                     }
 
                     override fun onFailedToLoad(error: AdError?) {
+                        // Hide shimmer and container when ad fails to load (e.g., ONLY_CACHE with no cache)
+                        binding.shimmerContainerNative.visibility = View.GONE
+                        binding.adUnit.visibility = View.GONE
+                        binding.nativeAdView.visibility = View.GONE
                         callback?.onFailedToLoad(error)
                     }
 

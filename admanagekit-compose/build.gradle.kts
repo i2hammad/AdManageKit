@@ -72,8 +72,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     // Debug tooling
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 afterEvaluate {
@@ -83,7 +83,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-compose"
-                version = "2.5.0"
+                version = "2.6.0"
             }
         }
     }

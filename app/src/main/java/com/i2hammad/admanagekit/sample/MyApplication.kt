@@ -11,6 +11,7 @@ import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
 import com.i2hammad.admanagekit.billing.PurchaseItem
 import com.i2hammad.admanagekit.billing.PurchaseListener
 import com.i2hammad.admanagekit.core.NoPurchaseProvider
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import kotlin.time.Duration.Companion.hours
@@ -24,9 +25,9 @@ class MyApplication : Application() {
         super.onCreate()
 
         //If you want to use billing feature must use billing provider
-        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
-        //If you do not want to use billing library for it
-//        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
+//        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+//        If you do not want to use billing library for it
+        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
         
         // Configure AdManageKit with comprehensive settings
         configureAdManageKit()
@@ -50,10 +51,13 @@ class MyApplication : Application() {
             
             // =================== PERFORMANCE SETTINGS ===================
             defaultAdTimeout = 15.seconds
-            appOpenAdTimeout = 4.seconds
+            appOpenAdTimeout = 10.seconds
             nativeCacheExpiry = 2.hours
             maxCachedAdsPerUnit = 3
             maxCacheMemoryMB = 50
+            enableWelcomeBackDialog = true
+            appOpenFetchFreshAd = true
+            welcomeDialogAppIcon = R.mipmap.ic_launcher_round
             
             // =================== RELIABILITY FEATURES ===================
             autoRetryFailedAds = true
@@ -65,7 +69,7 @@ class MyApplication : Application() {
             maxRetryDelay = 10.seconds
             
             // =================== ADVANCED FEATURES ===================
-            enableSmartPreloading = true
+            enableSmartPreloading = false
             enableAdaptiveIntervals = true
             enablePerformanceMetrics = true
             enableAutoCacheCleanup = true
@@ -75,7 +79,41 @@ class MyApplication : Application() {
             defaultInterstitialInterval = 15.seconds
             defaultBannerRefreshInterval = 60.seconds
             enableCollapsibleBannersByDefault = false
-            
+
+            // =================== AD LOADING STRATEGIES ===================
+            // Choose strategy based on your app type:
+
+            // Option 1: HYBRID (Recommended) - Balanced approach
+            // - Shows cached ad instantly if available
+            // - Fetches fresh ad with loading dialog if cache is empty
+            // - Good balance between UX and ad coverage
+            interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
+            appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
+            nativeLoadingStrategy = AdLoadingStrategy.HYBRID
+
+            // Option 2: ONLY_CACHE - Best for smooth UX (gaming apps)
+            // - Only shows cached/preloaded ads
+            // - No loading dialogs
+            // - Skips ad if not cached
+            // - Best for: Games, frequent ad opportunities
+            // interstitialLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+            // appOpenLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+            // nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+
+            // Option 3: ON_DEMAND - Best for maximum ad coverage (utility apps)
+            // - Always fetches fresh ads with loading dialog
+            // - Best ad coverage but may interrupt flow
+            // - Best for: Utility apps, important monetization points
+            // interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+            // appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+            // nativeLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+
+            // You can also mix strategies for different ad types:
+            // Example: Smooth app opens, aggressive interstitials, instant natives
+            // appOpenLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+            // interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+            // nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+
             // =================== CACHE MANAGEMENT ===================
             cacheCleanupInterval = (5 * 60).seconds // 5 minutes for testing
         }

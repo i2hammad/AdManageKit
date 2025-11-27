@@ -168,8 +168,18 @@ object ProgrammaticNativeAdLoader {
             NativeAdSize.LARGE -> R.layout.layout_native_large
         }
 
-        val nativeAdView = LayoutInflater.from(context)
-            .inflate(layoutRes, null) as NativeAdView
+        // Handle LARGE layout which uses <merge> tag (requires parent container)
+        val nativeAdView = if (size == NativeAdSize.LARGE) {
+            // Create a temporary parent container for merge inflation
+            val parent = FrameLayout(context)
+            LayoutInflater.from(context).inflate(layoutRes, parent, true)
+
+            // Find the NativeAdView inside the merged content
+            parent.findViewById(R.id.native_ad_view) as NativeAdView
+        } else {
+            // SMALL and MEDIUM layouts have NativeAdView as root
+            LayoutInflater.from(context).inflate(layoutRes, null) as NativeAdView
+        }
 
         // Configure the view references based on size
         when (size) {

@@ -15,6 +15,7 @@ import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeLarge
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdValue
 
@@ -36,7 +37,8 @@ enum class NativeAdSize {
  * @param adUnitId The AdMob ad unit ID
  * @param size The size of the native ad (SMALL, MEDIUM, LARGE)
  * @param modifier Modifier for styling the ad container
- * @param useCachedAd Whether to use cached ads if available
+ * @param useCachedAd Whether to use cached ads if available (deprecated, use loadingStrategy)
+ * @param loadingStrategy Optional loading strategy override (ON_DEMAND, ONLY_CACHE, HYBRID)
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked
@@ -53,6 +55,7 @@ fun NativeAdCompose(
     size: NativeAdSize = NativeAdSize.SMALL,
     modifier: Modifier = Modifier,
     useCachedAd: Boolean = true,
+    loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
     onAdFailedToLoad: ((AdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
@@ -106,25 +109,34 @@ fun NativeAdCompose(
     }
 
     // Load the ad when the composable is first composed
-    DisposableEffect(adUnitId, size, useCachedAd) {
+    DisposableEffect(adUnitId, size, useCachedAd, loadingStrategy) {
         when (size) {
             NativeAdSize.SMALL -> {
                 if (context is androidx.activity.ComponentActivity) {
                     (nativeAdView as NativeBannerSmall).loadNativeBannerAd(
-                        context, adUnitId, useCachedAd, callback
+                        activity = context,
+                        adNativeBanner = adUnitId,
+                        adCallBack = callback,
+                        loadingStrategy = loadingStrategy
                     )
                 }
             }
             NativeAdSize.MEDIUM -> {
                 if (context is androidx.activity.ComponentActivity) {
                     (nativeAdView as NativeBannerMedium).loadNativeBannerAd(
-                        context, adUnitId, useCachedAd, callback
+                        activity = context,
+                        adNativeBanner = adUnitId,
+                        adCallBack = callback,
+                        loadingStrategy = loadingStrategy
                     )
                 }
             }
             NativeAdSize.LARGE -> {
                 (nativeAdView as NativeLarge).loadNativeAds(
-                    context, adUnitId, useCachedAd, callback
+                    activity = context,
+                    adNativeLarge = adUnitId,
+                    callback = callback,
+                    loadingStrategy = loadingStrategy
                 )
             }
         }
@@ -157,12 +169,15 @@ fun NativeAdCompose(
 /**
  * A small native banner ad composable.
  * Convenience function for NativeAdCompose with SMALL size.
+ *
+ * @param loadingStrategy Optional loading strategy override (ON_DEMAND, ONLY_CACHE, HYBRID)
  */
 @Composable
 fun NativeBannerSmallCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     useCachedAd: Boolean = true,
+    loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
     onAdFailedToLoad: ((AdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
@@ -176,6 +191,7 @@ fun NativeBannerSmallCompose(
         size = NativeAdSize.SMALL,
         modifier = modifier,
         useCachedAd = useCachedAd,
+        loadingStrategy = loadingStrategy,
         onAdLoaded = onAdLoaded,
         onAdFailedToLoad = onAdFailedToLoad,
         onAdClicked = onAdClicked,
@@ -189,12 +205,15 @@ fun NativeBannerSmallCompose(
 /**
  * A medium native banner ad composable.
  * Convenience function for NativeAdCompose with MEDIUM size.
+ *
+ * @param loadingStrategy Optional loading strategy override (ON_DEMAND, ONLY_CACHE, HYBRID)
  */
 @Composable
 fun NativeBannerMediumCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     useCachedAd: Boolean = true,
+    loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
     onAdFailedToLoad: ((AdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
@@ -208,6 +227,7 @@ fun NativeBannerMediumCompose(
         size = NativeAdSize.MEDIUM,
         modifier = modifier,
         useCachedAd = useCachedAd,
+        loadingStrategy = loadingStrategy,
         onAdLoaded = onAdLoaded,
         onAdFailedToLoad = onAdFailedToLoad,
         onAdClicked = onAdClicked,
@@ -221,12 +241,15 @@ fun NativeBannerMediumCompose(
 /**
  * A large native ad composable.
  * Convenience function for NativeAdCompose with LARGE size.
+ *
+ * @param loadingStrategy Optional loading strategy override (ON_DEMAND, ONLY_CACHE, HYBRID)
  */
 @Composable
 fun NativeLargeCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     useCachedAd: Boolean = true,
+    loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
     onAdFailedToLoad: ((AdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
@@ -240,6 +263,7 @@ fun NativeLargeCompose(
         size = NativeAdSize.LARGE,
         modifier = modifier,
         useCachedAd = useCachedAd,
+        loadingStrategy = loadingStrategy,
         onAdLoaded = onAdLoaded,
         onAdFailedToLoad = onAdFailedToLoad,
         onAdClicked = onAdClicked,

@@ -81,7 +81,6 @@ class SplashActivity : AppCompatActivity() {
                     Log.d("SplashActivity", "requestUMP: Consent accepted by user")
                     statusTextView.text = "Consent shown and user accepted."
                     MyApplication.instance.initAds()
-
                 } else {
                     Log.d("SplashActivity", "requestUMP: Consent not accepted or not shown")
                 }
@@ -89,9 +88,12 @@ class SplashActivity : AppCompatActivity() {
                 if (adsConsentManager.canRequestAds()) {
                     Log.d("SplashActivity", "requestUMP: Can request ads after consent process")
                     forceLoadAppOpen()
+                } else {
+                    // Offline or consent failed - proceed without ads
+                    Log.d("SplashActivity", "requestUMP: Cannot request ads (offline?), proceeding to next screen")
+                    statusTextView.text = "Cannot load ads. Proceeding..."
+                    onNextActionCalled()
                 }
-
-
             }
         }
     }

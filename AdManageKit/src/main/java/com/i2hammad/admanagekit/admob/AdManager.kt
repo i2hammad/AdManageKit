@@ -1,11 +1,18 @@
 package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
+import android.app.Dialog
 import android.content.Context
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
+import android.view.animation.AnimationUtils
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -15,6 +22,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
@@ -61,36 +69,93 @@ class AdManager() {
     }
 
 
-    private fun showLoadingDialog(
-        activity: Activity, callback: AdManagerCallback, isReload: Boolean
-    ) {
-        // Check if the user has already purchased, skip the dialog if true
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
-        if (purchaseProvider.isPurchased()) {
-            // move to the next action
-            callback.onNextAction()
-            return
+    /**
+     * Data class to hold dialog and its animated views
+     */
+    private data class LoadingDialogViews(
+        val dialog: Dialog,
+        val overlay: View,
+        val contentCard: View
+    )
+
+    /**
+     * Creates and shows a beautiful full-screen loading dialog with animations
+     */
+    private fun showBeautifulLoadingDialog(activity: Activity): LoadingDialogViews {
+        // Create beautiful full-screen loading dialog
+        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_loading_ad_fullscreen, null)
+        dialog.setContentView(dialogView)
+        dialog.window?.apply {
+            // Make truly full screen
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+
+            // Full screen flags
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+
+            // Make status bar transparent
+            statusBarColor = Color.TRANSPARENT
+
+            // Hide system UI for true full screen
+            decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        }
+        dialog.setCancelable(false)
+
+        // Get views for animations
+        val overlay = dialogView.findViewById<View>(R.id.overlay)
+        val contentCard = dialogView.findViewById<View>(R.id.contentCard)
+        val outerCircle = dialogView.findViewById<View>(R.id.outerCircle)
+        val innerCircle = dialogView.findViewById<View>(R.id.innerCircle)
+        val dot1 = dialogView.findViewById<View>(R.id.dot1)
+        val dot2 = dialogView.findViewById<View>(R.id.dot2)
+        val dot3 = dialogView.findViewById<View>(R.id.dot3)
+
+        // Apply dialog customizations
+        applyDialogCustomizations(dialogView, overlay, contentCard)
+
+        // Apply custom text if configured
+        AdManageKitConfig.loadingDialogTitle?.let { title ->
+            dialogView.findViewById<android.widget.TextView>(R.id.loadingTitle)?.text = title
+        }
+        AdManageKitConfig.loadingDialogSubtitle?.let { subtitle ->
+            dialogView.findViewById<android.widget.TextView>(R.id.loadingMessage)?.text = subtitle
         }
 
-        // Create a Material AlertDialog
-        val dialog = MaterialAlertDialogBuilder(activity).setTitle("Please Wait")
-            .setMessage("The ad will be shown shortly...")
-            .setCancelable(false) // Prevent dismissing the dialog by tapping outside
-            .create()
-
-        // Show the dialog
+        // Show dialog
         dialog.show()
 
-        // Use a Handler to add a delay before displaying the ad
-        Handler(Looper.getMainLooper()).postDelayed({
-            // Dismiss the dialog and show the ad
-            dialog.dismiss()
-            if (isReady()) {
-                showAd(activity, callback, isReload)
-            } else {
-                callback.onNextAction()
-            }
-        }, 500)
+        // Animate overlay fade in
+        overlay.animate()
+            .alpha(1f)
+            .setDuration(300)
+            .start()
+
+        // Animate content card
+        contentCard.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(400)
+            .setStartDelay(100)
+            .start()
+
+        // Start rotating animations for circles
+        val rotateClockwise = AnimationUtils.loadAnimation(activity, R.anim.rotate_clockwise)
+        val rotateCounterClockwise = AnimationUtils.loadAnimation(activity, R.anim.rotate_counterclockwise)
+        outerCircle.startAnimation(rotateClockwise)
+        innerCircle.startAnimation(rotateCounterClockwise)
+
+        // Animate dots with sequential delay
+        animateDot(dot1, 0)
+        animateDot(dot2, 200)
+        animateDot(dot3, 400)
+
+        return LoadingDialogViews(dialog, overlay, contentCard)
     }
 
 
@@ -316,26 +381,47 @@ class AdManager() {
     }
 
     /**
-     * Shows an interstitial ad immediately, regardless of the time interval.
+     * Forces fetch and display of a fresh interstitial ad.
+     * Always loads a new ad, does NOT use existing cached ads.
+     * Note: Does not reload after showing since next force call fetches fresh anyway.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
     fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
-        showAd(activity, callback, true)
+        forceShowInterstitialInternal(activity, callback)
     }
 
 
     /**
-     * Shows an interstitial ad immediately, regardless of the time interval.
+     * Forces fetch and display of a fresh interstitial ad with a loading dialog.
+     * Always loads a new ad, does NOT use existing cached ads.
+     * Note: Does not reload after showing since next force call fetches fresh anyway.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
     fun forceShowInterstitialWithDialog(
-        activity: Activity, callback: AdManagerCallback, isReload: Boolean = true
+        activity: Activity, callback: AdManagerCallback
     ) {
-        showLoadingDialog(activity, callback, isReload)
+        forceShowInterstitial(activity, callback)
+    }
+
+    /**
+     * Shows an interstitial ad immediately if one is loaded and ready.
+     * Does NOT fetch a new ad if none is available - proceeds to next action.
+     * Use this when you want to show an ad opportunistically without waiting.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param reloadAd Whether to reload the ad after it's shown. Defaults to true.
+     */
+    fun showInterstitialIfReady(
+        activity: Activity,
+        callback: AdManagerCallback,
+        reloadAd: Boolean = true
+    ) {
+        showAd(activity, callback, reloadAd)
     }
 
 
@@ -371,14 +457,153 @@ class AdManager() {
     }
 
     /**
-     * Shows an interstitial ad immediately, regardless of the time interval.
+     * Internal method to force fetch and display a fresh interstitial ad.
+     * Always loads a new ad, does NOT use existing cached ads.
+     * Does not reload after showing since next force call fetches fresh anyway.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
-     * @param reloadAd A boolean indicating whether to reload the ad after it's shown.
      */
-    fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
-        showAd(activity, callback, reloadAd)
+    private fun forceShowInterstitialInternal(activity: Activity, callback: AdManagerCallback) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onNextAction()
+            return
+        }
+
+        val currentAdUnitId = adUnitId ?: ""
+        if (currentAdUnitId.isEmpty()) {
+            Log.e("AdManager", "Ad unit ID is not set. Cannot force show interstitial.")
+            callback.onNextAction()
+            return
+        }
+
+        // Clear existing ad to force fresh fetch
+        mInterstitialAd = null
+        initializeFirebase(activity)
+
+        // Show beautiful loading dialog
+        val dialogViews = showBeautifulLoadingDialog(activity)
+
+        // Load fresh ad with timeout
+        val adRequest = AdRequest.Builder().build()
+        val timeoutMillis = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
+        var adLoaded = false
+        var timeoutTriggered = false
+
+        InterstitialAd.load(activity, currentAdUnitId, adRequest, object : InterstitialAdLoadCallback() {
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                if (timeoutTriggered) return
+                adLoaded = true
+                mInterstitialAd = interstitialAd
+                Log.d("AdManager", "Fresh interstitial ad loaded for force show")
+                AdDebugUtils.logEvent(currentAdUnitId, "onAdLoaded", "Fresh interstitial loaded for force show", true)
+
+                // Animate dialog dismissal
+                animateDialogDismissal(dialogViews) {
+                    showAd(activity, callback, false) // No reload - next force call fetches fresh anyway
+                }
+            }
+
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                if (timeoutTriggered) return
+                adLoaded = true
+                Log.e("AdManager", "Failed to load fresh interstitial ad: ${loadAdError.message}")
+                AdDebugUtils.logEvent(currentAdUnitId, "onFailedToLoad", "Fresh interstitial failed: ${loadAdError.message}", false)
+
+                // Log Firebase event
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, currentAdUnitId)
+                    putString("ad_error_code", loadAdError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", loadAdError.message)
+                    }
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
+
+                animateDialogDismissal(dialogViews) {
+                    callback.onNextAction()
+                }
+            }
+        })
+
+        // Timeout handler
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!adLoaded) {
+                timeoutTriggered = true
+                Log.d("AdManager", "Force show interstitial timed out")
+                AdDebugUtils.logEvent(currentAdUnitId, "onTimeout", "Force show interstitial timed out", false)
+                animateDialogDismissal(dialogViews) {
+                    callback.onNextAction()
+                }
+            }
+        }, timeoutMillis)
+    }
+
+    /**
+     * Apply dialog customizations from config
+     */
+    private fun applyDialogCustomizations(dialogView: View, overlay: View, contentCard: View) {
+        // Apply background color
+        if (AdManageKitConfig.dialogBackgroundColor != 0) {
+            dialogView.setBackgroundColor(AdManageKitConfig.dialogBackgroundColor)
+        }
+
+        // Apply overlay color
+        if (AdManageKitConfig.dialogOverlayColor != 0) {
+            overlay.setBackgroundColor(AdManageKitConfig.dialogOverlayColor)
+            overlay.visibility = View.VISIBLE
+        } else {
+            // Hide overlay if color is 0
+            overlay.visibility = View.GONE
+        }
+
+        // Apply card background color
+        if (AdManageKitConfig.dialogCardBackgroundColor != 0) {
+            contentCard.setBackgroundColor(AdManageKitConfig.dialogCardBackgroundColor)
+        }
+    }
+
+    /**
+     * Helper function to animate loading dots
+     */
+    private fun animateDot(dot: View, startDelay: Long) {
+        dot.animate()
+            .alpha(1f)
+            .setDuration(600)
+            .setStartDelay(startDelay)
+            .withEndAction {
+                dot.animate()
+                    .alpha(0.3f)
+                    .setDuration(600)
+                    .withEndAction {
+                        animateDot(dot, 0)
+                    }
+                    .start()
+            }
+            .start()
+    }
+
+    /**
+     * Helper function to animate dialog dismissal
+     */
+    private fun animateDialogDismissal(dialogViews: LoadingDialogViews, onComplete: () -> Unit) {
+        // Animate content card out
+        dialogViews.contentCard.animate()
+            .alpha(0f)
+            .translationY(50f)
+            .setDuration(250)
+            .start()
+
+        // Animate overlay out
+        dialogViews.overlay.animate()
+            .alpha(0f)
+            .setDuration(300)
+            .withEndAction {
+                dialogViews.dialog.dismiss()
+                onComplete()
+            }
+            .start()
     }
 
     /**

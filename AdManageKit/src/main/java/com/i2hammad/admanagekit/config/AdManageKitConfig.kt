@@ -152,20 +152,226 @@ object AdManageKitConfig {
      * Default: false
      */
     var enableCollapsibleBannersByDefault: Boolean = false
+
+    /**
+     * Default placement/direction for collapsible banners.
+     * Only used when enableCollapsibleBannersByDefault is true.
+     *
+     * Example:
+     * ```kotlin
+     * AdManageKitConfig.defaultCollapsiblePlacement = CollapsibleBannerPlacement.TOP
+     * ```
+     *
+     * Default: BOTTOM
+     */
+    var defaultCollapsiblePlacement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM
     
     /**
      * Default app open ad timeout before showing alternative content.
      * Default: 4 seconds
      */
     var appOpenAdTimeout: Duration = 4.seconds
-    
+
+    /**
+     * Delay before dismissing welcome dialog after app open ad is shown.
+     * The dialog stays visible in the background when the ad first appears,
+     * then dismisses after this delay (while ad continues to show).
+     *
+     * Set to 0 for immediate dismissal when ad shows.
+     * Default: 800 milliseconds (0.8 seconds)
+     */
+    var welcomeDialogDismissDelay: Duration = 0.8.seconds
+
+    /**
+     * Enable beautiful welcome back dialog when loading app open ads.
+     * Shows animated full-screen loading UI while ad is being fetched.
+     *
+     * Note: Welcome dialog is now always shown when fetching ads.
+     * This setting is kept for backward compatibility but has no effect.
+     *
+     * @deprecated Welcome dialog is always shown. This setting will be removed in future versions.
+     * Default: false
+     */
+    @Deprecated("Welcome dialog is always shown. This setting has no effect.")
+    var enableWelcomeBackDialog: Boolean = false
+
+    /**
+     * Control automatic background fetching of app open ads.
+     * When false: Automatically fetches and caches ads in background for instant display
+     * When true: Only fetches ads on-demand when needed (no background prefetching)
+     *
+     * Note: Existing cached ads are always used if available regardless of this setting.
+     * This setting only controls whether to automatically prefetch/cache ads.
+     *
+     * Default: false (enable background prefetching for better performance)
+     */
+    var appOpenFetchFreshAd: Boolean = false
+
+    /**
+     * App icon resource ID to display in the welcome back dialog.
+     * Set this to your app's launcher icon resource.
+     *
+     * Example:
+     * ```kotlin
+     * AdManageKitConfig.welcomeDialogAppIcon = R.mipmap.ic_launcher
+     * ```
+     *
+     * Default: 0 (uses default icon)
+     */
+    var welcomeDialogAppIcon: Int = 0
+
+    // =================== DIALOG CUSTOMIZATION ===================
+
+    /**
+     * Dialog background color. Set to 0 for transparent background.
+     * Applies to both interstitial and app open ad loading dialogs.
+     *
+     * Example:
+     * ```kotlin
+     * AdManageKitConfig.dialogBackgroundColor = Color.WHITE
+     * AdManageKitConfig.dialogBackgroundColor = 0 // Transparent
+     * ```
+     *
+     * Default: 0 (transparent)
+     */
+    var dialogBackgroundColor: Int = 0
+
+    /**
+     * Dialog overlay color (semi-transparent layer behind the card).
+     * Set to 0 to hide overlay completely.
+     *
+     * Example:
+     * ```kotlin
+     * AdManageKitConfig.dialogOverlayColor = 0x80000000.toInt() // 50% black
+     * AdManageKitConfig.dialogOverlayColor = 0xCCFFFFFF.toInt() // 80% white
+     * AdManageKitConfig.dialogOverlayColor = 0 // No overlay
+     * ```
+     *
+     * Default: 0x80000000 (50% black overlay)
+     */
+    var dialogOverlayColor: Int = 0x80000000.toInt()
+
+    /**
+     * Dialog card background color (the main content card).
+     * Set to 0 to use theme's default background color.
+     *
+     * Example:
+     * ```kotlin
+     * AdManageKitConfig.dialogCardBackgroundColor = Color.WHITE
+     * AdManageKitConfig.dialogCardBackgroundColor = 0 // Use theme color
+     * ```
+     *
+     * Default: 0 (uses theme's colorBackground)
+     */
+    var dialogCardBackgroundColor: Int = 0
+
+    /**
+     * Title text for the welcome back dialog (app open ads).
+     * Set to null to use default text.
+     *
+     * Default: null (uses "Welcome Back!")
+     */
+    var welcomeDialogTitle: String? = null
+
+    /**
+     * Subtitle text for the welcome back dialog (app open ads).
+     * Set to null to use default text.
+     *
+     * Default: null (uses "Loading your content...")
+     */
+    var welcomeDialogSubtitle: String? = null
+
+    /**
+     * Footer text for the welcome back dialog (app open ads).
+     * Set to null to use default text.
+     *
+     * Default: null (uses "Just a moment...")
+     */
+    var welcomeDialogFooter: String? = null
+
+    /**
+     * Title text for the loading dialog (interstitial ads).
+     * Set to null to use default text.
+     *
+     * Default: null (uses "Loading Ad")
+     */
+    var loadingDialogTitle: String? = null
+
+    /**
+     * Subtitle text for the loading dialog (interstitial ads).
+     * Set to null to use default text.
+     *
+     * Default: null (uses "Please wait...")
+     */
+    var loadingDialogSubtitle: String? = null
+
+    // =================== AD LOADING STRATEGIES ===================
+
+    /**
+     * Loading strategy for interstitial ads.
+     *
+     * - **ON_DEMAND**: Always fetch fresh ad with loading dialog when needed
+     * - **ONLY_CACHE**: Only show if cached ad is ready, skip if not
+     * - **HYBRID**: Check cache first, fetch with dialog if not available (recommended)
+     *
+     * Example:
+     * ```kotlin
+     * // For smooth gameplay - only show cached ads
+     * AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+     *
+     * // For important moments - always try to show
+     * AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+     *
+     * // Balanced approach (default)
+     * AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
+     * ```
+     *
+     * Default: HYBRID
+     */
+    var interstitialLoadingStrategy: AdLoadingStrategy = AdLoadingStrategy.HYBRID
+
+    /**
+     * Loading strategy for app open ads.
+     *
+     * - **ON_DEMAND**: Always fetch fresh ad with welcome dialog when app opens
+     * - **ONLY_CACHE**: Only show if cached ad is ready, skip if not
+     * - **HYBRID**: Check cache first, fetch with welcome dialog if not available (recommended)
+     *
+     * Default: HYBRID
+     */
+    var appOpenLoadingStrategy: AdLoadingStrategy = AdLoadingStrategy.HYBRID
+
+    /**
+     * Loading strategy for native ads.
+     *
+     * - **ON_DEMAND**: Always fetch fresh ad, show shimmer while loading
+     * - **ONLY_CACHE**: Only show if cached ad is ready, hide ad container if not
+     * - **HYBRID**: Check cache first, fetch with shimmer if not available (recommended)
+     *
+     * Note: Native ads don't have loading dialogs. Instead:
+     * - ON_DEMAND/HYBRID: Shows shimmer effect while loading
+     * - ONLY_CACHE: Hides container immediately if no cache
+     *
+     * Example:
+     * ```kotlin
+     * // For instant display only
+     * AdManageKitConfig.nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+     *
+     * // Always try to show (may show shimmer)
+     * AdManageKitConfig.nativeLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+     * ```
+     *
+     * Default: HYBRID
+     */
+    var nativeLoadingStrategy: AdLoadingStrategy = AdLoadingStrategy.HYBRID
+
     // =================== CACHE MANAGEMENT ===================
     
     /**
      * Maximum total memory usage for native ad cache (in MB).
-     * Default: 50 MB
+     * Default: 200 MB
      */
-    var maxCacheMemoryMB: Int = 50
+    var maxCacheMemoryMB: Int = 200
     
     /**
      * Enable LRU (Least Recently Used) eviction for cache management.
@@ -223,7 +429,23 @@ object AdManageKitConfig {
         defaultInterstitialInterval = 15.seconds
         defaultBannerRefreshInterval = 60.seconds
         enableCollapsibleBannersByDefault = false
+        defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM
         appOpenAdTimeout = 4.seconds
+        enableWelcomeBackDialog = false
+        appOpenFetchFreshAd = false
+        welcomeDialogAppIcon = 0
+        welcomeDialogDismissDelay = 0.8.seconds
+        dialogBackgroundColor = 0
+        dialogOverlayColor = 0x80000000.toInt()
+        dialogCardBackgroundColor = 0
+        welcomeDialogTitle = null
+        welcomeDialogSubtitle = null
+        welcomeDialogFooter = null
+        loadingDialogTitle = null
+        loadingDialogSubtitle = null
+        interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
+        appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
+        nativeLoadingStrategy = AdLoadingStrategy.HYBRID
         maxCacheMemoryMB = 50
         enableLRUEviction = true
         cacheCleanupInterval = 30.seconds * 60

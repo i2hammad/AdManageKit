@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.gms.ads.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/native_ad_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000">
+
+        <!-- Full Screen Video Player -->
+        <com.google.android.gms.ads.nativead.MediaView
+            android:id="@+id/ad_media"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop" />
+
+        <!-- Dark Overlay for Readability -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#33000000" />
+
+        <!-- Top Bar -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="20dp"
+            android:paddingTop="40dp"
+            android:background="@android:drawable/dialog_holo_dark_frame"
+            android:gravity="center_vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="● PLAYING VIDEO AD"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:textColor="#FF5252"
+                android:background="#CC000000"
+                android:paddingHorizontal="14dp"
+                android:paddingVertical="7dp"
+                android:fontFamily="@font/roboto_medium" />
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <com.google.android.gms.ads.nativead.AdChoicesView
+                android:id="@+id/ad_choices_view"
+                android:layout_width="24dp"
+                android:layout_height="24dp" />
+
+        </LinearLayout>
+
+        <!-- Center Play/Pause Placeholder -->
+        <FrameLayout
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:layout_gravity="center"
+            android:background="#99000000"
+            android:visibility="gone">
+
+            <!-- This is just visual, actual control handled by MediaView -->
+            <ImageView
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:src="@android:drawable/ic_media_play"
+                 />
+
+        </FrameLayout>
+
+        <!-- Bottom Content Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical"
+            android:background="@android:drawable/bottom_bar"
+            android:padding="24dp"
+            android:paddingBottom="40dp">
+
+            <!-- App Info -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    app:cardCornerRadius="14dp"
+                    app:cardElevation="4dp">
+
+                    <ImageView
+                        android:id="@+id/ad_app_icon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="centerCrop" />
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="16dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/ad_headline"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Immersive Video Experience"
+                        android:textSize="20sp"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/white"
+                        android:maxLines="2"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/roboto_medium"
+                        android:shadowColor="#000000"
+                        android:shadowDx="1"
+                        android:shadowDy="1"
+                        android:shadowRadius="4" />
+
+                    <TextView
+                        android:id="@+id/ad_advertiser"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Sponsored by Brand"
+                        android:textSize="13sp"
+                        android:textColor="#E0E0E0"
+                        android:layout_marginTop="4dp"
+                        android:fontFamily="@font/roboto"
+                        android:shadowColor="#000000"
+                        android:shadowRadius="2" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- Rating & Stats -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
+
+                <RatingBar
+                    android:id="@+id/ad_stars"
+                    style="?android:attr/ratingBarStyleSmall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:isIndicator="true"
+                    android:numStars="5"
+                    android:stepSize="0.5"
+                    android:progressTint="#FFD700" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4.9"
+                    android:textSize="14sp"
+                    android:textStyle="bold"
+                    android:textColor="@android:color/white"
+                    android:layout_marginStart="10dp"
+                    android:fontFamily="@font/roboto_medium"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="2" />
+
+                <View
+                    android:layout_width="1dp"
+                    android:layout_height="16dp"
+                    android:background="#80FFFFFF"
+                    android:layout_marginHorizontal="16dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="50M+ Downloads"
+                    android:textSize="12sp"
+                    android:textColor="#E0E0E0"
+                    android:fontFamily="@font/roboto"
+                    android:shadowColor="#000000"
+                    android:shadowRadius="2" />
+
+            </LinearLayout>
+
+            <!-- Body Description -->
+            <TextView
+                android:id="@+id/ad_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Experience the most immersive video content. Tap below to discover more amazing features."
+                android:textSize="15sp"
+                android:textColor="#EEEEEE"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:layout_marginBottom="20dp"
+                android:fontFamily="@font/roboto"
+                android:shadowColor="#000000"
+                android:shadowRadius="2" />
+
+            <!-- Large CTA Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/ad_call_to_action"
+                android:layout_width="match_parent"
+                android:layout_height="60dp"
+                android:text="Install Now"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:textAllCaps="false"
+                app:icon="@android:drawable/stat_sys_download"
+                app:iconGravity="textStart"
+                app:iconSize="28dp"
+                app:cornerRadius="30dp"
+                app:backgroundTint="@android:color/white"
+                android:textColor="#000000"
+                app:elevation="8dp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</com.google.android.gms.ads.nativead.NativeAdView>

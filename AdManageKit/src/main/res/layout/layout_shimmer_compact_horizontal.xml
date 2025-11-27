@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="4dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="#F5F5F5"
+        android:padding="12dp">
+
+        <!-- AdChoices placeholder -->
+        <View
+            android:id="@+id/shimmer_ad_choices"
+            android:layout_width="15dp"
+            android:layout_height="15dp"
+            android:layout_alignParentTop="true"
+            android:layout_alignParentEnd="true"
+            android:background="#E0E0E0" />
+
+        <!-- Left Section: Media with Icon (120x120 for video support) -->
+        <FrameLayout
+            android:id="@+id/shimmer_left_section"
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true">
+
+            <!-- Media placeholder -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="#E0E0E0" />
+
+            <!-- Icon overlay placeholder -->
+            <View
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="bottom|end"
+                android:layout_margin="4dp"
+                android:background="#D0D0D0" />
+
+        </FrameLayout>
+
+        <!-- Right Section: Content -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:layout_marginStart="12dp"
+            android:layout_toEndOf="@id/shimmer_left_section"
+            android:orientation="vertical">
+
+            <!-- Headline placeholder -->
+            <View
+                android:layout_width="140dp"
+                android:layout_height="14dp"
+                android:background="#E0E0E0" />
+
+            <View
+                android:layout_width="100dp"
+                android:layout_height="14dp"
+                android:layout_marginTop="4dp"
+                android:background="#E0E0E0" />
+
+            <!-- Body placeholder -->
+            <View
+                android:layout_width="120dp"
+                android:layout_height="12dp"
+                android:layout_marginTop="8dp"
+                android:background="#E0E0E0" />
+
+            <!-- Bottom Row: Advertiser + CTA -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Advertiser placeholder -->
+                <View
+                    android:layout_width="60dp"
+                    android:layout_height="11dp"
+                    android:layout_weight="1"
+                    android:background="#E0E0E0" />
+
+                <!-- CTA Button placeholder -->
+                <View
+                    android:layout_width="70dp"
+                    android:layout_height="32dp"
+                    android:background="#E0E0E0" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </RelativeLayout>
+
+</androidx.cardview.widget.CardView>

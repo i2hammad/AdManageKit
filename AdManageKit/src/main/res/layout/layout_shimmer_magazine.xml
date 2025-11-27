@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="12dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="2dp"
+    app:cardBackgroundColor="?attr/colorSurface"
+    app:strokeWidth="0dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Media placeholder with badge overlay -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:background="#E8E8E8">
+
+            <!-- Sponsored badge placeholder -->
+            <View
+                android:layout_width="80dp"
+                android:layout_height="22dp"
+                android:layout_gravity="top|start"
+                android:layout_margin="12dp"
+                android:background="#D0D0D0" />
+
+        </FrameLayout>
+
+        <!-- Content Section -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <!-- Large Headline placeholder -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="22dp"
+                android:background="#E0E0E0" />
+
+            <View
+                android:layout_width="220dp"
+                android:layout_height="22dp"
+                android:layout_marginTop="6dp"
+                android:background="#E0E0E0" />
+
+            <!-- Body placeholder -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="14dp"
+                android:layout_marginTop="12dp"
+                android:background="#E8E8E8" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="14dp"
+                android:layout_marginTop="4dp"
+                android:background="#E8E8E8" />
+
+            <View
+                android:layout_width="180dp"
+                android:layout_height="14dp"
+                android:layout_marginTop="4dp"
+                android:background="#E8E8E8" />
+
+            <!-- Divider -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="16dp"
+                android:background="#EEEEEE" />
+
+            <!-- Author Row + CTA -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <!-- Circular icon placeholder -->
+                <View
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:background="@drawable/bg_card_ads" />
+
+                <!-- Advertiser info -->
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <View
+                        android:layout_width="90dp"
+                        android:layout_height="13dp"
+                        android:background="#E0E0E0" />
+
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="10dp"
+                        android:layout_marginTop="4dp"
+                        android:background="#E8E8E8" />
+
+                </LinearLayout>
+
+                <!-- CTA placeholder -->
+                <View
+                    android:layout_width="100dp"
+                    android:layout_height="40dp"
+                    android:background="#D0D0D0" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</com.google.android.material.card.MaterialCardView>

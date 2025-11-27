@@ -2,16 +2,24 @@ package com.i2hammad.admanagekit.admob;
 
 import android.app.Activity
 import android.app.Application
+import android.app.Dialog
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
+import android.view.animation.AnimationUtils
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.google.android.gms.ads.*
 import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
@@ -91,16 +99,183 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
+     * Data class to hold dialog view references
+     */
+    private data class WelcomeBackDialogViews(
+        val dialog: Dialog,
+        val overlay: View,
+        val contentCard: View
+    )
+
+    /**
+     * Currently showing dialog (kept to dismiss after ad)
+     */
+    private var currentWelcomeDialog: WelcomeBackDialogViews? = null
+
+    /**
+     * Show beautiful welcome back dialog
+     */
+    private fun showWelcomeBackDialog(activity: Activity): WelcomeBackDialogViews {
+        val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_welcome_back_fullscreen, null)
+        dialog.setContentView(dialogView)
+        dialog.setCancelable(false)
+
+        dialog.window?.apply {
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+            statusBarColor = Color.TRANSPARENT
+            decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
+        }
+
+        val overlay = dialogView.findViewById<View>(R.id.overlay)
+        val contentCard = dialogView.findViewById<View>(R.id.contentCard)
+
+        // Apply dialog customizations
+        applyDialogCustomizations(dialogView, overlay, contentCard)
+
+        // Set app icon if configured
+        if (AdManageKitConfig.welcomeDialogAppIcon != 0) {
+            val appIconImage = dialogView.findViewById<android.widget.ImageView>(R.id.appIconImage)
+            appIconImage?.apply {
+                setImageResource(AdManageKitConfig.welcomeDialogAppIcon)
+                // Remove tint when using custom app icon
+                imageTintList = null
+            }
+        }
+
+        // Apply custom text if configured
+        AdManageKitConfig.welcomeDialogTitle?.let { title ->
+            dialogView.findViewById<android.widget.TextView>(R.id.welcomeTitle)?.text = title
+        }
+        AdManageKitConfig.welcomeDialogSubtitle?.let { subtitle ->
+            dialogView.findViewById<android.widget.TextView>(R.id.welcomeSubtitle)?.text = subtitle
+        }
+        AdManageKitConfig.welcomeDialogFooter?.let { footer ->
+            dialogView.findViewById<android.widget.TextView>(R.id.welcomeFooter)?.text = footer
+        }
+
+        // Animate entry with subtle fade
+        contentCard.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(300)
+            .setInterpolator(android.view.animation.DecelerateInterpolator())
+            .start()
+
+        dialog.show()
+        return WelcomeBackDialogViews(dialog, overlay, contentCard)
+    }
+
+    /**
+     * Dismiss dialog with subtle animation
+     */
+    private fun animateDialogDismissal(dialogViews: WelcomeBackDialogViews, onComplete: () -> Unit) {
+        dialogViews.contentCard.animate()
+            .alpha(0f)
+            .scaleX(0.9f)
+            .scaleY(0.9f)
+            .setDuration(200)
+            .setInterpolator(android.view.animation.AccelerateInterpolator())
+            .withEndAction {
+                dialogViews.dialog.dismiss()
+                onComplete()
+            }
+            .start()
+    }
+
+    /**
+     * Dismiss welcome dialog with configured delay
+     * Used when app open ad is shown - dismisses dialog while ad is displayed
+     */
+    private fun dismissWelcomeDialogWithDelay(dialogViews: WelcomeBackDialogViews?) {
+        dialogViews ?: return
+
+        val delayMillis = AdManageKitConfig.welcomeDialogDismissDelay.inWholeMilliseconds
+        Log.d(LOG_TAG, "Scheduling welcome dialog dismissal with ${delayMillis}ms delay (while ad is showing)")
+
+        if (delayMillis <= 0) {
+            // No delay - dismiss immediately
+            try {
+                if (dialogViews.dialog.isShowing) {
+                    dialogViews.dialog.dismiss()
+                }
+            } catch (e: Exception) {
+                Log.e(LOG_TAG, "Error dismissing welcome dialog: ${e.message}")
+            }
+            currentWelcomeDialog = null
+        } else {
+            // Dismiss with delay - dialog visible briefly, then fades while ad shows
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    if (dialogViews.dialog.isShowing) {
+                        animateDialogDismissal(dialogViews) {
+                            Log.d(LOG_TAG, "Welcome dialog dismissed (ad still showing)")
+                            currentWelcomeDialog = null
+                        }
+                    } else {
+                        currentWelcomeDialog = null
+                    }
+                } catch (e: Exception) {
+                    Log.e(LOG_TAG, "Error dismissing welcome dialog with delay: ${e.message}")
+                    currentWelcomeDialog = null
+                }
+            }, delayMillis)
+        }
+    }
+
+    /**
+     * Apply dialog customizations from config
+     */
+    private fun applyDialogCustomizations(dialogView: View, overlay: View, contentCard: View) {
+        // Apply background color
+        if (AdManageKitConfig.dialogBackgroundColor != 0) {
+            dialogView.setBackgroundColor(AdManageKitConfig.dialogBackgroundColor)
+        }
+
+        // Apply overlay color
+        if (AdManageKitConfig.dialogOverlayColor != 0) {
+            overlay.setBackgroundColor(AdManageKitConfig.dialogOverlayColor)
+            overlay.visibility = View.VISIBLE
+        } else {
+            // Hide overlay if color is 0
+            overlay.visibility = View.GONE
+        }
+
+        // Apply card background color
+        if (AdManageKitConfig.dialogCardBackgroundColor != 0) {
+            contentCard.setBackgroundColor(AdManageKitConfig.dialogCardBackgroundColor)
+        }
+    }
+
+    /**
      * Shows the ad if one isn't already showing.
      */
     fun showAdIfAvailable() {
-        val currentActivity = getCurrentActivity()
-        if (currentActivity != null && isActivityExcluded(currentActivity::class.java)) {
-            Log.d(LOG_TAG, "Ad display is skipped for this activity.")
-            fetchAd()
+        // Check if user has purchased to remove ads
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping app open ad.")
             return
         }
 
+        val currentActivity = getCurrentActivity()
+        if (currentActivity != null && isActivityExcluded(currentActivity::class.java)) {
+            Log.d(LOG_TAG, "Ad display is skipped for this activity.")
+            // Only fetch in background if appOpenFetchFreshAd is false
+            if (!AdManageKitConfig.appOpenFetchFreshAd) {
+                fetchAd()
+            }
+            return
+        }
+
+        // If ad is available, show it
         if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isDisplayingAd()) {
             Log.e(LOG_TAG, "Will show ad.")
 
@@ -113,32 +288,180 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     show(activity)
                 }
             }
+        } else if (!isAdAvailable() && currentActivity != null) {
+            // No cached ad available - always show welcome dialog while fetching
+            Log.d(LOG_TAG, "No ad available, showing welcome dialog.")
+            showAdWithWelcomeDialog(currentActivity, null)
         } else {
             Log.d(LOG_TAG, "Cannot show ad.")
-            fetchAd()
+            // Only fetch in background if appOpenFetchFreshAd is false
+            if (!AdManageKitConfig.appOpenFetchFreshAd) {
+                fetchAd()
+            }
         }
 
         skipNextAd.set(false)
     }
 
     /**
+     * Show ad with welcome back dialog
+     */
+    private fun showAdWithWelcomeDialog(activity: Activity, callback: AdManagerCallback?) {
+        if (activity.isFinishing) {
+            callback?.onNextAction()
+            return
+        }
+
+        val dialogViews = showWelcomeBackDialog(activity)
+        val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
+
+        var hasTimedOut = false
+        val timeoutRunnable = scheduleTimeout(timeoutMillis) {
+            hasTimedOut = true
+            animateDialogDismissal(dialogViews) {
+                Log.e(LOG_TAG, "App open ad load timed out")
+                callback?.onNextAction()
+            }
+        }
+
+        val request = getAdRequest()
+        AppOpenAd.load(
+            myApplication,
+            adUnitId,
+            request,
+            object : AppOpenAd.AppOpenAdLoadCallback() {
+                override fun onAdLoaded(ad: AppOpenAd) {
+                    if (!hasTimedOut) {
+                        cancelTimeout(timeoutRunnable)
+                        appOpenAd = ad
+
+                        // Keep dialog showing - ad will be displayed on top
+                        // Dialog will be dismissed after ad is closed with delay
+                        currentWelcomeDialog = dialogViews
+                        Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
+
+                        if (!activity.isFinishing && !activity.isDestroyed) {
+                            showLoadedAd(activity, callback)
+                        } else {
+                            Log.d(LOG_TAG, "Activity not in valid state after ad load")
+                            dismissWelcomeDialogWithDelay(dialogViews)
+                            callback?.onNextAction()
+                        }
+                    }
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    if (!hasTimedOut) {
+                        cancelTimeout(timeoutRunnable)
+                        logFailedToLoadEvent(error)
+                        animateDialogDismissal(dialogViews) {
+                            callback?.onNextAction()
+                        }
+                    }
+                }
+            }
+        )
+    }
+
+    /**
+     * Fetch and show fresh ad without dialog
+     */
+    private fun fetchAndShowFresh(activity: Activity, callback: AdManagerCallback?) {
+        if (activity.isFinishing) {
+            callback?.onNextAction()
+            return
+        }
+
+        val request = getAdRequest()
+        AppOpenAd.load(
+            myApplication,
+            adUnitId,
+            request,
+            object : AppOpenAd.AppOpenAdLoadCallback() {
+                override fun onAdLoaded(ad: AppOpenAd) {
+                    appOpenAd = ad
+                    if (!activity.isFinishing) {
+                        showLoadedAd(activity, callback)
+                    } else {
+                        callback?.onNextAction()
+                    }
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    logFailedToLoadEvent(error)
+                    callback?.onNextAction()
+                }
+            }
+        )
+    }
+
+    /**
+     * Show already loaded ad
+     */
+    private fun showLoadedAd(activity: Activity, callback: AdManagerCallback?) {
+        // Check if we can show the ad
+        if (isShowingAd.get() || activity.isFinishing) {
+            Log.d(LOG_TAG, "Cannot show ad: isShowingAd=${isShowingAd.get()}, isFinishing=${activity.isFinishing}")
+            callback?.onNextAction()
+            return
+        }
+
+        // Additional check: ensure activity is still valid and resumed
+        if (activity.isDestroyed) {
+            Log.d(LOG_TAG, "Cannot show ad: activity is destroyed")
+            callback?.onNextAction()
+            return
+        }
+
+        val fullScreenContentCallback = createFullScreenContentCallback(
+            if (callback != null) "forced" else "regular",
+            callback
+        )
+
+        appOpenAd?.apply {
+            setOnPaidEventListener(createPaidEventListener())
+            setFullScreenContentCallback(fullScreenContentCallback)
+            show(activity)
+        } ?: run {
+            // No ad available
+            Log.d(LOG_TAG, "Cannot show ad: appOpenAd is null")
+            callback?.onNextAction()
+        }
+    }
+
+    /**
      * Force Show the ad on provided activity if one isn't already showing or already user purchased.
      */
     fun forceShowAdIfAvailable(activity: Activity, adManagerCallback: AdManagerCallback) {
-        if (!isShowingAd.get() && isAdAvailable() && !activity.isFinishing) {
-            Log.e(LOG_TAG, "Will show ad.")
+        // Check if user has purchased to remove ads
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping app open ad.")
+            adManagerCallback.onNextAction()
+            return
+        }
 
-            val fullScreenContentCallback = createFullScreenContentCallback("forced", adManagerCallback)
+        if (activity.isFinishing) {
+            adManagerCallback.onNextAction()
+            return
+        }
 
-            appOpenAd?.apply {
-                setOnPaidEventListener(createPaidEventListener())
-                setFullScreenContentCallback(fullScreenContentCallback)
-                show(activity)
-            }
+        // If cached ad is available, use it
+        if (!isShowingAd.get() && isAdAvailable()) {
+            Log.e(LOG_TAG, "Will show ad (cached).")
+            showLoadedAd(activity, adManagerCallback)
+        } else if (!isAdAvailable()) {
+            // No cached ad - always show welcome dialog while fetching
+            Log.d(LOG_TAG, "No cached ad, fetching with welcome dialog.")
+            showAdWithWelcomeDialog(activity, adManagerCallback)
         } else {
+            // Already showing or other condition
             adManagerCallback.onNextAction()
             Log.d(LOG_TAG, "Cannot show ad.")
-            fetchAd()
+            // Only fetch in background if appOpenFetchFreshAd is false
+            if (!AdManageKitConfig.appOpenFetchFreshAd) {
+                fetchAd()
+            }
         }
 
         skipNextAd.set(false)
@@ -188,7 +511,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     else -> "App open ad dismissed"
                 }
                 AdDebugUtils.logEvent(adUnitId, "onAdDismissed", logMessage, true)
-                fetchAd()
+
+                // Clear dialog reference if still set
+                currentWelcomeDialog = null
+
+//                fetchAd()
                 callback?.onNextAction()
             }
 
@@ -199,12 +526,28 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 }
                 AdDebugUtils.logEvent(adUnitId, "onFailedToShow", logMessage, false)
                 logFailedToLoadEvent(adError)
+
+                // Dismiss dialog immediately if ad fails to show
+                currentWelcomeDialog?.let { dialogViews ->
+                    try {
+                        if (dialogViews.dialog.isShowing) {
+                            dialogViews.dialog.dismiss()
+                        }
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Error dismissing dialog on ad failure: ${e.message}")
+                    }
+                    currentWelcomeDialog = null
+                }
+
                 callback?.onNextAction()
             }
 
             override fun onAdShowedFullScreenContent() {
                 isShowingAd.set(true)
                 isShownAd.set(true)
+
+                // Dismiss welcome dialog with delay NOW (while ad is showing)
+                dismissWelcomeDialogWithDelay(currentWelcomeDialog)
                 val logMessage = when (type) {
                     "forced" -> "App open ad shown (forced)"
                     else -> "App open ad shown"
@@ -323,6 +666,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Request an ad
      */
     fun fetchAd() {
+        // Don't fetch ads if user has purchased
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping ad fetch.")
+            return
+        }
         fetchAdWithRetry(0)
     }
 
@@ -417,6 +766,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds,
         customAdUnitId: String? = null
     ) {
+        // Don't fetch ads if user has purchased
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping ad fetch.")
+            adLoadCallback.onAdLoaded() // Call success to continue app flow
+            return
+        }
+
         // Use custom ad unit if provided, otherwise use default
         val effectiveAdUnitId = customAdUnitId ?: adUnitId
 

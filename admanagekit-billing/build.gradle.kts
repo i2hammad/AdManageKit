@@ -50,7 +50,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-billing"
-                version = "2.5.0" // Updated version to match the new library
+                version = "2.6.0"
             }
         }
     }

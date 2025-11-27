@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- NativeTemplateView attributes -->
+    <declare-styleable name="NativeTemplateView">
+        <!-- The template style to use for the native ad -->
+        <attr name="adTemplate" format="enum">
+            <!-- Modern & Material Design Templates -->
+            <enum name="card_modern" value="0" />
+            <enum name="material3" value="1" />
+            <enum name="minimal" value="2" />
+            <enum name="compact_horizontal" value="3" />
+            <enum name="story_style" value="4" />
+            <enum name="full_width_banner" value="5" />
+            <enum name="grid_card" value="6" />
+            <enum name="list_item" value="7" />
+            <enum name="featured" value="8" />
+            <enum name="overlay_dark" value="9" />
+            <enum name="magazine" value="10" />
+            <!-- Video Templates -->
+            <enum name="video_small" value="11" />
+            <enum name="video_medium" value="12" />
+            <enum name="video_large" value="13" />
+            <enum name="video_square" value="14" />
+            <enum name="video_vertical" value="15" />
+            <enum name="video_fullscreen" value="16" />
+        </attr>
+    </declare-styleable>
+
+</resources>

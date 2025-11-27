@@ -154,7 +154,7 @@ fun InterstitialAdEffect(
                     InterstitialShowMode.FORCE -> {
                         if (AdManager.getInstance().isReady()) {
                             onAdShown?.invoke()
-                            AdManager.getInstance().forceShowInterstitial(context, callback, true)
+                            AdManager.getInstance().forceShowInterstitial(context, callback)
                         } else {
                             onAdDismissed?.invoke()
                         }
@@ -318,7 +318,7 @@ class InterstitialAdState(
                     if (isLoaded) {
                         isDisplaying = true
                         onShown?.invoke()
-                        AdManager.getInstance().forceShowInterstitial(context, callback, true)
+                        AdManager.getInstance().forceShowInterstitial(context, callback)
                     } else {
                         onDismissed?.invoke()
                     }

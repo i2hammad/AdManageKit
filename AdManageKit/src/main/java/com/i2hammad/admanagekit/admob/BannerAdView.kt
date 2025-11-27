@@ -24,6 +24,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
@@ -99,43 +100,73 @@ class BannerAdView @JvmOverloads constructor(
 
 
     fun loadBanner(context: Activity?, adUnitId: String?, adLoadCallback: AdLoadCallback? = null) {
-        loadCollapsibleBanner(context, adUnitId, false, adLoadCallback)
+        loadCollapsibleBanner(context, adUnitId, false, CollapsibleBannerPlacement.BOTTOM, adLoadCallback)
     }
 
     fun loadBanner(context: Activity?, adUnitId: String?) {
-        loadCollapsibleBanner(context, adUnitId, false, callback)
+        loadCollapsibleBanner(context, adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
     }
 
     fun setAdCallback(callback: AdLoadCallback?) {
         this.callback = callback
     }
 
+    // =================== DEPRECATED METHODS (kept for backward compatibility) ===================
 
-    public fun loadCollapsibleBanner(
+    @Deprecated(
+        message = "Use loadCollapsibleBanner with CollapsibleBannerPlacement parameter instead",
+        replaceWith = ReplaceWith("loadCollapsibleBanner(context, adUnitId, collapsible, CollapsibleBannerPlacement.BOTTOM)")
+    )
+    fun loadCollapsibleBanner(
         context: Activity?, adUnitId: String?, collapsible: Boolean
     ) {
-        loadCollapsibleBanner(context, adUnitId, collapsible, callback)
+        loadCollapsibleBanner(context, adUnitId, collapsible, CollapsibleBannerPlacement.BOTTOM, callback)
     }
 
+    @Deprecated(
+        message = "Use loadCollapsibleBanner with CollapsibleBannerPlacement parameter instead",
+        replaceWith = ReplaceWith("loadCollapsibleBanner(context, adUnitId, collapsible, CollapsibleBannerPlacement.BOTTOM, callback)")
+    )
     fun loadCollapsibleBanner(
         context: Activity?,
         adUnitId: String?,
         collapsible: Boolean,
         callback: AdLoadCallback? = null
     ) {
+        loadCollapsibleBanner(context, adUnitId, collapsible, CollapsibleBannerPlacement.BOTTOM, callback)
+    }
+
+    // =================== NEW METHODS (recommended) ===================
+
+    /**
+     * Load a collapsible banner ad with custom placement direction.
+     *
+     * @param context Activity context
+     * @param adUnitId Ad unit ID
+     * @param collapsible Whether the banner should be collapsible
+     * @param placement Direction from which the banner collapses (TOP or BOTTOM)
+     * @param callback Optional callback for ad lifecycle events
+     */
+    fun loadCollapsibleBanner(
+        context: Activity?,
+        adUnitId: String?,
+        collapsible: Boolean,
+        placement: CollapsibleBannerPlacement,
+        callback: AdLoadCallback? = null
+    ) {
         if (isInEditMode || context == null || adUnitId == null) return
-        
+
         // Enhanced memory management
         this.activityRef = WeakReference(context)
         this.currentAdUnitId = adUnitId
         this.callback = callback
-        
+
         // Register lifecycle observer if possible
         if (context is LifecycleOwner) {
             context.lifecycle.addObserver(this)
         }
-        
-        loadBannerInternal(adUnitId, collapsible, callback)
+
+        loadBannerInternal(adUnitId, collapsible, placement, callback)
     }
     
     /**
@@ -144,6 +175,7 @@ class BannerAdView @JvmOverloads constructor(
     private fun loadBannerInternal(
         adUnitId: String,
         collapsible: Boolean,
+        placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
         callback: AdLoadCallback? = null
     ) {
         // Prevent concurrent loads
@@ -198,12 +230,14 @@ class BannerAdView @JvmOverloads constructor(
             
             // Build ad request
             val builder = AdRequest.Builder()
-            
+
             // Add collapsible extras if needed
             if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
                 val extras = Bundle()
-                extras.putString("collapsible", "bottom")
+                extras.putString("collapsible", placement.value)
                 builder.addNetworkExtrasBundle(AdMobAdapter::class.java, extras)
+
+                AdDebugUtils.logDebug("BannerAdView", "Loading collapsible banner with placement: ${placement.value}")
             }
             
             // Configure ad listener with enhanced functionality
@@ -368,7 +402,7 @@ class BannerAdView @JvmOverloads constructor(
                 
                 Handler(Looper.getMainLooper()).postDelayed({
                     AdDebugUtils.logEvent(adUnitId, "RetryAttempt", "Retrying ad load (attempt $attempt) after ${retryDelay}ms", true)
-                    loadBannerInternal(adUnitId, false, callback) // Retry without collapsible
+                    loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback) // Retry without collapsible
                 }, retryDelay)
             } else {
                 // Max retries reached or retry disabled - hide the entire banner view
@@ -482,7 +516,7 @@ class BannerAdView @JvmOverloads constructor(
         refreshRunnable = Runnable {
             currentAdUnitId?.let { adUnitId ->
                 AdDebugUtils.logEvent(adUnitId, "AutoRefresh", "Auto-refreshing banner ad", true)
-                loadBannerInternal(adUnitId, false, callback)
+                loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
             }
         }
         
@@ -541,7 +575,7 @@ class BannerAdView @JvmOverloads constructor(
     fun refreshAd() {
         currentAdUnitId?.let { adUnitId ->
             AdDebugUtils.logEvent(adUnitId, "ManualRefresh", "Manual refresh triggered", true)
-            loadBannerInternal(adUnitId, false, callback)
+            loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
         }
     }
     

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Ad placeholder - will contain the actual native ad view -->
+        <FrameLayout
+            android:id="@+id/fl_ad_placeholder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <!-- Shimmer container - will be dynamically populated based on template -->
+        <com.facebook.shimmer.ShimmerFrameLayout
+            android:id="@+id/shimmer_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:shimmer_auto_start="true"
+            app:shimmer_base_color="#E0E0E0"
+            app:shimmer_highlight_color="#F5F5F5">
+
+            <!-- Shimmer content will be dynamically inflated here -->
+            <FrameLayout
+                android:id="@+id/shimmer_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        </com.facebook.shimmer.ShimmerFrameLayout>
+
+    </FrameLayout>
+
+</merge>

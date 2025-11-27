@@ -2,35 +2,66 @@ package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
 import com.google.android.gms.ads.LoadAdError
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
+import com.i2hammad.admanagekit.config.AdManageKitConfig
 
 /**
- * Modern, fluent API for loading and showing interstitial ads.
+ * Modern, fluent API for loading and showing interstitial ads with comprehensive configuration.
  *
- * Usage:
+ * ## Basic Usage:
  * ```kotlin
- * // Simple usage
- * InterstitialAd.with(activity)
+ * // Simple show
+ * InterstitialAdBuilder.with(activity)
  *     .adUnit("ca-app-pub-xxxxx/yyyyy")
  *     .show { /* next action */ }
+ * ```
  *
- * // With callbacks
- * InterstitialAd.with(activity)
- *     .adUnit("ca-app-pub-xxxxx/yyyyy")
- *     .onAdShown { /* track */ }
- *     .onFailed { error -> /* handle */ }
- *     .show { /* next action */ }
- *
- * // With fallbacks
- * InterstitialAd.with(activity)
+ * ## Advanced Features:
+ * ```kotlin
+ * // Full configuration
+ * InterstitialAdBuilder.with(activity)
  *     .adUnit("primary-unit")
- *     .fallback("backup-unit")
+ *     .fallback("backup-unit")                    // Fallback ad units
+ *     .force()                                     // Force show (ignores interval)
+ *     .loadingStrategy(AdLoadingStrategy.HYBRID)   // Set loading strategy
+ *     .timeout(5000)                               // 5 second load timeout
+ *     .onAdShown { /* analytics */ }               // Ad shown callback
+ *     .onAdDismissed { /* cleanup */ }             // Ad dismissed callback
+ *     .onFailed { error -> /* handle */ }          // Failure callback
  *     .show { /* next action */ }
+ * ```
  *
- * // Force show immediately
- * InterstitialAd.with(activity)
- *     .adUnit("ca-app-pub-xxxxx/yyyyy")
- *     .force()
- *     .show { /* next action */ }
+ * ## Loading Strategies:
+ * ```kotlin
+ * // ON_DEMAND: Always fetch fresh ad with loading dialog
+ * .loadingStrategy(AdLoadingStrategy.ON_DEMAND)
+ *
+ * // ONLY_CACHE: Only show if ad is ready, skip otherwise
+ * .loadingStrategy(AdLoadingStrategy.ONLY_CACHE)
+ *
+ * // HYBRID: Show cached instantly, or fetch with dialog if needed (recommended)
+ * .loadingStrategy(AdLoadingStrategy.HYBRID)
+ * ```
+ *
+ * ## Frequency Controls:
+ * ```kotlin
+ * // Show every 3rd time
+ * .everyNthTime(3)
+ *
+ * // Maximum 5 shows total
+ * .maxShows(5)
+ *
+ * // Minimum 30 seconds between shows
+ * .minIntervalSeconds(30)
+ * ```
+ *
+ * ## Extension Functions:
+ * ```kotlin
+ * // Simple extension
+ * activity.showInterstitialAd("ad-unit-id") { /* done */ }
+ *
+ * // Preload for later
+ * activity.preloadInterstitialAd("ad-unit-id")
  * ```
  */
 class InterstitialAdBuilder private constructor(private val activity: Activity) {
@@ -39,12 +70,14 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private val fallbackAdUnits = mutableListOf<String>()
     private var forceShow = false
     private var respectInterval = true
-    private var autoReload = true
     private var onAdShownCallback: (() -> Unit)? = null
+    private var onAdDismissedCallback: (() -> Unit)? = null
     private var onAdFailedCallback: ((LoadAdError) -> Unit)? = null
     private var onAdLoadedCallback: (() -> Unit)? = null
     private var showLoadingDialog = false
     private var debugMode = false
+    private var timeoutMs: Long? = null
+    private var loadingStrategy: AdLoadingStrategy? = null
 
     // Count/Time configurations
     private var everyNthCall: Int? = null       // Show ad every Nth time show() is called
@@ -103,11 +136,19 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     }
 
     /**
-     * Automatically reload ad after showing (default: true)
+     * Set timeout for ad loading (in milliseconds)
      */
-    fun autoReload(reload: Boolean = true): InterstitialAdBuilder {
-        this.autoReload = reload
+    fun timeout(millis: Long): InterstitialAdBuilder {
+        require(millis > 0) { "Timeout must be greater than 0" }
+        this.timeoutMs = millis
         return this
+    }
+
+    /**
+     * Set timeout for ad loading (in seconds, convenience method)
+     */
+    fun timeoutSeconds(seconds: Int): InterstitialAdBuilder {
+        return timeout(seconds * 1000L)
     }
 
     /**
@@ -123,6 +164,22 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
      */
     fun onAdShown(listener: OnAdShownListener): InterstitialAdBuilder {
         this.onAdShownCallback = { listener.onAdShown() }
+        return this
+    }
+
+    /**
+     * Callback when ad is dismissed/closed (Kotlin lambda)
+     */
+    fun onAdDismissed(callback: () -> Unit): InterstitialAdBuilder {
+        this.onAdDismissedCallback = callback
+        return this
+    }
+
+    /**
+     * Callback when ad is dismissed/closed (Java-friendly)
+     */
+    fun onAdDismissed(listener: OnAdDismissedListener): InterstitialAdBuilder {
+        this.onAdDismissedCallback = { listener.onAdDismissed() }
         return this
     }
 
@@ -160,9 +217,41 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
 
     /**
      * Show a loading dialog while ad is being fetched
+     *
+     * @deprecated Use loadingStrategy(AdLoadingStrategy.ON_DEMAND) instead
      */
+    @Deprecated(
+        message = "Use loadingStrategy(AdLoadingStrategy.ON_DEMAND) instead",
+        replaceWith = ReplaceWith("loadingStrategy(AdLoadingStrategy.ON_DEMAND)")
+    )
     fun withLoadingDialog(): InterstitialAdBuilder {
         this.showLoadingDialog = true
+        return this
+    }
+
+    /**
+     * Set the loading strategy for this interstitial ad.
+     *
+     * - **ON_DEMAND**: Always fetch fresh ad with loading dialog
+     * - **ONLY_CACHE**: Only show if ad is ready (cached), skip if not available
+     * - **HYBRID**: Check cache first, fetch with dialog if needed (recommended)
+     *
+     * Example:
+     * ```kotlin
+     * // For smooth gameplay - only show cached ads
+     * .loadingStrategy(AdLoadingStrategy.ONLY_CACHE)
+     *
+     * // For important moments - always try to show
+     * .loadingStrategy(AdLoadingStrategy.ON_DEMAND)
+     *
+     * // Balanced approach (default)
+     * .loadingStrategy(AdLoadingStrategy.HYBRID)
+     * ```
+     *
+     * @param strategy The loading strategy to use
+     */
+    fun loadingStrategy(strategy: AdLoadingStrategy): InterstitialAdBuilder {
+        this.loadingStrategy = strategy
         return this
     }
 
@@ -291,6 +380,13 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             }
         }
 
+        // Determine effective loading strategy
+        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.interstitialLoadingStrategy
+
+        if (debugMode) {
+            android.util.Log.d("InterstitialBuilder", "Using loading strategy: $effectiveStrategy")
+        }
+
         // Create callback for showing the ad
         val showCallback = object : AdManagerCallback() {
             override fun onAdLoaded() {
@@ -299,6 +395,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             }
 
             override fun onNextAction() {
+                onAdDismissedCallback?.invoke()
                 onComplete()
             }
 
@@ -312,26 +409,45 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             }
         }
 
-        // Show with loading dialog if requested
-        if (showLoadingDialog && !adManager.isReady()) {
-            showWithDialog(showCallback, onComplete)
-        } else {
-            // Ensure ad is loaded, then show it
-            ensureAdLoaded(
-                onSuccess = {
-                    // Ad loaded successfully, now show it
+        // Handle different loading strategies
+        when (effectiveStrategy) {
+            AdLoadingStrategy.ON_DEMAND -> {
+                // Always fetch fresh ad with loading dialog
+                if (debugMode) android.util.Log.d("InterstitialBuilder", "ON_DEMAND: Fetching fresh ad with dialog")
+                showWithDialog(showCallback, onComplete)
+            }
+
+            AdLoadingStrategy.ONLY_CACHE -> {
+                // Only show if ad is already ready (cached), skip if not
+                if (adManager.isReady()) {
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing instantly")
                     if (forceShow || !respectInterval) {
-                        adManager.forceShowInterstitial(activity, showCallback, autoReload)
+                        adManager.forceShowInterstitial(activity, showCallback)
                     } else {
-                        adManager.showInterstitialAdByTime(activity, showCallback, autoReload)
+                        adManager.showInterstitialAdByTime(activity, showCallback, true)
                     }
-                },
-                onFailure = { error ->
-                    // Failed to load, still invoke callback
-                    onAdFailedCallback?.invoke(error)
+                } else {
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: No ad ready, skipping")
                     onComplete()
                 }
-            )
+            }
+
+            AdLoadingStrategy.HYBRID -> {
+                // Check cache first, fetch with dialog if needed
+                if (adManager.isReady()) {
+                    // Ad is ready, show instantly
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing instantly")
+                    if (forceShow || !respectInterval) {
+                        adManager.forceShowInterstitial(activity, showCallback)
+                    } else {
+                        adManager.showInterstitialAdByTime(activity, showCallback, true)
+                    }
+                } else {
+                    // Ad not ready, fetch with dialog
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad not cached, fetching with dialog")
+                    showWithDialog(showCallback, onComplete)
+                }
+            }
         }
     }
 
@@ -343,8 +459,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
 
         AdManager.getInstance().forceShowInterstitialWithDialog(
             activity,
-            callback,
-            autoReload
+            callback
         )
     }
 
@@ -473,4 +588,9 @@ fun Activity.preloadInterstitialAd(adUnitId: String) {
     InterstitialAdBuilder.with(this)
         .adUnit(adUnitId)
         .preload()
+}
+
+// Java-friendly listener interface for onAdDismissed (others exist in AdCallback.kt)
+interface OnAdDismissedListener {
+    fun onAdDismissed()
 }
