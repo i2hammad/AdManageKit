@@ -79,7 +79,7 @@ class NativeLarge @JvmOverloads constructor(
     /**
      * Load native ad with custom loading strategy override
      *
-     * @param loadingStrategy Strategy to use (ON_DEMAND, ONLY_CACHE, or HYBRID)
+     * @param loadingStrategy Strategy to use (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
      */
     fun loadNativeAds(
         activity: Context,
@@ -92,7 +92,7 @@ class NativeLarge @JvmOverloads constructor(
     /**
      * Load native ad with custom loading strategy and callback
      *
-     * @param loadingStrategy Strategy to use (ON_DEMAND, ONLY_CACHE, or HYBRID)
+     * @param loadingStrategy Strategy to use (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
      */
     fun loadNativeAds(
         activity: Context,

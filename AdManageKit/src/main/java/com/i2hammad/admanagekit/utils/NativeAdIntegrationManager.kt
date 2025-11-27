@@ -118,29 +118,9 @@ object NativeAdIntegrationManager {
                 loadNewAd(enhancedAdUnitId, enhancedCallback)
             }
 
-            AdLoadingStrategy.ONLY_CACHE -> {
-                // Only use cached ad, fail immediately if not available
-                if (NativeAdManager.enableCachingNativeAds) {
-                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
-
-                    if (cachedAd != null) {
-                        logDebug("ONLY_CACHE strategy: cache hit for $screenKey, serving cached ad")
-                        temporarilyCachedAd = cachedAd
-                        cachedAdScreenKey = screenKey
-                        return // Let the caller handle displaying the cached ad
-                    } else {
-                        logDebug("ONLY_CACHE strategy: cache miss for $screenKey, skipping ad")
-                        // Fail immediately - no ad available
-                        callback?.onFailedToLoad(null)
-                        return
-                    }
-                } else {
-                    logDebug("ONLY_CACHE strategy: caching disabled, skipping ad")
-                    callback?.onFailedToLoad(null)
-                    return
-                }
-            }
-
+            // Note: ONLY_CACHE is converted to HYBRID above for native ads
+            // This case should never execute but is kept for completeness
+            AdLoadingStrategy.ONLY_CACHE,
             AdLoadingStrategy.HYBRID -> {
                 // Try cache first, load fresh if not available
                 if (useCachedAd && NativeAdManager.enableCachingNativeAds) {

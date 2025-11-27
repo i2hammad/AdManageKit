@@ -2,6 +2,16 @@
 
 **New in v2.6.0** - AdManageKit supports three different ad loading strategies to fit different use cases in your app.
 
+## Strategy Availability
+
+| Strategy | Interstitial | App Open | Native |
+|----------|-------------|----------|--------|
+| ON_DEMAND | ✅ | ✅ | ✅ |
+| ONLY_CACHE | ✅ | ✅ | ❌ |
+| HYBRID | ✅ | ✅ | ✅ |
+
+> **Note:** `ONLY_CACHE` is only available for **Interstitial** and **App Open** ads. Native ads display inline with shimmer loading, so they always need to load content.
+
 ## Strategy Types
 
 ### 1. ON_DEMAND

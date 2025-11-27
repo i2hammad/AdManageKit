@@ -62,11 +62,13 @@ nativeTemplateView.loadNativeAd(activity, adUnitId, callback, AdLoadingStrategy.
 
 Three strategies to control how ads are loaded and displayed:
 
-| Strategy | Behavior | Best For |
-|----------|----------|----------|
-| `ON_DEMAND` | Always fetch fresh ad with loading dialog | Critical monetization points |
-| `ONLY_CACHE` | Instant display from cache, skip if unavailable | Games, frequent triggers |
-| `HYBRID` | Check cache first, fetch if needed | General use (recommended) |
+| Strategy | Behavior | Interstitial | App Open | Native |
+|----------|----------|:------------:|:--------:|:------:|
+| `ON_DEMAND` | Always fetch fresh ad with loading dialog | ✅ | ✅ | ✅ |
+| `ONLY_CACHE` | Instant display from cache, skip if unavailable | ✅ | ✅ | ❌ |
+| `HYBRID` | Check cache first, fetch if needed (recommended) | ✅ | ✅ | ✅ |
+
+> **Note:** `ONLY_CACHE` is only available for Interstitial and App Open ads. Native ads display inline with shimmer loading, so they always load content.
 
 **Configuration:**
 
@@ -74,7 +76,7 @@ Three strategies to control how ads are loaded and displayed:
 AdManageKitConfig.apply {
     interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
     appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
-    nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+    nativeLoadingStrategy = AdLoadingStrategy.HYBRID // ON_DEMAND or HYBRID only
 }
 ```
 

@@ -104,19 +104,15 @@ NativeVideoSquareCompose(adUnitId = adUnitId)
 
 ## Loading Strategies (NEW in 2.6.0)
 
-All native ad Compose components now support the `loadingStrategy` parameter:
+Native ad Compose components support `loadingStrategy` parameter with `ON_DEMAND` and `HYBRID`:
+
+> **Note:** `ONLY_CACHE` is only available for Interstitial and App Open ads, not for native ads.
 
 ```kotlin
-// ON_DEMAND - Always fetch fresh ad with loading indicator
+// ON_DEMAND - Always fetch fresh ad
 NativeBannerMediumCompose(
     adUnitId = adUnitId,
     loadingStrategy = AdLoadingStrategy.ON_DEMAND
-)
-
-// ONLY_CACHE - Instant display from cache, skip if unavailable
-NativeBannerMediumCompose(
-    adUnitId = adUnitId,
-    loadingStrategy = AdLoadingStrategy.ONLY_CACHE
 )
 
 // HYBRID - Check cache first, fetch if needed (recommended)

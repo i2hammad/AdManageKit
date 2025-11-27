@@ -269,10 +269,10 @@ fun MyScreen() {
         loadingStrategy = AdLoadingStrategy.HYBRID
     )
 
-    // Native with loading strategy
+    // Native with loading strategy (ON_DEMAND or HYBRID only)
     NativeBannerMediumCompose(
         adUnitId = "ca-app-pub-xxx/yyy",
-        loadingStrategy = AdLoadingStrategy.ONLY_CACHE
+        loadingStrategy = AdLoadingStrategy.HYBRID
     )
 
     // Interstitial

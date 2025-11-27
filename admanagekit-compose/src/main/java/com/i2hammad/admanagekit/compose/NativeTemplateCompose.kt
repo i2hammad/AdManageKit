@@ -18,12 +18,12 @@ import com.i2hammad.admanagekit.config.AdLoadingStrategy
 /**
  * A Jetpack Compose wrapper for NativeTemplateView.
  *
- * Supports all 17 template styles with Material 3 theming and loading strategies.
+ * Supports all 17 template styles with Material 3 theming.
  *
  * @param adUnitId The AdMob ad unit ID
  * @param template The template style to use (default: CARD_MODERN)
  * @param modifier Modifier for styling the ad container
- * @param loadingStrategy Optional loading strategy override (ON_DEMAND, ONLY_CACHE, HYBRID)
+ * @param loadingStrategy Loading strategy (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked
