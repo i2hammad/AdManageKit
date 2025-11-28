@@ -5,15 +5,13 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.7.0`** introduces **Smart Splash Screen Support**, fixes for HYBRID/ONLY_CACHE strategies, and premium user optimization.
+**Latest Version `2.8.0`** adds **Loading Strategy for AdManager** and **Global Auto-Reload Config**.
 
-## What's New in 2.7.0
+## What's New in 2.8.0
 
-- **Smart Splash Screen**: New `waitForLoading()` for optimal splash ad experience
-- **Fixed HYBRID/ONLY_CACHE**: Now properly use cached ads instead of fetching fresh
-- **Premium Optimization**: Skip ad requests for premium users
-- **Frequency Controls**: `everyNthTime()`, `minInterval()`, `maxShows()` in InterstitialAdBuilder
-- **New Methods**: `isLoading()`, `showOrWaitForAd()` in AdManager
+- **Loading Strategy for AdManager**: `forceShowInterstitial()` now respects global loading strategy
+- **Global Auto-Reload Config**: New `interstitialAutoReload` setting with per-call override
+- **New Method**: `forceShowInterstitialAlways()` for explicit force fetch behavior
 
 ## Screenshots
 
@@ -46,12 +44,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.7.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.7.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.7.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.8.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.7.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -131,6 +129,9 @@ class MyApp : Application() {
             interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
             appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
+
+            // Auto-reload interstitial after showing (v2.7.0+)
+            interstitialAutoReload = true  // default: true
         }
 
         // Set up billing
@@ -237,6 +238,26 @@ AdManager.getInstance().showInterstitialAdByTime(this, callback)
 // Count-based
 AdManager.getInstance().showInterstitialAdByCount(this, callback, maxDisplayCount = 3)
 ```
+
+#### Auto-Reload Configuration (v2.7.0+)
+
+Control whether interstitial ads automatically reload after being shown:
+
+```kotlin
+// Global config (applies to all AdManager methods)
+AdManageKitConfig.interstitialAutoReload = false  // Disable auto-reload
+
+// Per-call override via InterstitialAdBuilder
+InterstitialAdBuilder.with(activity)
+    .adUnit(adUnitId)
+    .autoReload(true)  // Override global setting for this call
+    .show { navigateNext() }
+
+// Per-call override via AdManager
+AdManager.getInstance().showInterstitialIfReady(activity, callback, reloadAd = false)
+```
+
+**Priority:** `InterstitialAdBuilder.autoReload()` > `AdManageKitConfig.interstitialAutoReload`
 
 ### App Open Ads
 
@@ -345,6 +366,19 @@ AppPurchase.getInstance().setPurchaseListener(object : PurchaseListener {
 ---
 
 ## Migration Guide
+
+### Migrating to 2.8.0
+
+Version 2.8.0 is **fully backward compatible** with one behavioral change:
+
+**`forceShowInterstitial()` now respects loading strategy:**
+```kotlin
+// If you need old behavior (always force fetch), use:
+AdManager.getInstance().forceShowInterstitialAlways(activity, callback)
+
+// Or set strategy to ON_DEMAND globally:
+AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+```
 
 ### Migrating to 2.7.0
 

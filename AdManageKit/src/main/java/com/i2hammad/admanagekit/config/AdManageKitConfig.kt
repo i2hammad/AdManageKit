@@ -139,6 +139,17 @@ object AdManageKitConfig {
      * Default: 15 seconds
      */
     var defaultInterstitialInterval: Duration = 15.seconds
+
+    /**
+     * Enable auto-reload of interstitial ads after showing.
+     * When true, a new ad is automatically loaded after the current one is dismissed.
+     * When false, you must manually call loadInterstitialAd() to load the next ad.
+     *
+     * Can be overridden per-call using InterstitialAdBuilder.autoReload()
+     *
+     * Default: true
+     */
+    var interstitialAutoReload: Boolean = true
     
     /**
      * Default auto-refresh interval for banner ads.
@@ -427,6 +438,7 @@ object AdManageKitConfig {
         privacyCompliantMode = true
         enableDebugOverlay = false
         defaultInterstitialInterval = 15.seconds
+        interstitialAutoReload = true
         defaultBannerRefreshInterval = 60.seconds
         enableCollapsibleBannersByDefault = false
         defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM

@@ -69,7 +69,6 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private var primaryAdUnit: String? = null
     private val fallbackAdUnits = mutableListOf<String>()
     private var forceShow = false
-    private var respectInterval = true
     private var onAdShownCallback: (() -> Unit)? = null
     private var onAdDismissedCallback: (() -> Unit)? = null
     private var onAdFailedCallback: ((LoadAdError) -> Unit)? = null
@@ -85,6 +84,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private var minIntervalMs: Long? = null     // Minimum milliseconds between shows
     private var callCount = 0                   // Track calls to show() method
     private var waitForLoading = false          // Wait for loading ad before force fetching
+    private var autoReload: Boolean? = null     // Auto reload after showing (null = use global config)
 
     companion object {
         /**
@@ -125,14 +125,6 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
      */
     fun force(): InterstitialAdBuilder {
         this.forceShow = true
-        return this
-    }
-
-    /**
-     * Respect the configured time interval (default: true)
-     */
-    fun respectInterval(respect: Boolean = true): InterstitialAdBuilder {
-        this.respectInterval = respect
         return this
     }
 
@@ -310,6 +302,17 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     }
 
     /**
+     * Control whether to automatically reload the next ad after showing.
+     * Default is true.
+     *
+     * @param reload true to auto-reload after showing (default), false to disable
+     */
+    fun autoReload(reload: Boolean = true): InterstitialAdBuilder {
+        this.autoReload = reload
+        return this
+    }
+
+    /**
      * Smart wait behavior for splash screens and critical moments.
      *
      * When enabled:
@@ -457,10 +460,11 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
 
             AdLoadingStrategy.ONLY_CACHE -> {
                 // Only show if ad is already ready (cached), skip if not
+                val effectiveAutoReload = autoReload ?: AdManageKitConfig.interstitialAutoReload
                 if (adManager.isReady()) {
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing cached ad")
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing cached ad (autoReload=$effectiveAutoReload)")
                     // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
-                    adManager.showInterstitialIfReady(activity, showCallback, true)
+                    adManager.showInterstitialIfReady(activity, showCallback, effectiveAutoReload)
                 } else {
                     if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: No ad ready, skipping")
                     onComplete()
@@ -469,11 +473,12 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
 
             AdLoadingStrategy.HYBRID -> {
                 // Check cache first, fetch with dialog if needed
+                val effectiveAutoReload = autoReload ?: AdManageKitConfig.interstitialAutoReload
                 if (adManager.isReady()) {
                     // Ad is ready, show cached ad instantly
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing cached ad")
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing cached ad (autoReload=$effectiveAutoReload)")
                     // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
-                    adManager.showInterstitialIfReady(activity, showCallback, true)
+                    adManager.showInterstitialIfReady(activity, showCallback, effectiveAutoReload)
                 } else {
                     // Ad not ready, fetch with dialog
                     if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad not cached, fetching with dialog")
@@ -484,12 +489,13 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     }
 
     /**
-     * Show ad with loading dialog
+     * Show ad with loading dialog (always forces fresh fetch, ignores global strategy)
      */
     private fun showWithDialog(callback: AdManagerCallback, onComplete: () -> Unit) {
-        if (debugMode) android.util.Log.d("InterstitialBuilder", "Showing ad with loading dialog")
+        if (debugMode) android.util.Log.d("InterstitialBuilder", "Showing ad with loading dialog (force fetch)")
 
-        AdManager.getInstance().forceShowInterstitialWithDialog(
+        // Use forceShowInterstitialAlways to bypass global strategy - Builder has its own strategy logic
+        AdManager.getInstance().forceShowInterstitialAlways(
             activity,
             callback
         )

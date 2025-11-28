@@ -24,6 +24,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
@@ -183,18 +184,26 @@ class AdManager() {
         val adRequest = AdRequest.Builder().build()
 
         isAdLoading = true
+        var callbackCalled = false  // Prevent double callbacks
 
         // Load the interstitial ad
         InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                // Always save the ad (improves show rate even if timeout already fired)
                 mInterstitialAd = interstitialAd
                 isAdLoading = false
                 Log.d("AdManager", "Interstitial ad loaded for splash")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded for splash", true)
 
-                // Call the callback since the ad is loaded
-                callback.onNextAction()
-                callback.onAdLoaded()
+                // Only call callback if not already called by timeout
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    callback.onNextAction()
+                    callback.onAdLoaded()
+                } else {
+                    // Ad loaded after timeout - it's saved for next use (not wasted!)
+                    AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
+                }
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -207,7 +216,7 @@ class AdManager() {
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
                     retryAttempts[adUnitId] = currentAttempt + 1
-                    
+
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = currentAttempt,
@@ -231,18 +240,21 @@ class AdManager() {
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
-                // Call the callback on failure
-                callback.onNextAction()
-                callback.onFailedToLoad(loadAdError)
+                // Only call callback if not already called by timeout
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    callback.onNextAction()
+                    callback.onFailedToLoad(loadAdError)
+                }
             }
         })
 
-
         Handler(Looper.getMainLooper()).postDelayed({
-            if (isAdLoading) {
+            if (isAdLoading && !callbackCalled) {
                 Log.d("AdManager", "Ad loading timed out for splash")
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Interstitial ad loading timed out for splash", false)
-                isAdLoading = false
+                callbackCalled = true
+                // Note: Don't set isAdLoading = false here, so ad can still load and be saved
 
                 // Ensure the callback is called if the ad loading is taking too long
                 callback.onNextAction()
@@ -388,30 +400,68 @@ class AdManager() {
     }
 
     /**
-     * Forces fetch and display of a fresh interstitial ad.
-     * Always loads a new ad, does NOT use existing cached ads.
-     * Note: Does not reload after showing since next force call fetches fresh anyway.
+     * Shows an interstitial ad respecting the global loading strategy.
+     *
+     * Behavior based on AdManageKitConfig.interstitialLoadingStrategy:
+     * - **ON_DEMAND**: Always fetch fresh ad with loading dialog
+     * - **ONLY_CACHE**: Only show if cached ad is ready, skip if not
+     * - **HYBRID**: Show cached if ready, otherwise fetch fresh with dialog
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
     fun forceShowInterstitial(activity: Activity, callback: AdManagerCallback) {
-        forceShowInterstitialInternal(activity, callback)
+        val strategy = AdManageKitConfig.interstitialLoadingStrategy
+        val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+
+        when (strategy) {
+            AdLoadingStrategy.ON_DEMAND -> {
+                // Always fetch fresh ad with dialog
+                forceShowInterstitialAlways(activity, callback)
+            }
+            AdLoadingStrategy.ONLY_CACHE -> {
+                // Only show if cached, skip otherwise
+                if (isReady()) {
+                    showInterstitialIfReady(activity, callback, effectiveAutoReload)
+                } else {
+                    callback.onNextAction()
+                }
+            }
+            AdLoadingStrategy.HYBRID -> {
+                // Show cached if ready, otherwise fetch fresh
+                if (isReady()) {
+                    showInterstitialIfReady(activity, callback, effectiveAutoReload)
+                } else {
+                    forceShowInterstitialAlways(activity, callback)
+                }
+            }
+        }
     }
 
 
     /**
-     * Forces fetch and display of a fresh interstitial ad with a loading dialog.
-     * Always loads a new ad, does NOT use existing cached ads.
-     * Note: Does not reload after showing since next force call fetches fresh anyway.
+     * Shows an interstitial ad with loading dialog, respecting the global loading strategy.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
+     * @see forceShowInterstitial
      */
     fun forceShowInterstitialWithDialog(
         activity: Activity, callback: AdManagerCallback
     ) {
         forceShowInterstitial(activity, callback)
+    }
+
+    /**
+     * Always forces fetch and display of a fresh interstitial ad.
+     * Ignores loading strategy - always loads new ad with dialog.
+     * Used internally by InterstitialAdBuilder for explicit force behavior.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     */
+    internal fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback) {
+        forceShowInterstitialInternal(activity, callback)
     }
 
     /**
@@ -421,12 +471,12 @@ class AdManager() {
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
-     * @param reloadAd Whether to reload the ad after it's shown. Defaults to true.
+     * @param reloadAd Whether to reload the ad after it's shown. Defaults to AdManageKitConfig.interstitialAutoReload.
      */
     fun showInterstitialIfReady(
         activity: Activity,
         callback: AdManagerCallback,
-        reloadAd: Boolean = true
+        reloadAd: Boolean = AdManageKitConfig.interstitialAutoReload
     ) {
         showAd(activity, callback, reloadAd)
     }
@@ -434,13 +484,14 @@ class AdManager() {
 
     /**
      * Shows an interstitial ad based on the specified time interval criteria.
+     * Uses AdManageKitConfig.interstitialAutoReload to determine if ad should reload after showing.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
     fun showInterstitialAdByTime(activity: Activity, callback: AdManagerCallback) {
         if (canShowAd()) {
-            showAd(activity, callback, true)
+            showAd(activity, callback, AdManageKitConfig.interstitialAutoReload)
         } else {
             callback.onNextAction()
         }
@@ -448,6 +499,7 @@ class AdManager() {
 
     /**
      * Shows an interstitial ad based on the specified number of times it has been displayed.
+     * Uses AdManageKitConfig.interstitialAutoReload to determine if ad should reload after showing.
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
@@ -457,7 +509,7 @@ class AdManager() {
         activity: Activity, callback: AdManagerCallback, maxDisplayCount: Int
     ) {
         if (adDisplayCount < maxDisplayCount) {
-            showAd(activity, callback, true)
+            showAd(activity, callback, AdManageKitConfig.interstitialAutoReload)
         } else {
             callback.onNextAction()
         }
@@ -500,9 +552,17 @@ class AdManager() {
 
         InterstitialAd.load(activity, currentAdUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                if (timeoutTriggered) return
-                adLoaded = true
+                // Always save the ad for future use (improves show rate)
                 mInterstitialAd = interstitialAd
+                adLoaded = true
+
+                if (timeoutTriggered) {
+                    // Timeout already triggered, but SAVE the ad for next time (don't waste it!)
+                    Log.d("AdManager", "Ad loaded after timeout - saved for next show")
+                    AdDebugUtils.logEvent(currentAdUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show (not wasted)", true)
+                    return
+                }
+
                 Log.d("AdManager", "Fresh interstitial ad loaded for force show")
                 AdDebugUtils.logEvent(currentAdUnitId, "onAdLoaded", "Fresh interstitial loaded for force show", true)
 
@@ -868,17 +928,18 @@ class AdManager() {
             return
         }
 
+        val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
         when {
             // Case 1: Ad is ready - show immediately
             isReady() -> {
                 AdDebugUtils.logEvent(currentAdUnitId, "showOrWait", "Ad ready, showing immediately", true)
-                showAd(activity, callback, true)
+                showAd(activity, callback, effectiveAutoReload)
             }
 
             // Case 2: Ad is loading - wait for it with timeout
             isAdLoading -> {
                 AdDebugUtils.logEvent(currentAdUnitId, "showOrWait", "Ad loading, waiting with timeout ${timeoutMillis}ms", true)
-                waitForLoadingAd(activity, callback, timeoutMillis, showDialogIfLoading)
+                waitForLoadingAd(activity, callback, timeoutMillis, showDialogIfLoading, effectiveAutoReload)
             }
 
             // Case 3: Neither ready nor loading - force load
@@ -896,7 +957,8 @@ class AdManager() {
         activity: Activity,
         callback: AdManagerCallback,
         timeoutMillis: Long,
-        showDialog: Boolean
+        showDialog: Boolean,
+        reloadAd: Boolean = AdManageKitConfig.interstitialAutoReload
     ) {
         val checkIntervalMs = 100L
         var elapsedMs = 0L
@@ -916,10 +978,10 @@ class AdManager() {
                         AdDebugUtils.logEvent(adUnitId ?: "", "waitForAd", "Ad loaded after ${elapsedMs}ms, showing", true)
                         if (dialogViews != null) {
                             animateDialogDismissal(dialogViews) {
-                                showAd(activity, callback, true)
+                                showAd(activity, callback, reloadAd)
                             }
                         } else {
-                            showAd(activity, callback, true)
+                            showAd(activity, callback, reloadAd)
                         }
                     }
 
