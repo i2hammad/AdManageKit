@@ -5,15 +5,15 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.6.0`** introduces **NativeTemplateView** with 17 unified templates, **Ad Loading Strategies**, Material 3 theme support, and enhanced native ad handling.
+**Latest Version `2.7.0`** introduces **Smart Splash Screen Support**, fixes for HYBRID/ONLY_CACHE strategies, and premium user optimization.
 
-## What's New in 2.6.0
+## What's New in 2.7.0
 
-- **NativeTemplateView**: Single view supporting 17 template styles with XML preview
-- **Ad Loading Strategies**: ON_DEMAND, ONLY_CACHE, HYBRID for different use cases
-- **Material 3 Theming**: Automatic dark/light mode support
-- **Video Support**: 120dp+ MediaView for video ads
-- **Smart View Handling**: Auto-hide empty containers, proper alignment
+- **Smart Splash Screen**: New `waitForLoading()` for optimal splash ad experience
+- **Fixed HYBRID/ONLY_CACHE**: Now properly use cached ads instead of fetching fresh
+- **Premium Optimization**: Skip ad requests for premium users
+- **Frequency Controls**: `everyNthTime()`, `minInterval()`, `maxShows()` in InterstitialAdBuilder
+- **New Methods**: `isLoading()`, `showOrWaitForAd()` in AdManager
 
 ## Screenshots
 
@@ -46,26 +46,26 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.6.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.6.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.7.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.7.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.7.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.7.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
 
 ## Features
 
-### NativeTemplateView (NEW in 2.6.0)
+### NativeTemplateView (v2.6.0+)
 - **17 Template Styles**: card_modern, material3, minimal, list_item, magazine, video templates, and more
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
 - **Video-Ready**: All templates support video ads (120dp+ MediaView)
 - [View Documentation](docs/NATIVE_TEMPLATE_VIEW.md)
 
-### Ad Loading Strategies (NEW in 2.6.0)
+### Ad Loading Strategies (v2.6.0+)
 - **ON_DEMAND**: Fetch fresh ads with loading dialog
 - **ONLY_CACHE**: Instant display from cache
 - **HYBRID**: Cache-first with fallback fetch (recommended)
@@ -127,7 +127,7 @@ class MyApp : Application() {
             enableSmartPreloading = true
             autoRetryFailedAds = true
 
-            // Ad Loading Strategies (NEW in 2.6.0)
+            // Ad Loading Strategies (v2.6.0+)
             interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
             appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
@@ -142,7 +142,7 @@ class MyApp : Application() {
 }
 ```
 
-### NativeTemplateView (NEW in 2.6.0)
+### NativeTemplateView (v2.6.0+)
 
 #### XML Usage
 
@@ -262,7 +262,7 @@ fun MyScreen() {
     // Banner
     BannerAdCompose(adUnitId = "ca-app-pub-xxx/yyy")
 
-    // NativeTemplateView with any template (NEW in 2.6.0)
+    // NativeTemplateView with any template (v2.6.0+)
     NativeTemplateCompose(
         adUnitId = "ca-app-pub-xxx/yyy",
         template = NativeAdTemplate.MATERIAL3,
@@ -346,9 +346,9 @@ AppPurchase.getInstance().setPurchaseListener(object : PurchaseListener {
 
 ## Migration Guide
 
-### Migrating to 2.6.0
+### Migrating to 2.7.0
 
-Version 2.6.0 is **fully backward compatible**. Optionally adopt new features:
+Version 2.7.0 is **fully backward compatible**. Optionally adopt new features:
 
 ```kotlin
 // Old way (still works)

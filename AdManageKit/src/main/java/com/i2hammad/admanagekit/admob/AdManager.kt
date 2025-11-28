@@ -251,6 +251,13 @@ class AdManager() {
     }
 
     fun loadInterstitialAd(context: Context, adUnitId: String) {
+        // Skip loading for premium users - no need to request ads
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            AdDebugUtils.logEvent(adUnitId, "skipLoad", "Skipping ad load - user is premium", true)
+            return
+        }
+
         if (AdManageKitConfig.testMode) {
             AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads", true)
         }
@@ -816,5 +823,139 @@ class AdManager() {
      */
     fun getTimeSinceLastAd(): Long {
         return System.currentTimeMillis() - lastAdShowTime
+    }
+
+    /**
+     * Check if an ad is currently being loaded
+     */
+    fun isLoading(): Boolean {
+        return isAdLoading
+    }
+
+    /**
+     * Smart show method for splash screens and critical moments.
+     *
+     * Behavior:
+     * 1. If ad is READY → Shows immediately
+     * 2. If ad is LOADING → Waits for it with timeout, then shows
+     * 3. If NEITHER → Force loads with dialog
+     *
+     * Perfect for splash screens where you want to:
+     * - Preload ad in Application.onCreate()
+     * - Show on splash with smart waiting
+     *
+     * @param activity The activity to show the ad
+     * @param callback Callback for ad events
+     * @param timeoutMillis Maximum time to wait for loading ad (default: 5 seconds)
+     * @param showDialogIfLoading Whether to show loading dialog while waiting (default: true)
+     */
+    fun showOrWaitForAd(
+        activity: Activity,
+        callback: AdManagerCallback,
+        timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
+        showDialogIfLoading: Boolean = true
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onNextAction()
+            return
+        }
+
+        val currentAdUnitId = adUnitId ?: ""
+        if (currentAdUnitId.isEmpty()) {
+            Log.e("AdManager", "Ad unit ID is not set. Call loadInterstitialAd first or use forceShowInterstitial.")
+            callback.onNextAction()
+            return
+        }
+
+        when {
+            // Case 1: Ad is ready - show immediately
+            isReady() -> {
+                AdDebugUtils.logEvent(currentAdUnitId, "showOrWait", "Ad ready, showing immediately", true)
+                showAd(activity, callback, true)
+            }
+
+            // Case 2: Ad is loading - wait for it with timeout
+            isAdLoading -> {
+                AdDebugUtils.logEvent(currentAdUnitId, "showOrWait", "Ad loading, waiting with timeout ${timeoutMillis}ms", true)
+                waitForLoadingAd(activity, callback, timeoutMillis, showDialogIfLoading)
+            }
+
+            // Case 3: Neither ready nor loading - force load
+            else -> {
+                AdDebugUtils.logEvent(currentAdUnitId, "showOrWait", "Ad not loaded/loading, force fetching", true)
+                forceShowInterstitialInternal(activity, callback)
+            }
+        }
+    }
+
+    /**
+     * Wait for a currently loading ad with timeout
+     */
+    private fun waitForLoadingAd(
+        activity: Activity,
+        callback: AdManagerCallback,
+        timeoutMillis: Long,
+        showDialog: Boolean
+    ) {
+        val checkIntervalMs = 100L
+        var elapsedMs = 0L
+        val handler = Handler(Looper.getMainLooper())
+
+        // Show dialog if requested
+        var dialogViews: LoadingDialogViews? = null
+        if (showDialog) {
+            dialogViews = showBeautifulLoadingDialog(activity)
+        }
+
+        val checkRunnable = object : Runnable {
+            override fun run() {
+                when {
+                    // Ad became ready - show it
+                    isReady() -> {
+                        AdDebugUtils.logEvent(adUnitId ?: "", "waitForAd", "Ad loaded after ${elapsedMs}ms, showing", true)
+                        if (dialogViews != null) {
+                            animateDialogDismissal(dialogViews) {
+                                showAd(activity, callback, true)
+                            }
+                        } else {
+                            showAd(activity, callback, true)
+                        }
+                    }
+
+                    // Timeout reached
+                    elapsedMs >= timeoutMillis -> {
+                        AdDebugUtils.logEvent(adUnitId ?: "", "waitForAd", "Timeout after ${elapsedMs}ms, proceeding", false)
+                        if (dialogViews != null) {
+                            animateDialogDismissal(dialogViews) {
+                                callback.onNextAction()
+                            }
+                        } else {
+                            callback.onNextAction()
+                        }
+                    }
+
+                    // Still loading and not timed out - check again
+                    isAdLoading -> {
+                        elapsedMs += checkIntervalMs
+                        handler.postDelayed(this, checkIntervalMs)
+                    }
+
+                    // Loading failed (not loading anymore, not ready) - force fetch or proceed
+                    else -> {
+                        AdDebugUtils.logEvent(adUnitId ?: "", "waitForAd", "Loading failed, proceeding", false)
+                        if (dialogViews != null) {
+                            animateDialogDismissal(dialogViews) {
+                                callback.onNextAction()
+                            }
+                        } else {
+                            callback.onNextAction()
+                        }
+                    }
+                }
+            }
+        }
+
+        handler.post(checkRunnable)
     }
 }

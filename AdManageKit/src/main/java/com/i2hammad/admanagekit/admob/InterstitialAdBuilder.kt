@@ -84,6 +84,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private var maxShows: Int? = null           // Maximum total times to show ad
     private var minIntervalMs: Long? = null     // Minimum milliseconds between shows
     private var callCount = 0                   // Track calls to show() method
+    private var waitForLoading = false          // Wait for loading ad before force fetching
 
     companion object {
         /**
@@ -309,6 +310,35 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     }
 
     /**
+     * Smart wait behavior for splash screens and critical moments.
+     *
+     * When enabled:
+     * 1. If ad is READY → Shows immediately
+     * 2. If ad is LOADING → Waits for it with timeout, then shows
+     * 3. If NEITHER → Force loads with dialog
+     *
+     * Perfect for splash screens where you preload in Application.onCreate()
+     * and want to show on splash with smart waiting.
+     *
+     * Example:
+     * ```kotlin
+     * // In Application.onCreate()
+     * AdManager.getInstance().loadInterstitialAd(this, adUnitId)
+     *
+     * // In SplashActivity
+     * InterstitialAdBuilder.with(activity)
+     *     .adUnit(adUnitId)
+     *     .waitForLoading()      // Wait if loading, force if not
+     *     .timeout(5000)         // 5 second max wait
+     *     .show { startMainActivity() }
+     * ```
+     */
+    fun waitForLoading(): InterstitialAdBuilder {
+        this.waitForLoading = true
+        return this
+    }
+
+    /**
      * Show the ad and execute next action when done (Kotlin lambda)
      */
     fun show(onComplete: () -> Unit) {
@@ -380,13 +410,6 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             }
         }
 
-        // Determine effective loading strategy
-        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.interstitialLoadingStrategy
-
-        if (debugMode) {
-            android.util.Log.d("InterstitialBuilder", "Using loading strategy: $effectiveStrategy")
-        }
-
         // Create callback for showing the ad
         val showCallback = object : AdManagerCallback() {
             override fun onAdLoaded() {
@@ -409,6 +432,21 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             }
         }
 
+        // Handle waitForLoading mode (smart splash screen behavior)
+        if (waitForLoading) {
+            if (debugMode) android.util.Log.d("InterstitialBuilder", "WAIT_FOR_LOADING: Using smart wait behavior")
+            val effectiveTimeout = timeoutMs ?: AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
+            adManager.showOrWaitForAd(activity, showCallback, effectiveTimeout, showLoadingDialog)
+            return
+        }
+
+        // Determine effective loading strategy
+        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.interstitialLoadingStrategy
+
+        if (debugMode) {
+            android.util.Log.d("InterstitialBuilder", "Using loading strategy: $effectiveStrategy")
+        }
+
         // Handle different loading strategies
         when (effectiveStrategy) {
             AdLoadingStrategy.ON_DEMAND -> {
@@ -420,12 +458,9 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             AdLoadingStrategy.ONLY_CACHE -> {
                 // Only show if ad is already ready (cached), skip if not
                 if (adManager.isReady()) {
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing instantly")
-                    if (forceShow || !respectInterval) {
-                        adManager.forceShowInterstitial(activity, showCallback)
-                    } else {
-                        adManager.showInterstitialAdByTime(activity, showCallback, true)
-                    }
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing cached ad")
+                    // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
+                    adManager.showInterstitialIfReady(activity, showCallback, true)
                 } else {
                     if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: No ad ready, skipping")
                     onComplete()
@@ -435,13 +470,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             AdLoadingStrategy.HYBRID -> {
                 // Check cache first, fetch with dialog if needed
                 if (adManager.isReady()) {
-                    // Ad is ready, show instantly
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing instantly")
-                    if (forceShow || !respectInterval) {
-                        adManager.forceShowInterstitial(activity, showCallback)
-                    } else {
-                        adManager.showInterstitialAdByTime(activity, showCallback, true)
-                    }
+                    // Ad is ready, show cached ad instantly
+                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing cached ad")
+                    // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
+                    adManager.showInterstitialIfReady(activity, showCallback, true)
                 } else {
                     // Ad not ready, fetch with dialog
                     if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad not cached, fetching with dialog")

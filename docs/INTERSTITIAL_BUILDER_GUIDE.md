@@ -38,10 +38,25 @@ showInterstitialAd("ca-app-pub-xxxxx/yyyyy") {
 | `.fallbacks(vararg String)` | Add multiple fallback units | `.fallbacks("unit1", "unit2", "unit3")` |
 | `.force()` | Show ad ignoring time interval | `.force()` |
 | `.respectInterval(Boolean)` | Respect time interval (default: true) | `.respectInterval(false)` |
-| `.autoReload(Boolean)` | Auto-reload after showing (default: true) | `.autoReload(true)` |
-| `.withLoadingDialog()` | Show loading dialog while fetching | `.withLoadingDialog()` |
-| `.maxShows(Int)` | Cap total shows using AdManager counter | `.maxShows(5)` |
+| `.timeout(Long)` | Set load timeout in milliseconds | `.timeout(5000)` |
+| `.timeoutSeconds(Int)` | Set load timeout in seconds | `.timeoutSeconds(5)` |
 | `.debug()` | Enable debug logging | `.debug()` |
+
+### Loading Strategy Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `.loadingStrategy(Strategy)` | Set how ads are loaded/shown | `.loadingStrategy(AdLoadingStrategy.HYBRID)` |
+| `.waitForLoading()` | Smart wait for splash screens (see below) | `.waitForLoading()` |
+
+### Frequency Control Methods
+
+| Method | Description | Example |
+|--------|-------------|---------|
+| `.everyNthTime(Int)` | Show only every Nth call | `.everyNthTime(3)` |
+| `.maxShows(Int)` | Maximum total shows in session | `.maxShows(5)` |
+| `.minInterval(Long)` | Minimum ms between shows | `.minInterval(30000)` |
+| `.minIntervalSeconds(Int)` | Minimum seconds between shows | `.minIntervalSeconds(30)` |
 
 ### Callback Methods
 
@@ -57,6 +72,105 @@ showInterstitialAd("ca-app-pub-xxxxx/yyyyy") {
 |--------|-------------|
 | `.show(() -> Unit)` | Load and show ad, then execute callback |
 | `.preload()` | Just preload ad without showing |
+
+---
+
+## 🎯 Loading Strategies
+
+### Available Strategies
+
+| Strategy | Behavior | Best For |
+|----------|----------|----------|
+| `ON_DEMAND` | Always fetch fresh ad with loading dialog | Important moments, max revenue |
+| `ONLY_CACHE` | Only show if cached, skip otherwise | Smooth gameplay, no interruption |
+| `HYBRID` | Check cache first, fetch if needed (default) | Balanced UX and fill rate |
+
+### Strategy Examples
+
+```kotlin
+// ON_DEMAND: Always fetch fresh (shows loading dialog)
+InterstitialAdBuilder.with(activity)
+    .adUnit(adUnitId)
+    .loadingStrategy(AdLoadingStrategy.ON_DEMAND)
+    .show { next() }
+
+// ONLY_CACHE: Show only if ready, no network request
+InterstitialAdBuilder.with(activity)
+    .adUnit(adUnitId)
+    .loadingStrategy(AdLoadingStrategy.ONLY_CACHE)
+    .show { next() }
+
+// HYBRID: Try cache first, fetch with dialog if needed
+InterstitialAdBuilder.with(activity)
+    .adUnit(adUnitId)
+    .loadingStrategy(AdLoadingStrategy.HYBRID)
+    .show { next() }
+```
+
+---
+
+## 🚀 Splash Screen Pattern
+
+Use `.waitForLoading()` for optimal splash screen ad experience:
+
+### How It Works
+
+| Ad State | Action |
+|----------|--------|
+| **READY** | Shows immediately |
+| **LOADING** | Waits with timeout, then shows |
+| **NEITHER** | Force fetches with dialog |
+
+### Recommended Pattern
+
+```kotlin
+// Step 1: In Application.onCreate() - Start loading early
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-xxx/yyy")
+    }
+}
+
+// Step 2: In SplashActivity - Use waitForLoading()
+class SplashActivity : AppCompatActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Smart wait: shows cached, waits for loading, or force fetches
+        InterstitialAdBuilder.with(this)
+            .adUnit("ca-app-pub-xxx/yyy")
+            .waitForLoading()         // Smart splash behavior
+            .timeout(5000)            // 5 second max wait
+            .show {
+                startMainActivity()
+            }
+    }
+}
+```
+
+### Alternative: Direct AdManager Usage
+
+```kotlin
+// Check states manually
+val adManager = AdManager.getInstance()
+
+when {
+    adManager.isReady() -> {
+        // Ad cached, show immediately
+        adManager.forceShowInterstitial(activity, callback)
+    }
+    adManager.isLoading() -> {
+        // Ad loading, use showOrWaitForAd
+        adManager.showOrWaitForAd(activity, callback, timeoutMillis = 5000)
+    }
+    else -> {
+        // Nothing happening, force fetch
+        adManager.forceShowInterstitialWithDialog(activity, callback)
+    }
+}
+```
 
 ---
 
