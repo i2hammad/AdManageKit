@@ -20,6 +20,7 @@ import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.nativead.AdChoicesView
 import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.gms.ads.nativead.NativeAdOptions
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
@@ -29,6 +30,10 @@ import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.databinding.LayoutNativeTemplatePreviewBinding
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.NativeAdIntegrationManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * A unified native ad view that supports multiple template styles.
@@ -70,6 +75,21 @@ class NativeTemplateView @JvmOverloads constructor(
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
     private var shimmerInflated = false
 
+    /**
+     * AdChoices placement position. Default is TOP_RIGHT.
+     * Note: This only applies when the template doesn't have a custom AdChoicesView in XML.
+     * If the template has an AdChoicesView defined, the SDK renders into that view instead.
+     * Options: ADCHOICES_TOP_LEFT, ADCHOICES_TOP_RIGHT, ADCHOICES_BOTTOM_RIGHT, ADCHOICES_BOTTOM_LEFT
+     */
+    private var adChoicesPlacement: Int = NativeAdOptions.ADCHOICES_TOP_RIGHT
+
+    /**
+     * Whether to use custom AdChoicesView from template XML (true) or SDK auto-placement (false).
+     * When true (default): Uses AdChoicesView position defined in template XML
+     * When false: Removes custom view and uses SDK's setAdChoicesPlacement()
+     */
+    private var useCustomAdChoicesView: Boolean = false
+
     init {
         // Read template from XML attributes
         attrs?.let {
@@ -77,6 +97,12 @@ class NativeTemplateView @JvmOverloads constructor(
             try {
                 val templateIndex = typedArray.getInt(R.styleable.NativeTemplateView_adTemplate, 0)
                 currentTemplate = NativeAdTemplate.fromIndex(templateIndex)
+
+                // Read AdChoices placement
+                adChoicesPlacement = typedArray.getInt(
+                    R.styleable.NativeTemplateView_adChoicesPlacement,
+                    NativeAdOptions.ADCHOICES_TOP_RIGHT
+                )
             } finally {
                 typedArray.recycle()
             }
@@ -172,6 +198,33 @@ class NativeTemplateView @JvmOverloads constructor(
      * Get the current template
      */
     fun getTemplate(): NativeAdTemplate = currentTemplate
+
+    /**
+     * Set AdChoices placement position programmatically.
+     * Note: This only takes effect when useCustomAdChoicesView is set to false,
+     * otherwise the template's XML-defined AdChoicesView position is used.
+     *
+     * @param placement One of NativeAdOptions.ADCHOICES_TOP_LEFT, ADCHOICES_TOP_RIGHT,
+     *                  ADCHOICES_BOTTOM_RIGHT, ADCHOICES_BOTTOM_LEFT
+     * @param useSDKPlacement If true, ignores template's AdChoicesView and uses SDK auto-placement
+     */
+    fun setAdChoicesPlacement(placement: Int, useSDKPlacement: Boolean = false) {
+        adChoicesPlacement = placement
+        useCustomAdChoicesView = !useSDKPlacement
+    }
+
+    /**
+     * Get current AdChoices placement
+     */
+    fun getAdChoicesPlacement(): Int = adChoicesPlacement
+
+    /**
+     * Configure whether to use custom AdChoicesView from template XML or SDK auto-placement.
+     * @param useCustomView true = use template's AdChoicesView position, false = use SDK's setAdChoicesPlacement()
+     */
+    fun setUseCustomAdChoicesView(useCustomView: Boolean) {
+        useCustomAdChoicesView = useCustomView
+    }
 
     private fun inflateShimmerPlaceholder() {
         val shimmerContent = binding.shimmerContent
@@ -314,22 +367,31 @@ class NativeTemplateView @JvmOverloads constructor(
 
     private fun getScreenTypeForTemplate(): NativeAdIntegrationManager.ScreenType {
         return when (currentTemplate) {
+            // Small/Compact templates
             NativeAdTemplate.COMPACT_HORIZONTAL,
             NativeAdTemplate.FULL_WIDTH_BANNER,
             NativeAdTemplate.LIST_ITEM,
             NativeAdTemplate.GRID_CARD,
+            NativeAdTemplate.MEDIA_CONTENT_SPLIT,
+            NativeAdTemplate.PILL_BANNER,
             NativeAdTemplate.VIDEO_SMALL -> NativeAdIntegrationManager.ScreenType.SMALL
 
+            // Medium templates
             NativeAdTemplate.CARD_MODERN,
             NativeAdTemplate.MATERIAL3,
             NativeAdTemplate.MINIMAL,
+            NativeAdTemplate.APP_STORE,
             NativeAdTemplate.VIDEO_MEDIUM,
             NativeAdTemplate.VIDEO_SQUARE -> NativeAdIntegrationManager.ScreenType.MEDIUM
 
+            // Large/Hero templates
             NativeAdTemplate.STORY_STYLE,
             NativeAdTemplate.FEATURED,
             NativeAdTemplate.OVERLAY_DARK,
             NativeAdTemplate.MAGAZINE,
+            NativeAdTemplate.SOCIAL_FEED,
+            NativeAdTemplate.GRADIENT_CARD,
+            NativeAdTemplate.SPOTLIGHT,
             NativeAdTemplate.VIDEO_LARGE,
             NativeAdTemplate.VIDEO_VERTICAL,
             NativeAdTemplate.VIDEO_FULLSCREEN -> NativeAdIntegrationManager.ScreenType.LARGE
@@ -342,116 +404,128 @@ class NativeTemplateView @JvmOverloads constructor(
         callback: AdLoadCallback?,
         useCachedAd: Boolean = false
     ) {
-        val nativeAdView = LayoutInflater.from(context)
-            .inflate(currentTemplate.layoutResId, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdPlaceholder
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainer
 
-        // Setup view references based on template
-        setupNativeAdViewReferences(nativeAdView)
+        // Build AdLoader on background thread as recommended by Google
+        CoroutineScope(Dispatchers.IO).launch {
+            // Configure NativeAdOptions with AdChoices placement
+            val nativeAdOptions = NativeAdOptions.Builder()
+                .setAdChoicesPlacement(adChoicesPlacement)
+                .build()
 
-        val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
-            adPlaceholder.removeAllViews()
-            adPlaceholder.addView(nativeAdView)
-            binding.root.visibility = VISIBLE
-            adPlaceholder.visibility = VISIBLE
+            val builder = AdLoader.Builder(context, adUnitId)
+                .withNativeAdOptions(nativeAdOptions)
+                .forNativeAd { nativeAd ->
+                    // UI operations on main thread
+                    CoroutineScope(Dispatchers.Main).launch {
+                        val nativeAdView = LayoutInflater.from(context)
+                            .inflate(currentTemplate.layoutResId, null) as NativeAdView
 
-            // Cache with screen-aware context
-            if (context is Activity && NativeAdManager.enableCachingNativeAds) {
-                val screenKey = "${context.javaClass.simpleName}_${currentTemplate.name}"
-                NativeAdIntegrationManager.cacheNativeAdWithScreenContext(
-                    baseAdUnitId = this@NativeTemplateView.adUnitId,
-                    screenType = getScreenTypeForTemplate(),
-                    screenKey = screenKey,
-                    nativeAd = nativeAd
-                )
-            } else if (NativeAdManager.enableCachingNativeAds) {
-                NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
-            }
+                        // Setup view references based on template
+                        setupNativeAdViewReferences(nativeAdView)
 
-            populateNativeAdView(nativeAd, nativeAdView)
-            shimmerFrameLayout.visibility = GONE
+                        adPlaceholder.removeAllViews()
+                        adPlaceholder.addView(nativeAdView)
+                        binding.root.visibility = VISIBLE
+                        adPlaceholder.visibility = VISIBLE
 
-            nativeAd.setOnPaidEventListener { adValue ->
-                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-                }
-                firebaseAnalytics?.logEvent("ad_paid_event", params)
-            }
-        }.withAdListener(object : AdListener() {
-            override fun onAdLoaded() {
-                super.onAdLoaded()
-                AdDebugUtils.logEvent(adUnitId, "onAdLoaded",
-                    "NativeTemplateView (${currentTemplate.name}) loaded successfully", true)
-                callback?.onAdLoaded()
-            }
+                        // NOTE: Do NOT cache ad here - it's being displayed immediately
+                        // Caching is only for preloaded ads that will be shown later
+                        // Ads expire after 1 hour, so we should only cache ads we intend to show later
 
-            override fun onAdFailedToLoad(adError: LoadAdError) {
-                // Try cached ad fallback
-                if (NativeAdManager.enableCachingNativeAds && !useCachedAd) {
-                    val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId, enableFallbackToAnyAd = true)
-                    if (cachedAd != null) {
-                        AdDebugUtils.logEvent(adUnitId, "usedFallbackCache",
-                            "Used fallback cached ad for ${currentTemplate.name} after network failure", true)
-                        displayAd(cachedAd)
+                        populateNativeAdView(nativeAd, nativeAdView)
+                        shimmerFrameLayout.visibility = GONE
+
+                        nativeAd.setOnPaidEventListener { adValue ->
+                            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                            val params = Bundle().apply {
+                                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                            }
+                            firebaseAnalytics?.logEvent("ad_paid_event", params)
+                        }
+                    }
+                }.withAdListener(object : AdListener() {
+                    override fun onAdLoaded() {
+                        super.onAdLoaded()
+                        AdDebugUtils.logEvent(adUnitId, "onAdLoaded",
+                            "NativeTemplateView (${currentTemplate.name}) loaded successfully", true)
                         callback?.onAdLoaded()
-                        return
                     }
-                }
 
-                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad",
-                    "NativeTemplateView (${currentTemplate.name}) failed: ${adError.message}", false)
-                adPlaceholder.visibility = GONE
-                shimmerFrameLayout.visibility = GONE
+                    override fun onAdFailedToLoad(adError: LoadAdError) {
+                        // Try cached ad fallback
+                        if (NativeAdManager.enableCachingNativeAds && !useCachedAd) {
+                            val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId, enableFallbackToAnyAd = true)
+                            if (cachedAd != null) {
+                                AdDebugUtils.logEvent(adUnitId, "usedFallbackCache",
+                                    "Used fallback cached ad for ${currentTemplate.name} after network failure", true)
+                                displayAd(cachedAd)
+                                callback?.onAdLoaded()
+                                return
+                            }
+                        }
 
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", adError.code.toString())
-                    if (AdManageKitConfig.enablePerformanceMetrics) {
-                        putString("error_message", adError.message)
+                        AdDebugUtils.logEvent(adUnitId, "onFailedToLoad",
+                            "NativeTemplateView (${currentTemplate.name}) failed: ${adError.message}", false)
+
+                        // UI operations on main thread
+                        CoroutineScope(Dispatchers.Main).launch {
+                            adPlaceholder.visibility = GONE
+                            shimmerFrameLayout.visibility = GONE
+                        }
+
+                        val params = Bundle().apply {
+                            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                            putString("ad_error_code", adError.code.toString())
+                            if (AdManageKitConfig.enablePerformanceMetrics) {
+                                putString("error_message", adError.message)
+                            }
+                        }
+                        firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                        callback?.onFailedToLoad(adError)
                     }
-                }
-                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(adError)
-            }
 
-            override fun onAdImpression() {
-                super.onAdImpression()
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                }
-                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                AdDebugUtils.logEvent(adUnitId, "onAdImpression",
-                    "NativeTemplateView (${currentTemplate.name}) impression", true)
-                callback?.onAdImpression()
-            }
+                    override fun onAdImpression() {
+                        super.onAdImpression()
+                        val params = Bundle().apply {
+                            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        }
+                        firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                        AdDebugUtils.logEvent(adUnitId, "onAdImpression",
+                            "NativeTemplateView (${currentTemplate.name}) impression", true)
+                        callback?.onAdImpression()
+                    }
 
-            override fun onAdClicked() {
-                super.onAdClicked()
-                AdDebugUtils.logEvent(adUnitId, "onAdClicked",
-                    "NativeTemplateView (${currentTemplate.name}) clicked", true)
-                callback?.onAdClicked()
-            }
+                    override fun onAdClicked() {
+                        super.onAdClicked()
+                        AdDebugUtils.logEvent(adUnitId, "onAdClicked",
+                            "NativeTemplateView (${currentTemplate.name}) clicked", true)
+                        callback?.onAdClicked()
+                    }
 
-            override fun onAdOpened() {
-                super.onAdOpened()
-                AdDebugUtils.logEvent(adUnitId, "onAdOpened",
-                    "NativeTemplateView (${currentTemplate.name}) opened", true)
-                callback?.onAdOpened()
-            }
+                    override fun onAdOpened() {
+                        super.onAdOpened()
+                        AdDebugUtils.logEvent(adUnitId, "onAdOpened",
+                            "NativeTemplateView (${currentTemplate.name}) opened", true)
+                        callback?.onAdOpened()
+                    }
 
-            override fun onAdClosed() {
-                super.onAdClosed()
-                AdDebugUtils.logEvent(adUnitId, "onAdClosed",
-                    "NativeTemplateView (${currentTemplate.name}) closed", true)
-                callback?.onAdClosed()
-            }
-        })
+                    override fun onAdClosed() {
+                        super.onAdClosed()
+                        AdDebugUtils.logEvent(adUnitId, "onAdClosed",
+                            "NativeTemplateView (${currentTemplate.name}) closed", true)
+                        callback?.onAdClosed()
+                    }
+                })
 
-        builder.build().loadAd(AdRequest.Builder().build())
+            // Load ad on main thread (required by AdMob)
+            withContext(Dispatchers.Main) {
+                builder.build().loadAd(AdRequest.Builder().build())
+            }
+        }
     }
 
     private fun setupNativeAdViewReferences(nativeAdView: NativeAdView) {
@@ -466,8 +540,18 @@ class NativeTemplateView @JvmOverloads constructor(
         nativeAdView.mediaView = nativeAdView.findViewById(R.id.ad_media)
         nativeAdView.starRatingView = nativeAdView.findViewById(R.id.ad_stars)
 
+        // AdChoices handling:
+        // - If useCustomAdChoicesView is true: Use the template's AdChoicesView position
+        // - If useCustomAdChoicesView is false: Let SDK auto-place via setAdChoicesPlacement()
         val adChoicesView: AdChoicesView? = nativeAdView.findViewById(R.id.ad_choices_view)
-        nativeAdView.adChoicesView = adChoicesView
+        if (useCustomAdChoicesView && adChoicesView != null) {
+            // Use custom view from template XML - SDK will render AdChoices into this view
+            nativeAdView.adChoicesView = adChoicesView
+        } else {
+            // Hide custom view if exists, let SDK handle placement via NativeAdOptions
+            adChoicesView?.visibility = GONE
+            // SDK will automatically place AdChoices based on setAdChoicesPlacement()
+        }
     }
 
     private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView) {

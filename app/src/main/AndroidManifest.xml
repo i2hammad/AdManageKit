@@ -39,7 +39,11 @@
             android:label="Native Template Tester"
             android:theme="@style/Theme.AdManageKit" />
 
-
+        <activity
+            android:name=".NonMaterialTestActivity"
+            android:exported="false"
+            android:label="Non-Material Theme Test"
+            android:theme="@style/Theme.NonMaterial" />
 
         <meta-data android:name="com.google.android.gms.ads.flag.NATIVE_AD_DEBUGGER_ENABLED"
             android:value="false" />

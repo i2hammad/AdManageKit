@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
@@ -68,8 +69,11 @@ public class AppPurchase {
     private Handler handler;
     private Runnable runnable;
     private String price = "2.89$";
+    @Deprecated
     private boolean consumePurchase = false;
     private String oldPrice = "3.50$";
+
+    private PurchaseHistoryListener purchaseHistoryListener;
     private boolean isPurchased = false;
     private double discount = 1.0d;
     private String idPurchased = "";
@@ -176,8 +180,39 @@ public class AppPurchase {
         this.price = price;
     }
 
+    /**
+     * @deprecated Use {@link PurchaseItem#isConsumable} per-product configuration instead.
+     * Set isConsumable=true when creating PurchaseItem for consumable products.
+     */
+    @Deprecated
     public void setConsumePurchase(boolean consumePurchase) {
         this.consumePurchase = consumePurchase;
+    }
+
+    /**
+     * Sets a listener to receive purchase history events.
+     * Use this to persist purchase history in your app if needed.
+     *
+     * @param listener The listener to receive history events.
+     */
+    public void setPurchaseHistoryListener(PurchaseHistoryListener listener) {
+        this.purchaseHistoryListener = listener;
+    }
+
+    /**
+     * Checks if a product is configured as consumable.
+     *
+     * @param productId The product ID to check.
+     * @return true if the product is consumable, false otherwise.
+     */
+    private boolean isProductConsumable(String productId) {
+        if (purchaseItemList == null) return consumePurchase; // fallback to legacy
+        for (PurchaseItem item : purchaseItemList) {
+            if (productId.equals(item.itemId)) {
+                return item.isConsumable;
+            }
+        }
+        return consumePurchase; // fallback to legacy global setting
     }
 
     public void setOldPrice(String oldPrice) {
@@ -196,12 +231,59 @@ public class AppPurchase {
         this.isPurchased = purchase;
     }
 
+    /**
+     * Checks if user has any active purchase that should disable ads.
+     * This includes:
+     * - Active subscriptions
+     * - Lifetime premium purchases
+     * - Remove ads purchases
+     *
+     * Note: Consumable and feature unlock purchases do NOT affect this result.
+     *
+     * @return true if user has an ad-disabling purchase, false otherwise.
+     */
     public boolean isPurchased() {
-        return isPurchased || !stringList.isEmpty() || !purchaseResultList.isEmpty();
+        // Check subscriptions
+        if (!purchaseResultList.isEmpty()) {
+            return true;
+        }
+        // Check for ad-disabling INAPP purchases only
+        for (String productId : stringList) {
+            PurchaseItem item = getPurchaseItem(productId);
+            if (item != null && item.shouldDisableAds()) {
+                return true;
+            }
+            // Fallback for items not in list - check if not consumable
+            if (item == null && !isProductConsumable(productId)) {
+                return true;
+            }
+        }
+        // Fallback to manual flag
+        return isPurchased;
     }
 
     public boolean isPurchased(Context context) {
         return isPurchased();
+    }
+
+    /**
+     * Checks if a specific product is currently owned (purchased and not consumed).
+     *
+     * @param productId The product ID to check.
+     * @return true if the product is owned, false otherwise.
+     */
+    public boolean isProductOwned(String productId) {
+        // Check INAPP purchases
+        if (stringList.contains(productId)) {
+            return true;
+        }
+        // Check subscriptions
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.getProductId().contains(productId)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public String getIdPurchased() {
@@ -472,6 +554,181 @@ public class AppPurchase {
         return handleBillingResult(result);
     }
 
+    /**
+     * Upgrades or downgrades a subscription.
+     *
+     * @param activity           The activity context.
+     * @param newSubsId          The new subscription product ID.
+     * @param oldPurchaseToken   The purchase token of the current subscription to replace.
+     * @param replacementMode    The replacement mode (proration mode).
+     * @return Result message.
+     */
+    public String updateSubscription(Activity activity, String newSubsId, String oldPurchaseToken,
+                                      SubscriptionReplacementMode replacementMode) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            Log.e(Tag, "Invalid activity context");
+            notifyListener("Invalid activity");
+            return "Invalid activity context";
+        }
+        if (subProductDetailsMap == null || subProductDetailsMap.isEmpty()) {
+            Log.e(Tag, "Subscription products not initialized");
+            notifyListener("Billing not initialized");
+            return "Billing not initialized";
+        }
+        ProductDetails productDetails = subProductDetailsMap.get(newSubsId);
+        if (productDetails == null) {
+            Log.e(Tag, "Subscription not found: " + newSubsId);
+            notifyListener("Subscription not available");
+            return "Invalid subscription ID";
+        }
+        if (billingClient == null || !billingClient.isReady()) {
+            Log.e(Tag, "BillingClient not ready");
+            notifyListener("Billing service unavailable");
+            return "Billing service unavailable";
+        }
+        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
+        if (offers == null || offers.isEmpty()) {
+            Log.e(Tag, "No subscription offers found");
+            notifyListener("No available offers");
+            return "No subscription offers available";
+        }
+        String offerToken = findBestOfferToken(newSubsId, offers);
+
+        // Build subscription update params
+        BillingFlowParams.SubscriptionUpdateParams updateParams = BillingFlowParams.SubscriptionUpdateParams
+                .newBuilder()
+                .setOldPurchaseToken(oldPurchaseToken)
+                .setSubscriptionReplacementMode(replacementMode.getMode())
+                .build();
+
+        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(productDetails)
+                .setOfferToken(offerToken)
+                .build();
+        BillingFlowParams flowParams = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(Collections.singletonList(params))
+                .setSubscriptionUpdateParams(updateParams)
+                .build();
+
+        Log.d(Tag, "Updating subscription from token: " + oldPurchaseToken + " to: " + newSubsId);
+        BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
+        return handleBillingResult(result);
+    }
+
+    /**
+     * Upgrades a subscription to a higher tier.
+     * Uses CHARGE_PRORATED_PRICE mode - user pays the difference immediately.
+     *
+     * @param activity   The activity context.
+     * @param newSubsId  The new (higher tier) subscription product ID.
+     * @return Result message.
+     */
+    public String upgradeSubscription(Activity activity, String newSubsId) {
+        PurchaseResult currentSub = getFirstActiveSubscription();
+        if (currentSub == null) {
+            Log.e(Tag, "No active subscription to upgrade");
+            notifyListener("No active subscription");
+            return "No active subscription to upgrade";
+        }
+        return updateSubscription(activity, newSubsId, currentSub.getPurchaseToken(),
+                SubscriptionReplacementMode.CHARGE_PRORATED_PRICE);
+    }
+
+    /**
+     * Downgrades a subscription to a lower tier.
+     * Uses DEFERRED mode - change takes effect at next renewal.
+     *
+     * @param activity   The activity context.
+     * @param newSubsId  The new (lower tier) subscription product ID.
+     * @return Result message.
+     */
+    public String downgradeSubscription(Activity activity, String newSubsId) {
+        PurchaseResult currentSub = getFirstActiveSubscription();
+        if (currentSub == null) {
+            Log.e(Tag, "No active subscription to downgrade");
+            notifyListener("No active subscription");
+            return "No active subscription to downgrade";
+        }
+        return updateSubscription(activity, newSubsId, currentSub.getPurchaseToken(),
+                SubscriptionReplacementMode.DEFERRED);
+    }
+
+    /**
+     * Upgrades or downgrades from a specific subscription.
+     *
+     * @param activity         The activity context.
+     * @param currentSubsId    The current subscription product ID to replace.
+     * @param newSubsId        The new subscription product ID.
+     * @param replacementMode  The replacement mode.
+     * @return Result message.
+     */
+    public String changeSubscription(Activity activity, String currentSubsId, String newSubsId,
+                                      SubscriptionReplacementMode replacementMode) {
+        PurchaseResult currentSub = getSubscription(currentSubsId);
+        if (currentSub == null) {
+            Log.e(Tag, "Subscription not found: " + currentSubsId);
+            notifyListener("Subscription not found");
+            return "Current subscription not found";
+        }
+        return updateSubscription(activity, newSubsId, currentSub.getPurchaseToken(), replacementMode);
+    }
+
+    /**
+     * Gets the first active subscription.
+     */
+    @Nullable
+    private PurchaseResult getFirstActiveSubscription() {
+        if (purchaseResultList.isEmpty()) {
+            return null;
+        }
+        return purchaseResultList.get(0);
+    }
+
+    /**
+     * Subscription replacement modes for upgrade/downgrade.
+     */
+    public enum SubscriptionReplacementMode {
+        /**
+         * The new subscription takes effect immediately, and the user is charged full price.
+         * The remaining value from the old subscription is prorated for time.
+         */
+        WITH_TIME_PRORATION(BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.WITH_TIME_PRORATION),
+
+        /**
+         * The new subscription takes effect immediately, and the user is charged the price
+         * difference (upgrade only). Best for upgrades.
+         */
+        CHARGE_PRORATED_PRICE(BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.CHARGE_PRORATED_PRICE),
+
+        /**
+         * The new subscription takes effect immediately with full price charged.
+         * Best when you want immediate revenue.
+         */
+        CHARGE_FULL_PRICE(BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.CHARGE_FULL_PRICE),
+
+        /**
+         * The new subscription takes effect at the next renewal date.
+         * User keeps current subscription until then. Best for downgrades.
+         */
+        DEFERRED(BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.DEFERRED),
+
+        /**
+         * The new subscription takes effect immediately with no proration.
+         * The billing date remains the same.
+         */
+        WITHOUT_PRORATION(BillingFlowParams.SubscriptionUpdateParams.ReplacementMode.WITHOUT_PRORATION);
+
+        private final int mode;
+
+        SubscriptionReplacementMode(int mode) {
+            this.mode = mode;
+        }
+
+        public int getMode() {
+            return mode;
+        }
+    }
+
     private String findBestOfferToken(String subsId, List<ProductDetails.SubscriptionOfferDetails> offers) {
         String trialId = null;
         if (purchaseItemList != null) {
@@ -537,6 +794,22 @@ public class AppPurchase {
         consumePurchase(currentProductId);
     }
 
+    /**
+     * Consumes a purchased product, allowing it to be purchased again.
+     * Call this after you have granted the user their items/credits.
+     *
+     * <p>For consumable products (e.g., coins, gems), you must consume the purchase
+     * to allow the user to buy it again. The flow should be:</p>
+     * <ol>
+     *   <li>User purchases product</li>
+     *   <li>onProductPurchased callback fires</li>
+     *   <li>Grant user their items (update balance, etc.)</li>
+     *   <li>Call consumePurchase(productId)</li>
+     *   <li>onPurchaseConsumed callback fires (if listener set)</li>
+     * </ol>
+     *
+     * @param productId The product ID to consume.
+     */
     public void consumePurchase(String productId) {
         if (!isServiceConnected.get()) {
             Log.e(Tag, "Billing client not connected. Cannot consume purchase.");
@@ -554,6 +827,10 @@ public class AppPurchase {
                                 billingClient.consumeAsync(consumeParams, (consumeResult, purchaseToken) -> {
                                     if (consumeResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                                         Log.d(Tag, "Purchase consumed successfully: " + purchaseToken);
+                                        // Notify listener about consumption
+                                        notifyPurchaseHistoryEvent(purchase, productId, true);
+                                        // Remove from owned list
+                                        stringList.remove(productId);
                                         verifyPurchased(false);
                                     } else {
                                         Log.e(Tag, "Failed to consume purchase: " + consumeResult.getDebugMessage());
@@ -564,6 +841,306 @@ public class AppPurchase {
                     }
                 }
         );
+    }
+
+    /**
+     * Refreshes and retrieves all current purchases from Google Play.
+     * This fetches both INAPP and subscription purchases.
+     * Results are available via the existing purchase tracking.
+     *
+     * Note: For consumed purchases, you must track them yourself using PurchaseHistoryListener.
+     * Google's queryPurchaseHistoryAsync is deprecated in Billing Library 8+.
+     */
+    public void refreshPurchases() {
+        refreshPurchases(BillingClient.ProductType.INAPP);
+        refreshPurchases(BillingClient.ProductType.SUBS);
+    }
+
+    /**
+     * Refreshes and retrieves current purchases for a specific product type.
+     *
+     * @param productType BillingClient.ProductType.INAPP or BillingClient.ProductType.SUBS
+     */
+    public void refreshPurchases(String productType) {
+        if (!isServiceConnected.get()) {
+            Log.e(Tag, "Billing client not connected. Cannot refresh purchases.");
+            return;
+        }
+        billingClient.queryPurchasesAsync(
+                QueryPurchasesParams.newBuilder().setProductType(productType).build(),
+                (billingResult, purchases) -> {
+                    if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                        Log.d(Tag, "Purchases refreshed: " + purchases.size() + " for " + productType);
+                        for (Purchase purchase : purchases) {
+                            Log.d(Tag, "Active purchase - Products: " + purchase.getProducts() +
+                                    ", Time: " + purchase.getPurchaseTime() +
+                                    ", Quantity: " + purchase.getQuantity() +
+                                    ", Acknowledged: " + purchase.isAcknowledged());
+                            // Update internal tracking
+                            if (productType.equals(BillingClient.ProductType.INAPP)) {
+                                for (String productId : purchase.getProducts()) {
+                                    if (!stringList.contains(productId)) {
+                                        stringList.add(productId);
+                                    }
+                                }
+                                isPurchased = true;
+                            } else if (productType.equals(BillingClient.ProductType.SUBS)) {
+                                String productId = purchase.getProducts().isEmpty() ? "" : purchase.getProducts().get(0);
+                                handlePurchase(
+                                        new PurchaseResult(
+                                                purchase.getOrderId(),
+                                                purchase.getPackageName(),
+                                                purchase.getProducts(),
+                                                purchase.getPurchaseTime(),
+                                                purchase.getPurchaseState(),
+                                                purchase.getPurchaseToken(),
+                                                purchase.getQuantity(),
+                                                purchase.isAutoRenewing(),
+                                                purchase.isAcknowledged()
+                                        ),
+                                        productId
+                                );
+                                isPurchased = true;
+                            }
+                        }
+                    } else {
+                        Log.e(Tag, "Failed to refresh purchases: " + billingResult.getDebugMessage());
+                    }
+                }
+        );
+    }
+
+    /**
+     * Gets the PurchaseItem configuration for a product ID.
+     *
+     * @param productId The product ID to look up.
+     * @return The PurchaseItem or null if not found.
+     */
+    public PurchaseItem getPurchaseItem(String productId) {
+        if (purchaseItemList == null) return null;
+        for (PurchaseItem item : purchaseItemList) {
+            if (productId.equals(item.itemId)) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks if user has an active subscription (including cancelled but not expired).
+     *
+     * @return true if user has any active subscription, false otherwise.
+     */
+    public boolean isSubscribed() {
+        return !purchaseResultList.isEmpty();
+    }
+
+    /**
+     * Checks if user has a specific active subscription.
+     *
+     * @param subscriptionId The subscription product ID to check.
+     * @return true if the subscription is active, false otherwise.
+     */
+    public boolean isSubscribed(String subscriptionId) {
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.getProductId().contains(subscriptionId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Gets the subscription state for a specific subscription.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return The subscription state, or EXPIRED if not found.
+     */
+    public PurchaseResult.SubscriptionState getSubscriptionState(String subscriptionId) {
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.getProductId().contains(subscriptionId)) {
+                return result.getSubscriptionState();
+            }
+        }
+        return PurchaseResult.SubscriptionState.EXPIRED;
+    }
+
+    /**
+     * Gets all active subscriptions with their states.
+     *
+     * @return List of subscription PurchaseResults.
+     */
+    public List<PurchaseResult> getActiveSubscriptions() {
+        return new ArrayList<>(purchaseResultList);
+    }
+
+    /**
+     * Checks if any subscription is cancelled but still has access.
+     *
+     * @return true if user has a cancelled subscription.
+     */
+    public boolean hasSubscriptionCancelled() {
+        for (PurchaseResult result : purchaseResultList) {
+            if (!result.isAutoRenewing()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if all subscriptions will auto-renew.
+     *
+     * @return true if all subscriptions are set to auto-renew.
+     */
+    public boolean willSubscriptionsRenew() {
+        if (purchaseResultList.isEmpty()) {
+            return false;
+        }
+        for (PurchaseResult result : purchaseResultList) {
+            if (!result.isAutoRenewing()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Gets the subscription result for a specific product.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return The PurchaseResult or null if not found.
+     */
+    @Nullable
+    public PurchaseResult getSubscription(String subscriptionId) {
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.getProductId().contains(subscriptionId)) {
+                return result;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Checks if user has a lifetime premium purchase.
+     * This is an INAPP purchase with LIFETIME_PREMIUM or REMOVE_ADS category.
+     *
+     * @return true if user has any lifetime purchase, false otherwise.
+     */
+    public boolean hasLifetimePurchase() {
+        for (String productId : stringList) {
+            PurchaseItem item = getPurchaseItem(productId);
+            if (item != null && item.isLifetimePurchase()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if user has a "Remove Ads" purchase specifically.
+     *
+     * @return true if user has a remove ads purchase, false otherwise.
+     */
+    public boolean hasRemoveAdsPurchase() {
+        for (String productId : stringList) {
+            PurchaseItem item = getPurchaseItem(productId);
+            if (item != null && item.category == PurchaseItem.PurchaseCategory.REMOVE_ADS) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if user has a "Lifetime Premium" purchase specifically.
+     *
+     * @return true if user has a lifetime premium purchase, false otherwise.
+     */
+    public boolean hasLifetimePremium() {
+        for (String productId : stringList) {
+            PurchaseItem item = getPurchaseItem(productId);
+            if (item != null && item.category == PurchaseItem.PurchaseCategory.LIFETIME_PREMIUM) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a specific product has been purchased and is currently owned.
+     *
+     * @param productId The product ID to check.
+     * @return true if the product is owned, false otherwise.
+     */
+    public boolean hasLifetimePurchase(String productId) {
+        return stringList.contains(productId);
+    }
+
+    /**
+     * Checks if ads should be disabled based on any purchase type.
+     * Returns true for subscriptions, lifetime premium, or remove ads purchases.
+     * This is useful for the ads library integration.
+     *
+     * @return true if ads should be disabled, false otherwise.
+     */
+    public boolean shouldDisableAds() {
+        return isPurchased();
+    }
+
+    /**
+     * Gets the type of purchase that is disabling ads.
+     *
+     * @return PurchaseType indicating why ads are disabled, or NONE if not purchased.
+     */
+    public PurchaseType getActivePurchaseType() {
+        if (isSubscribed()) {
+            return PurchaseType.SUBSCRIPTION;
+        }
+        if (hasLifetimePremium()) {
+            return PurchaseType.LIFETIME_PREMIUM;
+        }
+        if (hasRemoveAdsPurchase()) {
+            return PurchaseType.REMOVE_ADS;
+        }
+        if (hasLifetimePurchase()) {
+            return PurchaseType.LIFETIME;
+        }
+        if (isPurchased) {
+            return PurchaseType.UNKNOWN;
+        }
+        return PurchaseType.NONE;
+    }
+
+    /**
+     * Gets the category of a purchased product.
+     *
+     * @param productId The product ID to check.
+     * @return The PurchaseCategory or null if not found.
+     */
+    public PurchaseItem.PurchaseCategory getPurchaseCategory(String productId) {
+        PurchaseItem item = getPurchaseItem(productId);
+        return item != null ? item.category : null;
+    }
+
+    /**
+     * Enum representing the type of purchase for ad-disabling purposes.
+     */
+    public enum PurchaseType {
+        /** No active purchase */
+        NONE,
+        /** Active recurring subscription */
+        SUBSCRIPTION,
+        /** Lifetime premium - one-time purchase with full premium access */
+        LIFETIME_PREMIUM,
+        /** Remove ads - one-time purchase to remove ads only */
+        REMOVE_ADS,
+        /** Other lifetime purchase (feature unlock, etc.) */
+        LIFETIME,
+        /** Consumable purchase - does not disable ads */
+        CONSUMABLE,
+        /** Legacy or unknown purchase type */
+        UNKNOWN
     }
 
     @Deprecated
@@ -683,26 +1260,40 @@ public class AppPurchase {
                                 purchaseListener.onProductPurchased(purchase.getOrderId(), purchase.getOriginalJson());
                             }
                             idPurchased = productId;
-                            isPurchased = true;
+
+                            // Notify history listener about new purchase
+                            notifyPurchaseHistoryEvent(purchase, productId, false);
+
                             ProductDetails details = productDetailsMap.get(productId);
-                            if (details != null && details.getProductType().equals(BillingClient.ProductType.INAPP) && consumePurchase) {
-                                consumePurchase(purchase);
-                            }
-                            if (details != null && details.getProductType().equals(BillingClient.ProductType.SUBS)) {
-                                handlePurchase(
-                                        new PurchaseResult(
-                                                purchase.getOrderId(),
-                                                purchase.getPackageName(),
-                                                purchase.getProducts(),
-                                                purchase.getPurchaseTime(),
-                                                purchase.getPurchaseState(),
-                                                purchase.getPurchaseToken(),
-                                                purchase.getQuantity(),
-                                                purchase.isAutoRenewing(),
-                                                purchase.isAcknowledged()
-                                        ),
-                                        productId
-                                );
+                            if (details != null) {
+                                if (details.getProductType().equals(BillingClient.ProductType.SUBS)) {
+                                    // Subscription - add to subscription list, mark as purchased
+                                    isPurchased = true;
+                                    handlePurchase(
+                                            new PurchaseResult(
+                                                    purchase.getOrderId(),
+                                                    purchase.getPackageName(),
+                                                    purchase.getProducts(),
+                                                    purchase.getPurchaseTime(),
+                                                    purchase.getPurchaseState(),
+                                                    purchase.getPurchaseToken(),
+                                                    purchase.getQuantity(),
+                                                    purchase.isAutoRenewing(),
+                                                    purchase.isAcknowledged()
+                                            ),
+                                            productId
+                                    );
+                                } else if (details.getProductType().equals(BillingClient.ProductType.INAPP)) {
+                                    // INAPP purchase - check if consumable or lifetime
+                                    if (!stringList.contains(productId)) {
+                                        stringList.add(productId);
+                                    }
+                                    // Only set isPurchased for non-consumable (lifetime) purchases
+                                    // Consumables don't disable ads
+                                    if (!isProductConsumable(productId)) {
+                                        isPurchased = true;
+                                    }
+                                }
                             }
                         } else {
                             Log.e(Tag, "Failed to acknowledge purchase: " + billingResult.getDebugMessage());
@@ -716,22 +1307,36 @@ public class AppPurchase {
                     purchaseListener.onProductPurchased(purchase.getOrderId(), purchase.getOriginalJson());
                 }
                 idPurchased = productId;
-                isPurchased = true;
-                if (productDetailsMap.get(productId) != null && productDetailsMap.get(productId).getProductType().equals(BillingClient.ProductType.SUBS)) {
-                    handlePurchase(
-                            new PurchaseResult(
-                                    purchase.getOrderId(),
-                                    purchase.getPackageName(),
-                                    purchase.getProducts(),
-                                    purchase.getPurchaseTime(),
-                                    purchase.getPurchaseState(),
-                                    purchase.getPurchaseToken(),
-                                    purchase.getQuantity(),
-                                    purchase.isAutoRenewing(),
-                                    purchase.isAcknowledged()
-                            ),
-                            productId
-                    );
+
+                ProductDetails details = productDetailsMap.get(productId);
+                if (details != null) {
+                    if (details.getProductType().equals(BillingClient.ProductType.SUBS)) {
+                        // Subscription - add to subscription list, mark as purchased
+                        isPurchased = true;
+                        handlePurchase(
+                                new PurchaseResult(
+                                        purchase.getOrderId(),
+                                        purchase.getPackageName(),
+                                        purchase.getProducts(),
+                                        purchase.getPurchaseTime(),
+                                        purchase.getPurchaseState(),
+                                        purchase.getPurchaseToken(),
+                                        purchase.getQuantity(),
+                                        purchase.isAutoRenewing(),
+                                        purchase.isAcknowledged()
+                                ),
+                                productId
+                        );
+                    } else if (details.getProductType().equals(BillingClient.ProductType.INAPP)) {
+                        // INAPP purchase - check if consumable or lifetime
+                        if (!stringList.contains(productId)) {
+                            stringList.add(productId);
+                        }
+                        // Only set isPurchased for non-consumable (lifetime) purchases
+                        if (!isProductConsumable(productId)) {
+                            isPurchased = true;
+                        }
+                    }
                 }
             }
         } else if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING) {
@@ -743,21 +1348,25 @@ public class AppPurchase {
         }
     }
 
-    private void consumePurchase(Purchase purchase) {
-        ConsumeParams consumeParams = ConsumeParams.newBuilder()
-                .setPurchaseToken(purchase.getPurchaseToken())
-                .build();
-        billingClient.consumeAsync(consumeParams, new ConsumeResponseListener() {
-            @Override
-            public void onConsumeResponse(@NonNull BillingResult billingResult, @NonNull String purchaseToken) {
-                if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
-                    Log.d(Tag, "Purchase consumed successfully: " + purchaseToken);
-                    verifyPurchased(false);
-                } else {
-                    Log.e(Tag, "Failed to consume purchase: " + billingResult.getDebugMessage());
-                }
+    /**
+     * Notifies the purchase history listener about a purchase event.
+     */
+    private void notifyPurchaseHistoryEvent(Purchase purchase, String productId, boolean isConsumed) {
+        if (purchaseHistoryListener != null) {
+            // Use factory method to capture all available data
+            PurchaseResult result = PurchaseResult.fromPurchase(purchase);
+            // Set product type for better tracking
+            ProductDetails details = productDetailsMap.get(productId);
+            if (details != null) {
+                result.setProductType(details.getProductType());
             }
-        });
+            if (isConsumed) {
+                result.markAsConsumed();
+                purchaseHistoryListener.onPurchaseConsumed(productId, result);
+            } else {
+                purchaseHistoryListener.onNewPurchase(productId, result);
+            }
+        }
     }
 
     public void connectToGooglePlayBilling() {

@@ -34,17 +34,9 @@
             android:background="@android:drawable/dialog_holo_dark_frame"
             android:gravity="center_vertical">
 
+            <!-- Ad Label -->
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="● PLAYING VIDEO AD"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="#FF5252"
-                android:background="#CC000000"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="7dp"
-                android:fontFamily="@font/roboto_medium" />
+                style="@style/AdsTheme" />
 
             <View
                 android:layout_width="0dp"

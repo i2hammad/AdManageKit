@@ -140,7 +140,7 @@ class MyApplication : Application() {
 
 
         val listPurchaseItem = listOf(
-            PurchaseItem("life_time", AppPurchase.TYPE_IAP.PURCHASE),
+            PurchaseItem("life_time", AppPurchase.TYPE_IAP.PURCHASE, PurchaseItem.PurchaseCategory.LIFETIME_PREMIUM), // lifetime premium
             PurchaseItem("sub_monthly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
             PurchaseItem("sub_half_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
             PurchaseItem("sub_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION)

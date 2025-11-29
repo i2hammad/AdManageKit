@@ -72,15 +72,9 @@
                         android:shadowColor="#000000"
                         android:shadowRadius="3" />
 
+                    <!-- Ad Label -->
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Sponsored • Video"
-                        android:textSize="11sp"
-                        android:textColor="#E0E0E0"
-                        android:fontFamily="@font/roboto"
-                        android:shadowColor="#000000"
-                        android:shadowRadius="2" />
+                        style="@style/AdsTheme" />
 
                 </LinearLayout>
 

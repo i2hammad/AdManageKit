@@ -17,13 +17,27 @@
             <enum name="featured" value="8" />
             <enum name="overlay_dark" value="9" />
             <enum name="magazine" value="10" />
+            <enum name="media_content_split" value="11" />
+            <enum name="app_store" value="12" />
+            <enum name="social_feed" value="13" />
+            <enum name="gradient_card" value="14" />
+            <enum name="pill_banner" value="15" />
+            <enum name="spotlight" value="16" />
             <!-- Video Templates -->
-            <enum name="video_small" value="11" />
-            <enum name="video_medium" value="12" />
-            <enum name="video_large" value="13" />
-            <enum name="video_square" value="14" />
-            <enum name="video_vertical" value="15" />
-            <enum name="video_fullscreen" value="16" />
+            <enum name="video_small" value="17" />
+            <enum name="video_medium" value="18" />
+            <enum name="video_large" value="19" />
+            <enum name="video_square" value="20" />
+            <enum name="video_vertical" value="21" />
+            <enum name="video_fullscreen" value="22" />
+        </attr>
+
+        <!-- AdChoices icon placement position -->
+        <attr name="adChoicesPlacement" format="enum">
+            <enum name="top_left" value="0" />
+            <enum name="top_right" value="1" />
+            <enum name="bottom_right" value="2" />
+            <enum name="bottom_left" value="3" />
         </attr>
     </declare-styleable>
 

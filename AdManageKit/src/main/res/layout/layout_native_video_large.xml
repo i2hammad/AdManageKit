@@ -45,17 +45,9 @@
                     android:padding="16dp"
                     android:gravity="center_vertical">
 
+                    <!-- Ad Label -->
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="● LIVE VIDEO"
-                        android:textSize="12sp"
-                        android:textColor="@android:color/white"
-                        android:background="#CC000000"
-                        android:paddingHorizontal="12dp"
-                        android:paddingVertical="6dp"
-                        android:drawablePadding="4dp"
-                        android:fontFamily="@font/roboto_medium" />
+                        style="@style/AdsTheme" />
 
                     <View
                         android:layout_width="0dp"

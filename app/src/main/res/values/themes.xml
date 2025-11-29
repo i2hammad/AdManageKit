@@ -7,4 +7,9 @@
     </style>
 
     <style name="Theme.AdManageKit" parent="Base.Theme.AdManageKit" />
+
+    <!-- Non-Material theme for testing app open ads -->
+    <style name="Theme.NonMaterial" parent="android:Theme.Light.NoTitleBar">
+        <!-- Basic Android theme without Material components -->
+    </style>
 </resources>

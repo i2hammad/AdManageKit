@@ -30,6 +30,12 @@
                     android:layout_height="match_parent"
                     android:scaleType="centerCrop" />
 
+                <!-- Ad Label -->
+                <TextView
+                    style="@style/AdsTheme"
+                    android:layout_gravity="top|start"
+                    android:layout_margin="8dp" />
+
                 <!-- Ad Choices Overlay -->
                 <com.google.android.gms.ads.nativead.AdChoicesView
                     android:id="@+id/ad_choices_view"

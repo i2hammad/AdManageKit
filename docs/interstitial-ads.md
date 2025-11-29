@@ -1,27 +1,38 @@
-# Interstitial Ads · AdManageKit v2.5.0
+# Interstitial Ads · AdManageKit v2.8.0
 
 ## Overview
-`AdManageKit` 2.5.0 ships a complete interstitial stack that spans `AdManager`, the fluent `InterstitialAdBuilder`, and brand-new Jetpack Compose utilities. The stack now includes automatic retry with exponential backoff, lifecycle-safe splash loading, fallback ad units, activity-aware purchase gating, and Compose state helpers. Everything is fully backward compatible with the traditional view-based APIs while enabling declarative use in Compose apps.
+`AdManageKit` 2.8.0 ships a complete interstitial stack that spans `AdManager`, the fluent `InterstitialAdBuilder`, and brand-new Jetpack Compose utilities. The stack now includes automatic retry with exponential backoff, lifecycle-safe splash loading, fallback ad units, activity-aware purchase gating, and Compose state helpers. Everything is fully backward compatible with the traditional view-based APIs while enabling declarative use in Compose apps.
 
-**What’s new since v1.x**  
-- Jetpack Compose helpers: `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState`  
-- Fluent builder with frequency controls (`everyNthTime`, `maxShows`, `minInterval`, `.force()`) and fallback chains  
-- Automatic retry via `AdRetryManager` (circuit breaker removed to maximize show rate)  
-- Splash-friendly `loadInterstitialAdForSplash(...)` with timeouts and callbacks  
+**What's new in v2.8.0**
+- `forceShowInterstitial()` now respects global loading strategy
+- New `forceShowInterstitialAlways()` for explicit force fetch
+- Global `interstitialAutoReload` config with per-call override
+- All AdManager methods use global auto-reload config as default
+
+**What's new in v2.7.0**
+- Smart splash screen with `waitForLoading()` in InterstitialAdBuilder
+- New `isLoading()` and `showOrWaitForAd()` methods
+- Frequency controls: `everyNthTime`, `maxShows`, `minInterval`
+
+**What's new since v1.x**
+- Jetpack Compose helpers: `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState`
+- Fluent builder with frequency controls (`everyNthTime`, `maxShows`, `minInterval`, `.force()`) and fallback chains
+- Automatic retry via `AdRetryManager` (circuit breaker removed to maximize show rate)
+- Splash-friendly `loadInterstitialAdForSplash(...)` with timeouts and callbacks
 - Debug overlays, aggressive pre-loading helpers, and test-mode overrides wired through `AdManageKitConfig`
 
 ---
 
 ## Installation
-Add the v2.5.0 artifacts plus Compose (if needed):
+Add the v2.8.0 artifacts plus Compose (if needed):
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.5.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.5.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.8.0"
     // Optional – Jetpack Compose helpers:
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.5.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0"
 }
 ```
 
@@ -44,12 +55,18 @@ class MyApp : Application() {
             maxRetryAttempts = 3
             enableAdaptiveIntervals = true
             enablePerformanceMetrics = BuildConfig.DEBUG
+
+            // Loading strategy (v2.6.0+)
+            interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
+
+            // Auto-reload after showing (v2.8.0+)
+            interstitialAutoReload = true  // default: true
         }
     }
 }
 ```
 
-`AdManageKitConfig` now drives retry timing, adaptive intervals, analytics, and debug overlays for every interstitial entry-point.
+`AdManageKitConfig` now drives retry timing, adaptive intervals, loading strategy, auto-reload, analytics, and debug overlays for every interstitial entry-point.
 
 ---
 
@@ -75,9 +92,13 @@ fun showInterstitial(activity: Activity) {
 
 ### Key APIs
 - `loadInterstitialAdForSplash(context, unit, timeoutMs, callback)` – timeouts + callback chain for splash flows
-- `forceShowInterstitial(activity, callback, reloadAd)` – immediate show with optional reload
+- `forceShowInterstitial(activity, callback)` – respects loading strategy (v2.8.0+)
+- `forceShowInterstitialAlways(activity, callback)` – always force fetch (bypasses strategy, v2.8.0+)
+- `showInterstitialIfReady(activity, callback, reloadAd)` – show only if cached
 - `showInterstitialAdByTime(...)` & `showInterstitialAdByCount(...)` – throttle via interval or count
 - `forceShowInterstitialWithDialog(...)` – built-in loading dialog for smoother UX
+- `showOrWaitForAd(activity, callback, timeout, showDialog)` – smart splash screen method (v2.7.0+)
+- `isLoading()` – check if ad is currently loading (v2.7.0+)
 - `preloadAd(context, adUnitId)` – kicks off background loading for next screen
 - `enableAggressiveAdLoading()` / `resetAdThrottling()` – quick helpers for tuning show rate
 
@@ -183,10 +204,17 @@ Compose helpers automatically reload on lifecycle events and integrate with `Bil
 | `AdManager.loadInterstitialAd(context, adUnitId)` | Preloads and caches one interstitial per unit. |
 | `AdManager.loadInterstitialAd(context, unit, callback)` | Same as above but surfaces `InterstitialAdLoadCallback`. |
 | `AdManager.loadInterstitialAdForSplash(...)` | Splash-friendly load with timeout + callback. |
-| `AdManager.forceShowInterstitial` / `showInterstitialAdByTime` / `showInterstitialAdByCount` | Choose show strategy – time, count, or forced. |
-| `AdManager.forceShowInterstitialWithDialog` | Uses built-in `MaterialAlertDialog` to shield loading. |
+| `AdManager.forceShowInterstitial(activity, callback)` | Respects loading strategy (v2.8.0+). |
+| `AdManager.forceShowInterstitialAlways(activity, callback)` | Always force fetch, bypasses strategy (v2.8.0+). |
+| `AdManager.showInterstitialIfReady(activity, callback, reloadAd)` | Show only if cached. |
+| `AdManager.showInterstitialAdByTime` / `showInterstitialAdByCount` | Throttle via time interval or count. |
+| `AdManager.forceShowInterstitialWithDialog` | Uses built-in dialog, respects strategy. |
+| `AdManager.showOrWaitForAd(...)` | Smart splash screen method (v2.7.0+). |
+| `AdManager.isLoading()` | Check if ad is currently loading (v2.7.0+). |
 | `AdManager.preloadAd` / `resetAdThrottling` / `enableAggressiveAdLoading` | Utility helpers for show-rate tuning. |
 | `InterstitialAdBuilder.with(activity)` | Entry point for the fluent API (Kotlin + Java). |
+| `InterstitialAdBuilder.autoReload(Boolean)` | Override global auto-reload setting (v2.8.0+). |
+| `InterstitialAdBuilder.waitForLoading()` | Smart splash screen behavior (v2.7.0+). |
 | `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState` | Compose-first APIs for declarative UI. |
 
 ---

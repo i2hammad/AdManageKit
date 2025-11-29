@@ -1,39 +1,108 @@
 package com.i2hammad.admanagekit.billing;
 
-import java.util.List;
+import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.android.billingclient.api.AccountIdentifiers;
+import com.android.billingclient.api.Purchase;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 /**
- * Represents the result of a purchase transaction.
+ * Represents the result of a purchase transaction with comprehensive details.
+ * This class wraps all information from Google Play Billing Library's Purchase object.
  */
 public class PurchaseResult {
-    private String orderId; // The unique order ID for the purchase
-    private String packageName; // The package name of the application
-    private List<String> productId; // List of product IDs associated with the purchase
-    private long purchaseTime; // The time the purchase was made, in milliseconds since the epoch
-    private int purchaseState; // The state of the purchase (e.g., purchased, pending, etc.)
-    private String purchaseToken; // A unique token representing the purchase
-    private int quantity; // The quantity of items purchased
-    private boolean autoRenewing; // Indicates if the purchase is auto-renewing (for subscriptions)
-    private boolean acknowledged; // Indicates if the purchase has been acknowledged
+
+    // Core purchase details
+    private String orderId;
+    private String packageName;
+    private List<String> productIds;
+    private long purchaseTime;
+    private int purchaseState;
+    private String purchaseToken;
+    private int quantity;
+    private boolean autoRenewing;
+    private boolean acknowledged;
+
+    // Additional details from Billing Library v8
+    private String originalJson;
+    private String signature;
+    private String obfuscatedAccountId;
+    private String obfuscatedProfileId;
+
+    // Custom tracking fields
+    private boolean isConsumed;
+    private long consumedTime;
+    private String productType; // "inapp" or "subs"
 
     /**
-     * Constructs a new PurchaseResult instance.
-     *
-     * @param orderId       The unique order ID for the purchase.
-     * @param packageName   The package name of the application.
-     * @param productId     List of product IDs associated with the purchase.
-     * @param purchaseTime  The time the purchase was made, in milliseconds since the epoch.
-     * @param purchaseState The state of the purchase.
-     * @param purchaseToken A unique token representing the purchase.
-     * @param quantity      The quantity of items purchased.
-     * @param autoRenewing  Whether the purchase is auto-renewing.
-     * @param acknowledged  Whether the purchase has been acknowledged.
+     * Purchase states from Google Play Billing.
      */
-    public PurchaseResult(String orderId, String packageName, List<String> productId, long purchaseTime, int purchaseState, String purchaseToken, int quantity, boolean autoRenewing, boolean acknowledged) {
+    public static class State {
+        /** Purchase is completed and payment is received */
+        public static final int PURCHASED = Purchase.PurchaseState.PURCHASED;
+        /** Purchase is pending (e.g., waiting for payment approval) */
+        public static final int PENDING = Purchase.PurchaseState.PENDING;
+        /** Purchase state is unspecified */
+        public static final int UNSPECIFIED = Purchase.PurchaseState.UNSPECIFIED_STATE;
+    }
+
+    /**
+     * Creates a PurchaseResult from a Google Play Purchase object.
+     *
+     * @param purchase The Purchase object from Google Play Billing.
+     * @return A new PurchaseResult with all available details.
+     */
+    @NonNull
+    public static PurchaseResult fromPurchase(@NonNull Purchase purchase) {
+        PurchaseResult result = new PurchaseResult();
+        result.orderId = purchase.getOrderId();
+        result.packageName = purchase.getPackageName();
+        result.productIds = purchase.getProducts();
+        result.purchaseTime = purchase.getPurchaseTime();
+        result.purchaseState = purchase.getPurchaseState();
+        result.purchaseToken = purchase.getPurchaseToken();
+        result.quantity = purchase.getQuantity();
+        result.autoRenewing = purchase.isAutoRenewing();
+        result.acknowledged = purchase.isAcknowledged();
+        result.originalJson = purchase.getOriginalJson();
+        result.signature = purchase.getSignature();
+
+        // Get account identifiers if available
+        AccountIdentifiers accountIdentifiers = purchase.getAccountIdentifiers();
+        if (accountIdentifiers != null) {
+            result.obfuscatedAccountId = accountIdentifiers.getObfuscatedAccountId();
+            result.obfuscatedProfileId = accountIdentifiers.getObfuscatedProfileId();
+        }
+
+        result.isConsumed = false;
+        result.consumedTime = 0;
+
+        return result;
+    }
+
+    /**
+     * Default constructor for manual creation.
+     */
+    public PurchaseResult() {
+    }
+
+    /**
+     * Legacy constructor for backward compatibility.
+     */
+    public PurchaseResult(String orderId, String packageName, List<String> productIds,
+                          long purchaseTime, int purchaseState, String purchaseToken,
+                          int quantity, boolean autoRenewing, boolean acknowledged) {
         this.orderId = orderId;
         this.packageName = packageName;
-        this.productId = productId;
+        this.productIds = productIds;
         this.purchaseTime = purchaseTime;
         this.purchaseState = purchaseState;
         this.purchaseToken = purchaseToken;
@@ -43,164 +112,471 @@ public class PurchaseResult {
     }
 
     /**
-     * Gets the package name of the application.
-     *
-     * @return The package name.
+     * Full constructor with all fields.
      */
-    public String getPackageName() {
-        return this.packageName;
+    public PurchaseResult(String orderId, String packageName, List<String> productIds,
+                          long purchaseTime, int purchaseState, String purchaseToken,
+                          int quantity, boolean autoRenewing, boolean acknowledged,
+                          String originalJson, String signature,
+                          String obfuscatedAccountId, String obfuscatedProfileId) {
+        this.orderId = orderId;
+        this.packageName = packageName;
+        this.productIds = productIds;
+        this.purchaseTime = purchaseTime;
+        this.purchaseState = purchaseState;
+        this.purchaseToken = purchaseToken;
+        this.quantity = quantity;
+        this.autoRenewing = autoRenewing;
+        this.acknowledged = acknowledged;
+        this.originalJson = originalJson;
+        this.signature = signature;
+        this.obfuscatedAccountId = obfuscatedAccountId;
+        this.obfuscatedProfileId = obfuscatedProfileId;
+    }
+
+    // ==================== State Helper Methods ====================
+
+    /**
+     * Checks if the purchase is in PURCHASED state.
+     */
+    public boolean isPurchased() {
+        return purchaseState == State.PURCHASED;
     }
 
     /**
-     * Sets the package name of the application.
-     *
-     * @param packageName The package name to set.
+     * Checks if the purchase is in PENDING state.
      */
+    public boolean isPending() {
+        return purchaseState == State.PENDING;
+    }
+
+    /**
+     * Gets the purchase state as a readable string.
+     */
+    @NonNull
+    public String getPurchaseStateString() {
+        switch (purchaseState) {
+            case State.PURCHASED:
+                return "PURCHASED";
+            case State.PENDING:
+                return "PENDING";
+            default:
+                return "UNSPECIFIED";
+        }
+    }
+
+    // ==================== Product Helper Methods ====================
+
+    /**
+     * Gets the first (primary) product ID.
+     */
+    @Nullable
+    public String getFirstProductId() {
+        return (productIds != null && !productIds.isEmpty()) ? productIds.get(0) : null;
+    }
+
+    /**
+     * Checks if this purchase contains a specific product ID.
+     */
+    public boolean containsProduct(String productId) {
+        return productIds != null && productIds.contains(productId);
+    }
+
+    /**
+     * Gets the product IDs as a comma-separated string.
+     */
+    @NonNull
+    public String getProductIdsString() {
+        if (productIds == null || productIds.isEmpty()) {
+            return "";
+        }
+        return TextUtils.join(", ", productIds);
+    }
+
+    // ==================== Date Helper Methods ====================
+
+    /**
+     * Gets the purchase time as a formatted date string.
+     *
+     * @param pattern The date format pattern (e.g., "yyyy-MM-dd HH:mm:ss").
+     * @return The formatted date string.
+     */
+    @NonNull
+    public String getPurchaseTimeFormatted(String pattern) {
+        SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.getDefault());
+        return sdf.format(new Date(purchaseTime));
+    }
+
+    /**
+     * Gets the purchase time as a formatted date string in default format.
+     */
+    @NonNull
+    public String getPurchaseTimeFormatted() {
+        return getPurchaseTimeFormatted("yyyy-MM-dd HH:mm:ss");
+    }
+
+    /**
+     * Gets the purchase time as a Date object.
+     */
+    @NonNull
+    public Date getPurchaseDate() {
+        return new Date(purchaseTime);
+    }
+
+    /**
+     * Gets the consumed time as a formatted date string.
+     */
+    @NonNull
+    public String getConsumedTimeFormatted() {
+        if (consumedTime <= 0) {
+            return "Not consumed";
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
+        return sdf.format(new Date(consumedTime));
+    }
+
+    // ==================== Consumption Methods ====================
+
+    /**
+     * Marks this purchase as consumed.
+     */
+    public void markAsConsumed() {
+        this.isConsumed = true;
+        this.consumedTime = System.currentTimeMillis();
+    }
+
+    /**
+     * Checks if this purchase has been consumed.
+     */
+    public boolean isConsumed() {
+        return isConsumed;
+    }
+
+    /**
+     * Gets the time when this purchase was consumed.
+     */
+    public long getConsumedTime() {
+        return consumedTime;
+    }
+
+    // ==================== Verification Helper Methods ====================
+
+    /**
+     * Checks if this purchase has the necessary data for server-side verification.
+     */
+    public boolean hasVerificationData() {
+        return !TextUtils.isEmpty(originalJson) && !TextUtils.isEmpty(signature);
+    }
+
+    /**
+     * Gets the original JSON for server-side verification.
+     */
+    @Nullable
+    public String getOriginalJson() {
+        return originalJson;
+    }
+
+    /**
+     * Gets the signature for server-side verification.
+     */
+    @Nullable
+    public String getSignature() {
+        return signature;
+    }
+
+    // ==================== Account Identifier Methods ====================
+
+    /**
+     * Gets the obfuscated account ID set during purchase.
+     */
+    @Nullable
+    public String getObfuscatedAccountId() {
+        return obfuscatedAccountId;
+    }
+
+    /**
+     * Gets the obfuscated profile ID set during purchase.
+     */
+    @Nullable
+    public String getObfuscatedProfileId() {
+        return obfuscatedProfileId;
+    }
+
+    /**
+     * Checks if account identifiers are available.
+     */
+    public boolean hasAccountIdentifiers() {
+        return !TextUtils.isEmpty(obfuscatedAccountId) || !TextUtils.isEmpty(obfuscatedProfileId);
+    }
+
+    // ==================== Standard Getters and Setters ====================
+
+    public String getOrderId() {
+        return orderId;
+    }
+
+    public void setOrderId(String orderId) {
+        this.orderId = orderId;
+    }
+
+    public String getPackageName() {
+        return packageName;
+    }
+
     public void setPackageName(String packageName) {
         this.packageName = packageName;
     }
 
     /**
-     * Gets the list of product IDs associated with the purchase.
-     *
-     * @return The list of product IDs.
+     * @deprecated Use {@link #getProductIds()} instead.
      */
+    @Deprecated
     public List<String> getProductId() {
-        return this.productId;
+        return productIds;
+    }
+
+    public List<String> getProductIds() {
+        return productIds;
+    }
+
+    public void setProductIds(List<String> productIds) {
+        this.productIds = productIds;
     }
 
     /**
-     * Sets the list of product IDs associated with the purchase.
-     *
-     * @param productId The list of product IDs to set.
+     * @deprecated Use {@link #setProductIds(List)} instead.
      */
-    public void setProductId(List<String> productId) {
-        this.productId = productId;
+    @Deprecated
+    public void setProductId(List<String> productIds) {
+        this.productIds = productIds;
     }
 
-    /**
-     * Gets the state of the purchase.
-     *
-     * @return The purchase state.
-     */
-    public int getPurchaseState() {
-        return this.purchaseState;
-    }
-
-    /**
-     * Sets the state of the purchase.
-     *
-     * @param purchaseState The purchase state to set.
-     */
-    public void setPurchaseState(int purchaseState) {
-        this.purchaseState = purchaseState;
-    }
-
-    /**
-     * Checks if the purchase is auto-renewing.
-     *
-     * @return True if the purchase is auto-renewing, false otherwise.
-     */
-    public boolean isAutoRenewing() {
-        return this.autoRenewing;
-    }
-
-    /**
-     * Sets whether the purchase is auto-renewing.
-     *
-     * @param autoRenewing True if the purchase should be auto-renewing, false otherwise.
-     */
-    public void setAutoRenewing(boolean autoRenewing) {
-        this.autoRenewing = autoRenewing;
-    }
-
-    /**
-     * Gets the order ID for the purchase.
-     *
-     * @return The order ID.
-     */
-    public String getOrderId() {
-        return this.orderId;
-    }
-
-    /**
-     * Sets the order ID for the purchase.
-     *
-     * @param orderId The order ID to set.
-     */
-    public void setOrderId(String orderId) {
-        this.orderId = orderId;
-    }
-
-    /**
-     * Gets the time the purchase was made.
-     *
-     * @return The purchase time in milliseconds since the epoch.
-     */
     public long getPurchaseTime() {
-        return this.purchaseTime;
+        return purchaseTime;
     }
 
-    /**
-     * Sets the time the purchase was made.
-     *
-     * @param purchaseTime The purchase time to set, in milliseconds since the epoch.
-     */
     public void setPurchaseTime(long purchaseTime) {
         this.purchaseTime = purchaseTime;
     }
 
-    /**
-     * Gets the unique token representing the purchase.
-     *
-     * @return The purchase token.
-     */
-    public String getPurchaseToken() {
-        return this.purchaseToken;
+    public int getPurchaseState() {
+        return purchaseState;
     }
 
-    /**
-     * Sets the unique token representing the purchase.
-     *
-     * @param purchaseToken The purchase token to set.
-     */
+    public void setPurchaseState(int purchaseState) {
+        this.purchaseState = purchaseState;
+    }
+
+    public String getPurchaseToken() {
+        return purchaseToken;
+    }
+
     public void setPurchaseToken(String purchaseToken) {
         this.purchaseToken = purchaseToken;
     }
 
-    /**
-     * Gets the quantity of items purchased.
-     *
-     * @return The quantity of items purchased.
-     */
     public int getQuantity() {
-        return this.quantity;
+        return quantity;
     }
 
-    /**
-     * Sets the quantity of items purchased.
-     *
-     * @param quantity The quantity of items to set.
-     */
     public void setQuantity(int quantity) {
         this.quantity = quantity;
     }
 
-    /**
-     * Checks if the purchase has been acknowledged.
-     *
-     * @return True if the purchase has been acknowledged, false otherwise.
-     */
+    public boolean isAutoRenewing() {
+        return autoRenewing;
+    }
+
+    public void setAutoRenewing(boolean autoRenewing) {
+        this.autoRenewing = autoRenewing;
+    }
+
     public boolean isAcknowledged() {
-        return this.acknowledged;
+        return acknowledged;
+    }
+
+    public void setAcknowledged(boolean acknowledged) {
+        this.acknowledged = acknowledged;
+    }
+
+    public void setOriginalJson(String originalJson) {
+        this.originalJson = originalJson;
+    }
+
+    public void setSignature(String signature) {
+        this.signature = signature;
+    }
+
+    public void setObfuscatedAccountId(String obfuscatedAccountId) {
+        this.obfuscatedAccountId = obfuscatedAccountId;
+    }
+
+    public void setObfuscatedProfileId(String obfuscatedProfileId) {
+        this.obfuscatedProfileId = obfuscatedProfileId;
+    }
+
+    public void setConsumed(boolean consumed) {
+        this.isConsumed = consumed;
+    }
+
+    public void setConsumedTime(long consumedTime) {
+        this.consumedTime = consumedTime;
+    }
+
+    @Nullable
+    public String getProductType() {
+        return productType;
+    }
+
+    public void setProductType(String productType) {
+        this.productType = productType;
     }
 
     /**
-     * Sets whether the purchase has been acknowledged.
-     *
-     * @param acknowledged True if the purchase should be acknowledged, false otherwise.
+     * Checks if this is a subscription purchase.
      */
-    public void setAcknowledged(boolean acknowledged) {
-        this.acknowledged = acknowledged;
+    public boolean isSubscription() {
+        return "subs".equals(productType);
+    }
+
+    /**
+     * Checks if this is an in-app (one-time) purchase.
+     */
+    public boolean isInApp() {
+        return "inapp".equals(productType);
+    }
+
+    // ==================== Subscription State Methods ====================
+
+    /**
+     * Subscription lifecycle states.
+     * Note: Some states (GRACE_PERIOD, ON_HOLD, PAUSED) require server-side
+     * verification using Google Play Developer API as they're not available client-side.
+     */
+    public enum SubscriptionState {
+        /** Subscription is active and auto-renewing */
+        ACTIVE,
+        /** User cancelled but still has access until expiration */
+        CANCELLED,
+        /** Payment issue but still has access (requires server-side check) */
+        GRACE_PERIOD,
+        /** Payment issue, no access (requires server-side check) */
+        ON_HOLD,
+        /** User paused subscription (requires server-side check) */
+        PAUSED,
+        /** Subscription expired, no access */
+        EXPIRED,
+        /** Not a subscription or state unknown */
+        NOT_SUBSCRIPTION
+    }
+
+    /**
+     * Gets the subscription state based on available client-side data.
+     *
+     * <p><b>Important:</b> This only provides ACTIVE, CANCELLED, or NOT_SUBSCRIPTION states.
+     * For GRACE_PERIOD, ON_HOLD, PAUSED states, you need server-side verification
+     * using Google Play Developer API.</p>
+     *
+     * @return The subscription state based on client-side data.
+     */
+    public SubscriptionState getSubscriptionState() {
+        if (!isSubscription()) {
+            return SubscriptionState.NOT_SUBSCRIPTION;
+        }
+
+        // If we have a valid purchase in the list, it's either active or cancelled
+        if (isPurchased() && acknowledged) {
+            if (autoRenewing) {
+                return SubscriptionState.ACTIVE;
+            } else {
+                // Not auto-renewing means user cancelled, but still has access
+                return SubscriptionState.CANCELLED;
+            }
+        }
+
+        // If pending, treat as active (payment processing)
+        if (isPending()) {
+            return SubscriptionState.ACTIVE;
+        }
+
+        return SubscriptionState.EXPIRED;
+    }
+
+    /**
+     * Checks if the subscription is active (user has access).
+     * This includes ACTIVE and CANCELLED states (cancelled users still have access until expiration).
+     */
+    public boolean isSubscriptionActive() {
+        SubscriptionState state = getSubscriptionState();
+        return state == SubscriptionState.ACTIVE || state == SubscriptionState.CANCELLED;
+    }
+
+    /**
+     * Checks if the subscription will renew.
+     * Returns false if user cancelled (even if still has access).
+     */
+    public boolean willSubscriptionRenew() {
+        return isSubscription() && autoRenewing;
+    }
+
+    /**
+     * Checks if the user cancelled their subscription.
+     * Note: Cancelled users still have access until expiration date.
+     */
+    public boolean isSubscriptionCancelled() {
+        return getSubscriptionState() == SubscriptionState.CANCELLED;
+    }
+
+    /**
+     * Gets a human-readable subscription status string.
+     */
+    @NonNull
+    public String getSubscriptionStateString() {
+        switch (getSubscriptionState()) {
+            case ACTIVE:
+                return "Active";
+            case CANCELLED:
+                return "Cancelled (access until expiration)";
+            case GRACE_PERIOD:
+                return "Grace Period";
+            case ON_HOLD:
+                return "On Hold";
+            case PAUSED:
+                return "Paused";
+            case EXPIRED:
+                return "Expired";
+            default:
+                return "Not a subscription";
+        }
+    }
+
+    // ==================== Object Methods ====================
+
+    @NonNull
+    @Override
+    public String toString() {
+        return "PurchaseResult{" +
+                "orderId='" + orderId + '\'' +
+                ", products=" + getProductIdsString() +
+                ", state=" + getPurchaseStateString() +
+                ", quantity=" + quantity +
+                ", time=" + getPurchaseTimeFormatted() +
+                ", acknowledged=" + acknowledged +
+                ", autoRenewing=" + autoRenewing +
+                ", consumed=" + isConsumed +
+                '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        PurchaseResult that = (PurchaseResult) o;
+        return orderId != null ? orderId.equals(that.orderId) : that.orderId == null;
+    }
+
+    @Override
+    public int hashCode() {
+        return orderId != null ? orderId.hashCode() : 0;
     }
 }

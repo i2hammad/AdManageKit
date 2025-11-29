@@ -587,8 +587,7 @@ object NativeAdManager {
 
         logDebug("🔄 Preloading native ad for $adUnitId (size: $size)")
 
-        // Use ProgrammaticNativeAdLoader but don't display the ad
-        // The loader will automatically cache it when loaded (line 207)
+        // Use ProgrammaticNativeAdLoader to load the ad, then manually cache it
         com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
             activity = activity,
             adUnitId = adUnitId,
@@ -596,7 +595,8 @@ object NativeAdManager {
             useCachedAd = false, // Force fresh load
             callback = object : com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback {
                 override fun onAdLoaded(nativeAdView: com.google.android.gms.ads.nativead.NativeAdView, nativeAd: com.google.android.gms.ads.nativead.NativeAd) {
-                    // Ad is automatically cached by ProgrammaticNativeAdLoader
+                    // Manually cache the ad for later retrieval (preloading purpose)
+                    setCachedNativeAd(adUnitId, nativeAd)
                     logDebug("✅ Preloaded and cached native ad for $adUnitId (cache size: ${getCacheSize(adUnitId)})")
                     onSuccess?.invoke()
                 }

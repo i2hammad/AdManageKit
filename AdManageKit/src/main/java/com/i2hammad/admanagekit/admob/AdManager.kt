@@ -667,10 +667,26 @@ class AdManager() {
             .alpha(0f)
             .setDuration(300)
             .withEndAction {
-                dialogViews.dialog.dismiss()
+                dismissDialogSafely(dialogViews.dialog)
                 onComplete()
             }
             .start()
+    }
+
+    /**
+     * Safely dismiss dialog handling window detachment
+     */
+    private fun dismissDialogSafely(dialog: Dialog) {
+        try {
+            if (dialog.isShowing) {
+                dialog.dismiss()
+            }
+        } catch (e: IllegalArgumentException) {
+            // View not attached to window manager - activity was destroyed
+            Log.w("AdManager", "Dialog dismiss failed - window not attached: ${e.message}")
+        } catch (e: Exception) {
+            Log.e("AdManager", "Error dismissing dialog: ${e.message}")
+        }
     }
 
     /**

@@ -94,5 +94,15 @@
             android:textAllCaps="false"
             style="@style/Widget.Material3.Button" />
 
+        <Button
+            android:id="@+id/btnOpenNonMaterialTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Test Non-Material Theme (App Open)"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            style="@style/Widget.Material3.Button.TonalButton" />
+
     </LinearLayout>
 </RelativeLayout>

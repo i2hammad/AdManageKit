@@ -46,6 +46,11 @@
                     android:orientation="horizontal"
                     android:padding="12dp">
 
+                    <!-- Ad Label -->
+                    <TextView
+                        style="@style/AdsTheme"
+                        android:layout_marginEnd="8dp" />
+
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"

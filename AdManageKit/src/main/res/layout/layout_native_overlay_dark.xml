@@ -45,17 +45,9 @@
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
+                    <!-- Ad Label -->
                     <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:background="#4CAF50"
-                        android:paddingHorizontal="8dp"
-                        android:paddingVertical="3dp"
-                        android:text="AD"
-                        android:textColor="@android:color/white"
-                        android:textSize="10sp"
-                        android:textStyle="bold"
-                        android:fontFamily="@font/roboto_medium" />
+                        style="@style/AdsTheme" />
 
                     <View
                         android:layout_width="0dp"

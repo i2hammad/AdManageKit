@@ -21,12 +21,19 @@
             android:orientation="vertical"
             android:background="?attr/colorSurface">
 
+            <!-- Ad Label -->
+            <TextView
+                style="@style/AdsTheme"
+                android:layout_marginStart="20dp"
+                android:layout_marginTop="16dp" />
+
             <!-- Top Section with Ad Info -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="20dp"
+                android:paddingHorizontal="20dp"
+                android:paddingBottom="20dp"
                 android:gravity="center_vertical">
 
                 <!-- Icon -->

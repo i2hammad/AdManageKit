@@ -9,8 +9,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="12dp"
+        android:foreground="?attr/selectableItemBackground"
         app:cardCornerRadius="16dp"
         app:cardElevation="4dp"
+        app:cardUseCompatPadding="true"
+        app:strokeColor="?attr/colorOutline"
+        app:strokeWidth="1dp"
         app:cardBackgroundColor="?attr/colorSurface">
 
         <LinearLayout
@@ -35,40 +39,32 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
+                    android:orientation="horizontal"
                     android:layout_gravity="bottom"
-                    android:background="@android:drawable/bottom_bar"
-                    android:padding="12dp">
+                    android:gravity="center_vertical"
+                    android:background="@drawable/native_video_overlay_gradient"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="12dp">
 
-                    <!-- Ad Badge -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                    <TextView
+                        style="@style/AdsTheme"
+                        android:paddingHorizontal="12dp"
+                        android:paddingVertical="6dp"
+                        android:background="@drawable/native_ad_badge_background"
+                        android:textAllCaps="true"
+                        android:textStyle="bold"
+                        android:textColor="@android:color/white" />
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="VIDEO AD"
-                            android:textSize="10sp"
-                            android:textColor="@android:color/white"
-                            android:background="#E91E63"
-                            android:paddingHorizontal="8dp"
-                            android:paddingVertical="4dp"
-                            android:fontFamily="@font/roboto_medium" />
+                    <View
+                        android:layout_width="0dp"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1" />
 
-                        <View
-                            android:layout_width="0dp"
-                            android:layout_height="1dp"
-                            android:layout_weight="1" />
-
-                        <com.google.android.gms.ads.nativead.AdChoicesView
-                            android:id="@+id/ad_choices_view"
-                            android:layout_width="18dp"
-                            android:layout_height="18dp" />
-
-                    </LinearLayout>
+                    <com.google.android.gms.ads.nativead.AdChoicesView
+                        android:id="@+id/ad_choices_view"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp" />
 
                 </LinearLayout>
 
@@ -89,11 +85,14 @@
                     android:gravity="center_vertical"
                     android:layout_marginBottom="12dp">
 
-                    <ImageView
+                    <com.google.android.material.imageview.ShapeableImageView
                         android:id="@+id/ad_app_icon"
                         android:layout_width="48dp"
                         android:layout_height="48dp"
-                        android:scaleType="centerCrop" />
+                        android:scaleType="centerCrop"
+                        app:shapeAppearanceOverlay="@style/ShapeAppearance.MyApp.Corner.Medium"
+                        app:strokeColor="?attr/colorPrimary"
+                        app:strokeWidth="1dp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -155,15 +154,19 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/ad_call_to_action"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
+                    android:layout_height="wrap_content"
                     android:text="Watch Full Video"
                     android:textSize="14sp"
                     android:textStyle="bold"
                     android:textAllCaps="false"
+                    android:paddingTop="14dp"
+                    android:paddingBottom="14dp"
+                    app:cornerRadius="24dp"
                     app:icon="@android:drawable/ic_media_play"
                     app:iconGravity="textStart"
-                    app:cornerRadius="25dp"
-                    app:backgroundTint="?attr/colorPrimary" />
+                    app:iconTint="@android:color/white"
+                    app:backgroundTint="?attr/colorPrimary"
+                    app:rippleColor="?attr/colorOnPrimary" />
 
             </LinearLayout>
 

@@ -5,12 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <LinearLayout
+    <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:background="?attr/colorSurface"
-        android:padding="16dp">
+        android:layout_margin="8dp"
+        app:cardCornerRadius="12dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="?attr/colorSurface">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="?attr/colorSurface"
+            android:padding="16dp">
 
         <!-- Minimal Header -->
         <RelativeLayout
@@ -38,22 +46,37 @@
                     android:layout_marginStart="12dp"
                     android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/ad_advertiser"
+                    <!-- Advertiser + Ad Label Row -->
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Advertiser"
-                        android:textSize="13sp"
-                        android:textStyle="bold"
-                        android:textColor="?attr/colorOnSurface"
-                        android:fontFamily="@font/roboto_medium" />
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
 
+                        <TextView
+                            android:id="@+id/ad_advertiser"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Advertiser"
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="?attr/colorOnSurface"
+                            android:fontFamily="@font/roboto_medium" />
+
+                        <!-- Ad Label -->
+                        <TextView
+                            style="@style/AdsTheme"
+                            android:layout_marginStart="8dp" />
+
+                    </LinearLayout>
+
+                    <!-- Sponsored text -->
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Ad"
+                        android:text="Sponsored"
                         android:textSize="11sp"
-                        android:textColor="?attr/colorOutline"
+                        android:textColor="?attr/colorOnSurfaceVariant"
                         android:fontFamily="@font/roboto" />
 
                 </LinearLayout>
@@ -144,13 +167,9 @@
 
         </LinearLayout>
 
-        <!-- Divider -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="16dp"
-            android:background="?attr/colorOutlineVariant" />
 
-    </LinearLayout>
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
 
 </com.google.android.gms.ads.nativead.NativeAdView>

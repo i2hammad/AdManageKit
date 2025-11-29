@@ -19,12 +19,19 @@
             android:orientation="vertical"
             android:background="?attr/colorSurface">
 
+            <!-- Ad Label -->
+            <TextView
+                style="@style/AdsTheme"
+                android:layout_marginStart="12dp"
+                android:layout_marginTop="12dp" />
+
             <!-- Header with App Icon, Name, and Sponsored -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:padding="12dp"
+                android:paddingHorizontal="12dp"
+                android:paddingBottom="12dp"
                 android:gravity="center_vertical">
 
                 <ImageView

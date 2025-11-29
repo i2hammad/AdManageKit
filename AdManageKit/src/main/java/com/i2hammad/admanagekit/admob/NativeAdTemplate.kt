@@ -82,6 +82,42 @@ enum class NativeAdTemplate(
         displayName = "Magazine"
     ),
 
+    MEDIA_CONTENT_SPLIT(
+        layoutResId = R.layout.layout_native_media_content_split,
+        shimmerResId = R.layout.layout_shimmer_media_content_split,
+        displayName = "Media Content Split"
+    ),
+
+    APP_STORE(
+        layoutResId = R.layout.layout_native_app_store,
+        shimmerResId = R.layout.layout_shimmer_app_store,
+        displayName = "App Store"
+    ),
+
+    SOCIAL_FEED(
+        layoutResId = R.layout.layout_native_social_feed,
+        shimmerResId = R.layout.layout_shimmer_social_feed,
+        displayName = "Social Feed"
+    ),
+
+    GRADIENT_CARD(
+        layoutResId = R.layout.layout_native_gradient_card,
+        shimmerResId = R.layout.layout_shimmer_gradient_card,
+        displayName = "Gradient Card"
+    ),
+
+    PILL_BANNER(
+        layoutResId = R.layout.layout_native_pill_banner,
+        shimmerResId = R.layout.layout_shimmer_pill_banner,
+        displayName = "Pill Banner"
+    ),
+
+    SPOTLIGHT(
+        layoutResId = R.layout.layout_native_spotlight,
+        shimmerResId = R.layout.layout_shimmer_spotlight,
+        displayName = "Spotlight"
+    ),
+
     // Video Templates
     VIDEO_SMALL(
         layoutResId = R.layout.layout_native_video_small,

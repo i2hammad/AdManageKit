@@ -38,19 +38,11 @@
                     android:layout_gravity="top|end"
                     android:layout_margin="6dp" />
 
-                <!-- Ad Badge -->
+                <!-- Ad Label -->
                 <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
+                    style="@style/AdsTheme"
                     android:layout_gravity="top|start"
-                    android:layout_margin="6dp"
-                    android:background="#E0000000"
-                    android:paddingHorizontal="6dp"
-                    android:paddingVertical="2dp"
-                    android:text="Ad"
-                    android:textColor="@android:color/white"
-                    android:textSize="10sp"
-                    android:fontFamily="@font/roboto_medium" />
+                    android:layout_margin="6dp" />
 
             </FrameLayout>
 

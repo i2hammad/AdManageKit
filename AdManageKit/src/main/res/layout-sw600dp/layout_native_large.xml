@@ -140,16 +140,10 @@
                 </LinearLayout>
             </RelativeLayout>
 
+            <!-- Ad Label -->
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start"
-                android:background="@drawable/ad_text_background"
-                android:paddingStart="3dp"
-                android:paddingEnd="4dp"
-                android:text="Ad"
-                android:textColor="#ffffff"
-                android:textSize="12sp" />
+                style="@style/AdsTheme"
+                android:layout_gravity="start" />
         </com.google.android.gms.ads.nativead.NativeAdView>
 
         <com.facebook.shimmer.ShimmerFrameLayout xmlns:app="http://schemas.android.com/apk/res-auto"

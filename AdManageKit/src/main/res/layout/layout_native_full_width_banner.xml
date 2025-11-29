@@ -5,16 +5,20 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorSurface"
-        android:orientation="horizontal"
-        android:padding="12dp"
-        android:gravity="center_vertical">
+        android:background="?attr/colorSurface">
 
-        <!-- Left: Icon -->
-        <ImageView
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="12dp"
+            android:gravity="center_vertical">
+
+            <!-- Left: Icon -->
+            <ImageView
             android:id="@+id/ad_app_icon"
             android:layout_width="56dp"
             android:layout_height="56dp"
@@ -101,13 +105,20 @@
             android:background="@drawable/ads_bg_lib"
             android:textColor="@color/colorWhite" />
 
-        <!-- AdChoices -->
-        <com.google.android.gms.ads.nativead.AdChoicesView
-            android:id="@+id/ad_choices_view"
-            android:layout_width="16dp"
-            android:layout_height="16dp"
-            android:layout_marginStart="8dp" />
+            <!-- AdChoices -->
+            <com.google.android.gms.ads.nativead.AdChoicesView
+                android:id="@+id/ad_choices_view"
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:layout_marginStart="8dp" />
 
-    </LinearLayout>
+        </LinearLayout>
+
+        <!-- Ad Label -->
+        <TextView
+            style="@style/AdsTheme"
+            android:layout_gravity="top|start" />
+
+    </FrameLayout>
 
 </com.google.android.gms.ads.nativead.NativeAdView>

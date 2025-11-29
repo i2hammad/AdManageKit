@@ -30,6 +30,7 @@ class NativeTemplateTestActivity : AppCompatActivity() {
     private lateinit var tvTemplateInfo: TextView
 
     private val adUnitId = "ca-app-pub-3940256099942544/2247696110" // Test ad unit
+//    private val adUnitId = "ca-app-pub-3940256099942544/1044960115" // Test ad unit
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -142,6 +143,7 @@ class NativeTemplateTestActivity : AppCompatActivity() {
 
     private fun getTemplateInfo(template: NativeAdTemplate): String {
         return when (template) {
+            // Standard Templates
             NativeAdTemplate.CARD_MODERN -> "Modern card with media, icon, rating & Material button"
             NativeAdTemplate.MATERIAL3 -> "Material Design 3 compliant with stroke border"
             NativeAdTemplate.MINIMAL -> "Clean minimalist design with divider"
@@ -153,6 +155,16 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.FEATURED -> "Prominent card with FEATURED badge"
             NativeAdTemplate.OVERLAY_DARK -> "Dark theme with overlay effect"
             NativeAdTemplate.MAGAZINE -> "Editorial style with serif headline"
+
+            // New Beautiful Templates
+            NativeAdTemplate.MEDIA_CONTENT_SPLIT -> "Media 3/5 left, content 2/5 right - Play Store style"
+            NativeAdTemplate.APP_STORE -> "App Store/Play Store listing style with GET button"
+            NativeAdTemplate.SOCIAL_FEED -> "Instagram/Facebook sponsored post style"
+            NativeAdTemplate.GRADIENT_CARD -> "Hero card with gradient overlay on media"
+            NativeAdTemplate.PILL_BANNER -> "Compact pill-shaped banner with rounded corners"
+            NativeAdTemplate.SPOTLIGHT -> "Centered hero with large icon & full-width CTA"
+
+            // Video Templates
             NativeAdTemplate.VIDEO_SMALL -> "Compact video player (160dp)"
             NativeAdTemplate.VIDEO_MEDIUM -> "Medium video player (280dp, 16:9)"
             NativeAdTemplate.VIDEO_LARGE -> "Large video player (360dp) with overlay"

@@ -281,12 +281,21 @@ fun onArticleFinished() {
 
 ### Current Implementation Mapping
 
-The strategies are currently implemented through the existing AdManageKit APIs:
+**New in v2.8.0:** `forceShowInterstitial()` now respects the global loading strategy!
 
 **For Interstitial Ads:**
-- `ON_DEMAND`: Uses `forceShowInterstitial()` with dialog
+- `ON_DEMAND`: Uses `forceShowInterstitialAlways()` with dialog
 - `ONLY_CACHE`: Uses `showInterstitialIfReady()`
-- `HYBRID`: Checks cache first, falls back to `forceShowInterstitial()` if empty
+- `HYBRID`: Checks cache first, falls back to `forceShowInterstitialAlways()` if empty
+
+**Direct AdManager Methods (v2.8.0+):**
+```kotlin
+// Now respects AdManageKitConfig.interstitialLoadingStrategy
+AdManager.getInstance().forceShowInterstitial(activity, callback)
+
+// Always forces fresh fetch (bypasses strategy)
+AdManager.getInstance().forceShowInterstitialAlways(activity, callback)
+```
 
 **For App Open Ads:**
 - `ON_DEMAND`: Discards cache, fetches with welcome dialog
@@ -311,18 +320,23 @@ InterstitialAdBuilder.with(this)
 
 ## Migration from Old API
 
-If you're using the old methods:
+**v2.8.0+:** Old methods now automatically respect loading strategy!
 
 ```kotlin
-// Old way
+// Set strategy once
+AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
+
+// Old methods now respect strategy (v2.8.0+)
 AdManager.getInstance().forceShowInterstitial(activity, callback)
-AdManager.getInstance().showInterstitialAdByTime(activity, callback, true)
+// → HYBRID: shows cached or fetches fresh
 
-// New way - just set strategy and use builder
-AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+// If you need old behavior (always force fetch), use:
+AdManager.getInstance().forceShowInterstitialAlways(activity, callback)
 
+// Or use the builder for more control
 InterstitialAdBuilder.with(activity)
     .adUnit("ca-app-pub-xxx")
+    .loadingStrategy(AdLoadingStrategy.ON_DEMAND) // Override per-call
     .show { /* next action */ }
 ```
 

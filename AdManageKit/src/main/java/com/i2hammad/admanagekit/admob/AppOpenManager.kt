@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
@@ -46,6 +47,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val excludedActivityNames: MutableSet<String> = HashSet() // Cache for performance
 
     private val skipNextAd = AtomicBoolean(false)
+    private val isLoading = AtomicBoolean(false)  // Prevents concurrent ad requests
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
 
     // Reusable handler for timeouts
@@ -113,11 +115,45 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private var currentWelcomeDialog: WelcomeBackDialogViews? = null
 
     /**
+     * Get themed context for dialog inflation.
+     * Uses activity's theme if it has Material attributes (preserves app colors),
+     * otherwise wraps with Material3 as fallback for non-Material themes.
+     */
+    private fun getThemedContextForDialog(activity: Activity): android.content.Context {
+        return try {
+            // Check if activity's theme has colorPrimary (Material/AppCompat attribute)
+            val typedValue = android.util.TypedValue()
+            val hasMaterialTheme = activity.theme.resolveAttribute(
+                androidx.appcompat.R.attr.colorPrimary,
+                typedValue,
+                true
+            )
+
+            if (hasMaterialTheme) {
+                // Activity has Material/AppCompat theme - use it directly to preserve app colors
+                activity
+            } else {
+                // Non-Material theme - wrap with Material3 fallback
+                Log.d(LOG_TAG, "Activity doesn't have Material theme, using fallback")
+                ContextThemeWrapper(activity, com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar)
+            }
+        } catch (e: Exception) {
+            // On any error, use Material3 fallback
+            Log.w(LOG_TAG, "Error checking theme, using Material3 fallback: ${e.message}")
+            ContextThemeWrapper(activity, com.google.android.material.R.style.Theme_Material3_DayNight_NoActionBar)
+        }
+    }
+
+    /**
      * Show beautiful welcome back dialog
      */
     private fun showWelcomeBackDialog(activity: Activity): WelcomeBackDialogViews {
+        // Get themed context - use activity's theme if it has Material attributes,
+        // otherwise wrap with Material3 as fallback
+        val themedContext = getThemedContextForDialog(activity)
+
         val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-        val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_welcome_back_fullscreen, null)
+        val dialogView = LayoutInflater.from(themedContext).inflate(R.layout.dialog_welcome_back_fullscreen, null)
         dialog.setContentView(dialogView)
         dialog.setCancelable(false)
 
@@ -126,7 +162,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            statusBarColor = Color.TRANSPARENT
             decorView.systemUiVisibility = (
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
                 or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
@@ -184,10 +219,26 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             .setDuration(200)
             .setInterpolator(android.view.animation.AccelerateInterpolator())
             .withEndAction {
-                dialogViews.dialog.dismiss()
+                dismissDialogSafely(dialogViews.dialog)
                 onComplete()
             }
             .start()
+    }
+
+    /**
+     * Safely dismiss dialog handling window detachment
+     */
+    private fun dismissDialogSafely(dialog: Dialog) {
+        try {
+            if (dialog.isShowing) {
+                dialog.dismiss()
+            }
+        } catch (e: IllegalArgumentException) {
+            // View not attached to window manager - activity was destroyed
+            Log.w(LOG_TAG, "Dialog dismiss failed - window not attached: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error dismissing dialog: ${e.message}")
+        }
     }
 
     /**
@@ -202,13 +253,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         if (delayMillis <= 0) {
             // No delay - dismiss immediately
-            try {
-                if (dialogViews.dialog.isShowing) {
-                    dialogViews.dialog.dismiss()
-                }
-            } catch (e: Exception) {
-                Log.e(LOG_TAG, "Error dismissing welcome dialog: ${e.message}")
-            }
+            dismissDialogSafely(dialogViews.dialog)
             currentWelcomeDialog = null
         } else {
             // Dismiss with delay - dialog visible briefly, then fades while ad shows
@@ -529,13 +574,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
                 // Dismiss dialog immediately if ad fails to show
                 currentWelcomeDialog?.let { dialogViews ->
-                    try {
-                        if (dialogViews.dialog.isShowing) {
-                            dialogViews.dialog.dismiss()
-                        }
-                    } catch (e: Exception) {
-                        Log.e(LOG_TAG, "Error dismissing dialog on ad failure: ${e.message}")
-                    }
+                    dismissDialogSafely(dialogViews.dialog)
                     currentWelcomeDialog = null
                 }
 
@@ -625,6 +664,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         // Reset state
         isShowingAd.set(false)
         skipNextAd.set(false)
+        isLoading.set(false)
 
         // Unregister lifecycle callbacks
         try {
@@ -676,14 +716,22 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Fetch ad with exponential backoff retry logic
+     * Fetch ad with exponential backoff retry logic.
+     * Uses isLoading flag to prevent concurrent ad requests.
      */
     private fun fetchAdWithRetry(retryCount: Int) {
         if (isAdAvailable()) {
             return
         }
 
+        // Prevent concurrent ad requests - only check on first attempt
+        if (retryCount == 0 && !isLoading.compareAndSet(false, true)) {
+            Log.d(LOG_TAG, "fetchAdWithRetry: Already loading, skipping duplicate request")
+            return
+        }
+
         if (retryCount >= maxRetryAttempts) {
+            isLoading.set(false)  // Reset loading state
             AdDebugUtils.logEvent(adUnitId, "maxRetriesExceeded", "App open ad max retry attempts exceeded", false)
             return
         }
@@ -700,6 +748,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             request,
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
+                    isLoading.set(false)  // Reset loading state
                     appOpenAd = ad
 
                     // Track loading performance
@@ -728,6 +777,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         scheduleTimeout(retryDelay) {
                             fetchAdWithRetry(retryCount + 1)
                         }
+                    } else {
+                        isLoading.set(false)  // Reset loading state only if not retrying
                     }
                 }
             })

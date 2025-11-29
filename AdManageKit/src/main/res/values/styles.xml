@@ -16,4 +16,10 @@
         <item name="android:minHeight">15px</item>
         <item name="android:text">Ad</item>
     </style>
+
+
+    <style name="ShapeAppearance.MyApp.Corner.Medium" parent="ShapeAppearance.Material3.Corner.Full">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">8dp</item>
+    </style>
 </resources>

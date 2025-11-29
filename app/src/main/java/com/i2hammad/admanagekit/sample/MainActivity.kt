@@ -52,6 +52,12 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Setup button to open Non-Material Theme Test (for app open ad testing)
+        findViewById<Button>(R.id.btnOpenNonMaterialTest).setOnClickListener {
+            val intent = Intent(this, NonMaterialTestActivity::class.java)
+            startActivity(intent)
+        }
+
         loadAds()
 
 

@@ -343,6 +343,10 @@ object NativeAdIntegrationManager {
     
     /**
      * Caches a native ad with screen-aware strategy.
+     *
+     * NOTE: Only use this for PRELOADING ads that will be displayed later.
+     * Do NOT cache ads that are being displayed immediately - they should be consumed, not cached.
+     * Ads expire after 1 hour, so caching displayed ads wastes memory and causes stale references.
      */
     fun cacheNativeAdWithScreenContext(
         baseAdUnitId: String,
@@ -351,15 +355,13 @@ object NativeAdIntegrationManager {
         nativeAd: NativeAd
     ) {
         if (!NativeAdManager.enableCachingNativeAds || !AdManageKitConfig.enableSmartPreloading) return
-        
-        // Cache with screen-specific key for dedicated access
+
+        // Cache with screen-specific key ONLY (not both keys to avoid duplicate references)
+        // This prevents the same ad from appearing in multiple cache entries
         val screenSpecificKey = "${baseAdUnitId}${screenType.suffix}"
         NativeAdManager.setCachedNativeAd(screenSpecificKey, nativeAd)
-        
-        // Also cache with base key for cross-screen sharing (lower priority)
-        NativeAdManager.setCachedNativeAd(baseAdUnitId, nativeAd)
-        
-        logDebug("Cached ad for screen $screenKey with keys: [$screenSpecificKey, $baseAdUnitId]")
+
+        logDebug("Cached ad for screen $screenKey with key: $screenSpecificKey")
     }
     
     /**

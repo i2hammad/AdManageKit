@@ -212,10 +212,9 @@ object ProgrammaticNativeAdLoader {
         val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
 
         val builder = AdLoader.Builder(activity, adUnitId).forNativeAd { nativeAd ->
-            // Cache the ad for future use
-            if (NativeAdManager.enableCachingNativeAds) {
-                NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
-            }
+            // NOTE: Do NOT cache ad here - it's passed to callback for immediate display
+            // Caching is only for preloaded ads that will be shown later via getCachedNativeAd()
+            // Ads expire after 1 hour, so caching displayed ads wastes memory
 
             val nativeAdView = createNativeAdView(activity, size)
             populateNativeAdView(nativeAd, nativeAdView, size)

@@ -213,21 +213,11 @@ class NativeBannerSmall @JvmOverloads constructor(
             adPlaceholder.addView(nativeAdView)
             binding.root.visibility = VISIBLE
             adPlaceholder.visibility = VISIBLE
-            
-            // Cache with screen-aware context if we have an Activity
-            if (context is Activity && NativeAdManager.enableCachingNativeAds) {
-                val screenKey = "${context.javaClass.simpleName}_SMALL"
-                com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.cacheNativeAdWithScreenContext(
-                    baseAdUnitId = this@NativeBannerSmall.adUnitId,
-                    screenType = com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.ScreenType.SMALL,
-                    screenKey = screenKey,
-                    nativeAd = nativeAd
-                )
-            } else if (NativeAdManager.enableCachingNativeAds) {
-                // Fallback to basic caching
-                NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
-            }
-            
+
+            // NOTE: Do NOT cache ad here - it's being displayed immediately
+            // Caching is only for preloaded ads that will be shown later
+            // Ads expire after 1 hour, so caching displayed ads wastes memory
+
             populateNativeAdView(nativeAd, nativeAdView)
             shimmerFrameLayout.visibility = GONE
 
