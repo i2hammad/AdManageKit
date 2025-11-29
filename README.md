@@ -5,13 +5,24 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.8.0`** adds **Loading Strategy for AdManager** and **Global Auto-Reload Config**.
+**Latest Version `2.9.0`** adds **Enhanced Billing**, **6 New Native Templates**, and critical **Bug Fixes**.
 
-## What's New in 2.8.0
+## What's New in 2.9.0
 
-- **Loading Strategy for AdManager**: `forceShowInterstitial()` now respects global loading strategy
-- **Global Auto-Reload Config**: New `interstitialAutoReload` setting with per-call override
-- **New Method**: `forceShowInterstitialAlways()` for explicit force fetch behavior
+### Billing Module Enhancements
+- **Purchase Categories**: CONSUMABLE, FEATURE_UNLOCK, LIFETIME_PREMIUM, REMOVE_ADS
+- **Subscription Lifecycle**: Active, Cancelled, Expired state detection
+- **Upgrade/Downgrade**: Full subscription change support with proration modes
+- **Manual Consumption**: Full control over consumable product flow
+- **Enhanced PurchaseResult**: originalJson, signature, account identifiers
+
+### Native Ad Templates
+- **6 New Templates**: APP_STORE, SOCIAL_FEED, GRADIENT_CARD, PILL_BANNER, SPOTLIGHT, MEDIA_CONTENT_SPLIT
+- **AdChoices Control**: Configure placement position programmatically or via XML
+
+### Bug Fixes
+- Fixed dialog crash when activity destroyed (View not attached to window manager)
+- Fixed welcome dialog crash on non-Material themes
 
 ## Screenshots
 
@@ -44,12 +55,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.8.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.9.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.9.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -57,9 +68,10 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0'
 ## Features
 
 ### NativeTemplateView (v2.6.0+)
-- **17 Template Styles**: card_modern, material3, minimal, list_item, magazine, video templates, and more
+- **23 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, spotlight, and more
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
+- **AdChoices Control**: Configure placement position (v2.9.0+)
 - **Video-Ready**: All templates support video ads (120dp+ MediaView)
 - [View Documentation](docs/NATIVE_TEMPLATE_VIEW.md)
 
@@ -165,6 +177,12 @@ class MyApp : Application() {
 | `compact_horizontal` | Lists |
 | `list_item` | RecyclerView items |
 | `magazine` | News/blog apps |
+| `app_store` | App promotion (v2.9.0+) |
+| `social_feed` | Feed integration (v2.9.0+) |
+| `gradient_card` | Premium feel (v2.9.0+) |
+| `pill_banner` | Inline placement (v2.9.0+) |
+| `spotlight` | High visibility (v2.9.0+) |
+| `media_content_split` | Balanced display (v2.9.0+) |
 | `video_small/medium/large` | Video content |
 | `video_square/vertical/fullscreen` | Social feeds |
 
@@ -331,24 +349,67 @@ AdsConsentManager.getInstance(this).requestUMP(
 )
 ```
 
-### In-App Purchases
+### In-App Purchases (v2.9.0+)
 
 ```kotlin
-// Initialize
-AppPurchase.getInstance().initBilling(
-    application,
-    listOf(PurchaseItem("product_id", "", AppPurchase.TYPE_IAP.PURCHASE))
+// Define products with categories
+val products = listOf(
+    PurchaseItem("coins_100", TYPE_IAP.PURCHASE, PurchaseCategory.CONSUMABLE),
+    PurchaseItem("remove_ads", TYPE_IAP.PURCHASE, PurchaseCategory.REMOVE_ADS),
+    PurchaseItem("lifetime", TYPE_IAP.PURCHASE, PurchaseCategory.LIFETIME_PREMIUM),
+    PurchaseItem("premium_monthly", "free_trial", TYPE_IAP.SUBSCRIPTION)
 )
 
-// Purchase
-AppPurchase.getInstance().purchase(activity, "product_id")
+// Initialize
+AppPurchase.getInstance().initBilling(application, products)
 
-// Listen for results
-AppPurchase.getInstance().setPurchaseListener(object : PurchaseListener {
-    override fun onProductPurchased(productId: String, originalJson: String) { }
-    override fun displayErrorMessage(errorMessage: String) { }
-    override fun onUserCancelBilling() { }
+// Purchase
+AppPurchase.getInstance().purchase(activity, "remove_ads")
+
+// Subscribe
+AppPurchase.getInstance().subscribe(activity, "premium_monthly")
+
+// Check status
+if (AppPurchase.getInstance().isPurchased()) {
+    // User has premium (subscription, lifetime, or remove_ads)
+}
+
+// Track purchases and handle consumables
+AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryListener {
+    override fun onNewPurchase(productId: String, purchase: PurchaseResult) {
+        if (productId == "coins_100") {
+            addCoins(100 * purchase.quantity)
+            AppPurchase.getInstance().consumePurchase(productId) // Manual consume
+        }
+    }
+    override fun onPurchaseConsumed(productId: String, purchase: PurchaseResult) { }
 })
+```
+
+#### Subscription Management (v2.9.0+)
+
+```kotlin
+// Check subscription state
+val state = AppPurchase.getInstance().getSubscriptionState("premium_monthly")
+when (state) {
+    SubscriptionState.ACTIVE -> showPremiumUI()
+    SubscriptionState.CANCELLED -> showRenewalPrompt() // Still has access
+    SubscriptionState.EXPIRED -> showSubscribeButton()
+}
+
+// Upgrade subscription
+AppPurchase.getInstance().upgradeSubscription(activity, "premium_yearly")
+
+// Downgrade subscription
+AppPurchase.getInstance().downgradeSubscription(activity, "premium_basic")
+
+// Full control with proration mode
+AppPurchase.getInstance().changeSubscription(
+    activity,
+    "premium_monthly",
+    "premium_yearly",
+    SubscriptionReplacementMode.CHARGE_PRORATED_PRICE
+)
 ```
 
 ---
@@ -361,11 +422,51 @@ AppPurchase.getInstance().setPurchaseListener(object : PurchaseListener {
 - [Native Ads Caching](docs/native-ads-caching.md)
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
+- [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v2.9.0](docs/release-notes/RELEASE_NOTES_v2.9.0.md)
 - [API Reference](docs/API_REFERENCE.md)
+
+### Wiki (Billing)
+- [Billing Integration](wiki/Billing-Integration.md)
+- [Purchase Categories](wiki/Purchase-Categories.md)
+- [Consumable Products](wiki/Consumable-Products.md)
+- [Subscriptions](wiki/Subscriptions.md)
+- [Subscription Upgrades](wiki/Subscription-Upgrades.md)
 
 ---
 
 ## Migration Guide
+
+### Migrating to 2.9.0
+
+Version 2.9.0 has **one breaking change** for consumable products:
+
+**Consumables are no longer auto-consumed.** You must manually call `consumePurchase()`:
+
+```kotlin
+// Before v2.9.0 (auto-consume)
+AppPurchase.getInstance().setConsumePurchase(true)  // Deprecated
+
+// After v2.9.0 (manual consume)
+AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryListener {
+    override fun onNewPurchase(productId: String, purchase: PurchaseResult) {
+        grantItems(productId, purchase.quantity)
+        AppPurchase.getInstance().consumePurchase(productId)  // Manual!
+    }
+    override fun onPurchaseConsumed(productId: String, purchase: PurchaseResult) { }
+})
+```
+
+**Use Purchase Categories** for better product classification:
+
+```kotlin
+// Before
+PurchaseItem("coins", TYPE_IAP.PURCHASE, true)  // isConsumable
+
+// After (explicit categories)
+PurchaseItem("coins", TYPE_IAP.PURCHASE, PurchaseCategory.CONSUMABLE)
+PurchaseItem("remove_ads", TYPE_IAP.PURCHASE, PurchaseCategory.REMOVE_ADS)
+```
 
 ### Migrating to 2.8.0
 
