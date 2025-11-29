@@ -2,6 +2,7 @@
 activityCompose = "1.12.0"
 agp = "8.13.0"
 billing = "8.1.0"
+dokka = "2.0.0"
 composeBom = "2025.11.01"
 firebaseBom = "34.6.0"
 kotlin = "2.1.0"
@@ -51,4 +52,5 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 

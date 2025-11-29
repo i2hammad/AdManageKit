@@ -433,6 +433,18 @@ AppPurchase.getInstance().changeSubscription(
 - [Subscriptions](wiki/Subscriptions.md)
 - [Subscription Upgrades](wiki/Subscription-Upgrades.md)
 
+### API Documentation (Dokka)
+
+**Online:** [https://i2hammad.github.io/AdManageKit/](https://i2hammad.github.io/AdManageKit/)
+
+Generate locally:
+
+```bash
+./gradlew dokkaHtmlMultiModule
+```
+
+Output: `build/dokka/htmlMultiModule/index.html`
+
 ---
 
 ## Migration Guide
