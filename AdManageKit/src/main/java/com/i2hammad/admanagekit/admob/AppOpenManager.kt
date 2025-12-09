@@ -14,6 +14,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -39,7 +41,7 @@ import kotlin.math.pow
 class AppOpenManager(private val myApplication: Application, private var adUnitId: String) :
     Application.ActivityLifecycleCallbacks, DefaultLifecycleObserver {
 
-    private var currentActivityRef: WeakReference<Activity>? = null
+    private var currentActivity: Activity? = null
     @Volatile
     private var appOpenAd: AppOpenAd? = null
 
@@ -162,11 +164,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
-            decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
+            // Use modern WindowInsetsController API (replaces deprecated systemUiVisibility)
+            WindowCompat.setDecorFitsSystemWindows(this, false)
+            WindowCompat.getInsetsController(this, decorView).apply {
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
         }
 
         val overlay = dialogView.findViewById<View>(R.id.overlay)
@@ -322,16 +324,18 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         // If ad is available, show it
         if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isDisplayingAd()) {
-            Log.e(LOG_TAG, "Will show ad.")
+            if (currentActivity == null) {
+                Log.e(LOG_TAG, "Cannot show ad: currentActivity is null (WeakReference cleared)")
+                return
+            }
 
+            Log.d(LOG_TAG, "Showing ad on activity: ${currentActivity.javaClass.simpleName}")
             val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
 
-            currentActivity?.let { activity ->
-                appOpenAd?.apply {
-                    setOnPaidEventListener(createPaidEventListener())
-                    setFullScreenContentCallback(fullScreenContentCallback)
-                    show(activity)
-                }
+            appOpenAd?.apply {
+                setOnPaidEventListener(createPaidEventListener())
+                setFullScreenContentCallback(fullScreenContentCallback)
+                show(currentActivity)
             }
         } else if (!isAdAvailable() && currentActivity != null) {
             // No cached ad available - always show welcome dialog while fetching
@@ -520,7 +524,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     /**
      * Get current activity safely
      */
-    private fun getCurrentActivity(): Activity? = currentActivityRef?.get()
+    private fun getCurrentActivity(): Activity? = currentActivity
 
     /**
      * Check if activity is excluded with performance optimization
@@ -655,7 +659,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         appOpenAd = null
 
         // Clear activity reference
-        currentActivityRef = null
+        currentActivity = null
 
         // Clear caches
         excludedActivityNames.clear()
@@ -714,6 +718,65 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
         fetchAdWithRetry(0)
     }
+
+    /**
+     * Prefetch the next app open ad in background.
+     * Call this when you know the user will leave and return to the app.
+     *
+     * Use cases:
+     * - Before launching external intent (camera, browser, etc.)
+     * - Before starting an activity that will return
+     * - When user is about to leave for a known reason
+     *
+     * When user returns:
+     * - If ad is ready: shows instantly (no dialog)
+     * - If still loading: welcome dialog waits for it
+     *
+     * @param onPrefetchStarted Optional callback when prefetch starts (true) or skipped (false)
+     *
+     * Example:
+     * ```kotlin
+     * // Before launching camera
+     * appOpenManager.prefetchNextAd()
+     * startActivityForResult(cameraIntent, REQUEST_CODE)
+     * ```
+     */
+    @JvmOverloads
+    fun prefetchNextAd(onPrefetchStarted: ((Boolean) -> Unit)? = null) {
+        // Don't prefetch if user has purchased
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping prefetch.")
+            onPrefetchStarted?.invoke(false)
+            return
+        }
+
+        // Don't prefetch if ad already available or currently loading
+        if (isAdAvailable()) {
+            Log.d(LOG_TAG, "Ad already available, skipping prefetch.")
+            onPrefetchStarted?.invoke(false)
+            return
+        }
+
+        if (isLoading.get()) {
+            Log.d(LOG_TAG, "Ad already loading, skipping prefetch.")
+            onPrefetchStarted?.invoke(false)
+            return
+        }
+
+        Log.d(LOG_TAG, "Prefetching next app open ad...")
+        AdDebugUtils.logEvent(adUnitId, "prefetch", "Prefetching next app open ad", true)
+        onPrefetchStarted?.invoke(true)
+        fetchAd()
+    }
+
+    /**
+     * Check if an ad is currently being loaded.
+     * Useful to know if prefetch is in progress.
+     *
+     * @return true if ad is currently loading
+     */
+    fun isAdLoading(): Boolean = isLoading.get()
 
     /**
      * Fetch ad with exponential backoff retry logic.
@@ -971,12 +1034,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
 
     override fun onActivityStarted(activity: Activity) {
-        currentActivityRef = WeakReference(activity)
+        // Only update when not showing ad to avoid capturing AdActivity
+        if (!isShowingAd.get()) {
+            currentActivity = activity
+        }
     }
 
-    override fun onActivityResumed(activity: Activity) {
-        currentActivityRef = WeakReference(activity)
-    }
+    override fun onActivityResumed(activity: Activity) {}
 
     override fun onActivityStopped(activity: Activity) {}
 
@@ -984,11 +1048,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
     override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
 
-    override fun onActivityDestroyed(activity: Activity) {
-        if (getCurrentActivity() == activity) {
-            currentActivityRef = null
-        }
-    }
+    override fun onActivityDestroyed(activity: Activity) {}
 
     /**
      * Adds an activity class to the set of excluded activities.
@@ -1015,8 +1075,10 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     override fun onStart(owner: LifecycleOwner) {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (!purchaseProvider.isPurchased()) {
-            showAdIfAvailable()
-            Log.d(LOG_TAG, "onStart")
+            currentActivity?.let {
+                Log.d(LOG_TAG, "onStart - showing ad on: ${it.javaClass.simpleName}")
+                showAdIfAvailable()
+            }
         }
     }
 

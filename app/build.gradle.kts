@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.i2hammad.admanagekit.sample"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 36
         versionCode = 2
         versionName = "2.0"

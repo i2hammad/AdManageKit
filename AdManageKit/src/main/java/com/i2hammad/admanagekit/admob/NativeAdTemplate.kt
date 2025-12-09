@@ -112,6 +112,12 @@ enum class NativeAdTemplate(
         displayName = "Pill Banner"
     ),
 
+    MEDIUM_HORIZONTAL(
+        layoutResId = R.layout.layout_native_medium_horizontal,
+        shimmerResId = R.layout.layout_shimmer_medium_horizontal,
+        displayName = "Medium Horizontal"
+    ),
+
     SPOTLIGHT(
         layoutResId = R.layout.layout_native_spotlight,
         shimmerResId = R.layout.layout_shimmer_spotlight,

@@ -48,7 +48,17 @@ object AdManageKitConfig {
      * Default: 3
      */
     var maxCachedAdsPerUnit: Int = 3
-    
+
+    /**
+     * Enable cross ad unit fallback for native ad caching.
+     * When true, if no cached ad is found for the requested ad unit,
+     * the system will try to return ANY available cached ad from other ad units.
+     *
+     * Useful for RecyclerView scenarios where showing any ad is better than empty space.
+     * Default: false
+     */
+    var enableCrossAdUnitFallback: Boolean = false
+
     // =================== RELIABILITY FEATURES ===================
     
     /**
@@ -425,6 +435,7 @@ object AdManageKitConfig {
         defaultAdTimeout = 15.seconds
         nativeCacheExpiry = 1.hours
         maxCachedAdsPerUnit = 3
+        enableCrossAdUnitFallback = false
         autoRetryFailedAds = true
         maxRetryAttempts = 3
         circuitBreakerThreshold = 5

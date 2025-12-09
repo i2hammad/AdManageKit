@@ -381,6 +381,7 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.MATERIAL3,
             NativeAdTemplate.MINIMAL,
             NativeAdTemplate.APP_STORE,
+            NativeAdTemplate.MEDIUM_HORIZONTAL,
             NativeAdTemplate.VIDEO_MEDIUM,
             NativeAdTemplate.VIDEO_SQUARE -> NativeAdIntegrationManager.ScreenType.MEDIUM
 

@@ -10,7 +10,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        minSdk = 23
+        minSdk = 24
 
         consumerProguardFiles("consumer-rules.pro")
     }
@@ -68,7 +68,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "2.9.0"
+                version = "3.0.0"
             }
 
 

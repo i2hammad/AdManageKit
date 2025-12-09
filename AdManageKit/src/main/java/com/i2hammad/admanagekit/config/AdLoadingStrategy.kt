@@ -29,6 +29,16 @@ package com.i2hammad.admanagekit.config
  *
  * Example: User performs task -> check cache -> if available show immediately,
  *          if not fetch new ad with timeout -> show if loaded, skip if timeout
+ *
+ * ### FreshWithCacheFallback
+ * Load fresh ad first, fall back to cache if loading fails.
+ * - Always tries to load fresh ad first
+ * - If fresh load fails, uses cached ad as fallback
+ * - Successfully loaded ads are cached for subsequent requests
+ * - Best for: RecyclerView scenarios where ads are requested multiple times
+ *
+ * Example: RecyclerView item binds -> try load fresh ad -> if fails use cached ->
+ *          on success cache for next bind
  */
 enum class AdLoadingStrategy {
     /**
@@ -47,5 +57,14 @@ enum class AdLoadingStrategy {
      * Check cache first, fetch if needed.
      * Instant show if cached, loading dialog if fetching.
      */
-    HYBRID
+    HYBRID,
+
+    /**
+     * Load fresh ad first, fall back to cache if loading fails.
+     * Ideal for RecyclerView scenarios where:
+     * - You want to try loading a fresh ad each time
+     * - If fresh load fails, use cached ad as fallback
+     * - Successfully loaded ads are cached for subsequent requests
+     */
+    FRESH_WITH_CACHE_FALLBACK
 }

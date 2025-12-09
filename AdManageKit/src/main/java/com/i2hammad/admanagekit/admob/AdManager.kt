@@ -13,6 +13,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.view.animation.AnimationUtils
+import android.os.Build
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.FullScreenContentCallback
@@ -28,16 +32,47 @@ import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
+import java.util.concurrent.ConcurrentHashMap
+import androidx.core.graphics.drawable.toDrawable
 
 /**
  * AdManager is a singleton class responsible for managing interstitial ads
  * using Google AdMob. It provides functionality to load and show ads, manage
  * display intervals, and handle ad-related callbacks.
+ *
+ * ## Ad Pool Feature
+ * Supports multiple ad units stored in a pool. When showing an ad:
+ * - Returns ANY available ad from the pool (maximizes show rate)
+ * - Auto-reloads the specific unit that was shown
+ * - Each unit loads independently (no blocking)
+ *
+ * Example:
+ * ```kotlin
+ * // Load multiple ad units
+ * adManager.loadInterstitialAd(context, "unit_a")
+ * adManager.loadInterstitialAd(context, "unit_b")
+ * adManager.loadInterstitialAd(context, "unit_c")
+ *
+ * // Show any available ad
+ * adManager.showInterstitialIfReady(activity, callback)  // Returns unit_a, unit_b, or unit_c
+ * ```
  */
 class AdManager() {
 
+    // Ad pool - stores multiple ads by ad unit ID
+    private val adPool = ConcurrentHashMap<String, InterstitialAd>()
+
+    // Track which ad units are currently loading
+    private val loadingAdUnits = ConcurrentHashMap.newKeySet<String>()
+
+    // Legacy single ad reference (for backward compatibility)
+    @Deprecated("Use adPool instead", ReplaceWith("adPool"))
     private var mInterstitialAd: InterstitialAd? = null
+
+    // Primary ad unit ID (used when no specific unit is requested)
     private var adUnitId: String? = null
+
+    @Deprecated("Use loadingAdUnits instead")
     private var isAdLoading = false
     private var isDisplayingAd = false
     private var lastAdShowTime: Long = 0
@@ -90,21 +125,23 @@ class AdManager() {
         dialog.window?.apply {
             // Make truly full screen
             setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-            setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
 
             // Full screen flags
             addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
             addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
-            // Make status bar transparent
-            statusBarColor = Color.TRANSPARENT
+            // Configure edge-to-edge display using modern API
+            WindowCompat.setDecorFitsSystemWindows(this, false)
 
-            // Hide system UI for true full screen
-            decorView.systemUiVisibility = (
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-            )
+            // Use WindowInsetsControllerCompat for backward-compatible immersive mode
+            WindowCompat.getInsetsController(this, decorView).apply {
+                // Hide system bars for immersive experience
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+
+
         }
         dialog.setCancelable(false)
 
@@ -254,7 +291,10 @@ class AdManager() {
                 Log.d("AdManager", "Ad loading timed out for splash")
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Interstitial ad loading timed out for splash", false)
                 callbackCalled = true
-                // Note: Don't set isAdLoading = false here, so ad can still load and be saved
+
+                // Reset isAdLoading to allow new load requests
+                // Note: The in-flight load callback will still save the ad if it arrives later
+                isAdLoading = false
 
                 // Ensure the callback is called if the ad loading is taking too long
                 callback.onNextAction()
@@ -270,31 +310,73 @@ class AdManager() {
             return
         }
 
+        // Guard: Prevent duplicate concurrent loads for SAME ad unit
+        if (loadingAdUnits.contains(adUnitId)) {
+            Log.d("AdManager", "Ad unit $adUnitId already loading, skipping duplicate request")
+            AdDebugUtils.logEvent(adUnitId, "skipDuplicateLoad", "Ad unit already loading", true)
+            return
+        }
+
+        // Guard: Skip if THIS ad unit already has ad in pool
+        if (adPool.containsKey(adUnitId)) {
+            Log.d("AdManager", "Ad unit $adUnitId already in pool, skipping load request")
+            AdDebugUtils.logEvent(adUnitId, "skipAlreadyLoaded", "Ad already in pool", true)
+            return
+        }
+
         if (AdManageKitConfig.testMode) {
             AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads", true)
         }
-        this.adUnitId = adUnitId
+
+        // Set primary ad unit if not set
+        if (this.adUnitId == null) {
+            this.adUnitId = adUnitId
+        }
+
         initializeFirebase(context)
         val adRequest = AdRequest.Builder().build()
 
-        isAdLoading = true
+        // Mark this unit as loading
+        loadingAdUnits.add(adUnitId)
+        isAdLoading = true  // Legacy flag
+
+        Log.d("AdManager", "Loading interstitial ad for unit: $adUnitId (pool size: ${adPool.size})")
+
+        // Firebase: Log ad request
+        logAdRequest(adUnitId, "interstitial")
+
         InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                // Add to pool
+                adPool[adUnitId] = interstitialAd
+                loadingAdUnits.remove(adUnitId)
+
+                // Legacy compatibility
                 mInterstitialAd = interstitialAd
-                isAdLoading = false
-                Log.d("AdManager", "Interstitial ad loaded")
-                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded successfully", true)
+                isAdLoading = loadingAdUnits.isNotEmpty()
+
+                Log.d("AdManager", "Interstitial ad loaded for unit: $adUnitId (pool size: ${adPool.size})")
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Ad loaded, pool size: ${adPool.size}", true)
+
+                // Firebase: Log ad fill (successful load)
+                logAdFill(adUnitId, "interstitial")
+
+                // Reset retry attempts on success
+                retryAttempts.remove(adUnitId)
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
+                loadingAdUnits.remove(adUnitId)
+                isAdLoading = loadingAdUnits.isNotEmpty()
+
+                Log.e("AdManager", "Failed to load interstitial ad for $adUnitId: ${loadAdError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed: ${loadAdError.message}", false)
 
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
                     retryAttempts[adUnitId] = currentAttempt + 1
-                    
+
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = currentAttempt,
@@ -303,9 +385,6 @@ class AdManager() {
                         // Retry loading the ad
                         loadInterstitialAd(context, adUnitId)
                     }
-                } else {
-                    isAdLoading = false
-                    mInterstitialAd = null
                 }
 
                 // Log Firebase event for ad failed to load
@@ -319,6 +398,49 @@ class AdManager() {
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
             }
         })
+    }
+
+    /**
+     * Load multiple interstitial ad units into the pool.
+     * Each unit loads independently (non-blocking).
+     *
+     * Example:
+     * ```kotlin
+     * adManager.loadMultipleAdUnits(context, listOf("unit_a", "unit_b", "unit_c"))
+     * ```
+     *
+     * @param context The context
+     * @param adUnitIds List of ad unit IDs to load
+     */
+    fun loadMultipleAdUnits(context: Context, adUnitIds: List<String>) {
+        Log.d("AdManager", "Loading ${adUnitIds.size} ad units into pool")
+        adUnitIds.forEach { unitId ->
+            loadInterstitialAd(context, unitId)
+        }
+    }
+
+    /**
+     * Load multiple interstitial ad units into the pool (vararg version).
+     *
+     * Example:
+     * ```kotlin
+     * adManager.loadMultipleAdUnits(context, "unit_a", "unit_b", "unit_c")
+     * ```
+     */
+    fun loadMultipleAdUnits(context: Context, vararg adUnitIds: String) {
+        loadMultipleAdUnits(context, adUnitIds.toList())
+    }
+
+    /**
+     * Clear all ads from the pool.
+     * Useful for cleanup or when user purchases premium.
+     */
+    fun clearAdPool() {
+        val count = adPool.size
+        adPool.clear()
+        mInterstitialAd = null
+        Log.d("AdManager", "Cleared $count ads from pool")
+        AdDebugUtils.logEvent("", "poolCleared", "Cleared $count ads", true)
     }
 
     /**
@@ -435,6 +557,12 @@ class AdManager() {
                     forceShowInterstitialAlways(activity, callback)
                 }
             }
+            AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
+                // Try fresh first, fall back to cache if fails
+                // For interstitials, this behaves like ON_DEMAND (always tries fresh)
+                // but the internal loading will fall back to cache on failure
+                forceShowInterstitialAlways(activity, callback)
+            }
         }
     }
 
@@ -517,8 +645,14 @@ class AdManager() {
 
     /**
      * Internal method to force fetch and display a fresh interstitial ad.
-     * Always loads a new ad, does NOT use existing cached ads.
-     * Does not reload after showing since next force call fetches fresh anyway.
+     * Tries to load a fresh ad first, falls back to cached ad on timeout/failure.
+     *
+     * Flow:
+     * 1. Save existing cached ad as fallback (don't discard!)
+     * 2. Try loading fresh ad
+     * 3. On success → show fresh ad
+     * 4. On timeout/failure → show cached fallback if available
+     * 5. Only if both fail → onNextAction()
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
@@ -537,9 +671,16 @@ class AdManager() {
             return
         }
 
-        // Clear existing ad to force fresh fetch
-        mInterstitialAd = null
         initializeFirebase(activity)
+
+        // IMPORTANT: Save existing cached ad as fallback - DON'T discard it!
+        val cachedAdFallback = mInterstitialAd
+        val hasCachedFallback = cachedAdFallback != null
+
+        if (hasCachedFallback) {
+            Log.d("AdManager", "Cached ad available as fallback while loading fresh")
+            AdDebugUtils.logEvent(currentAdUnitId, "cachedFallbackAvailable", "Cached ad saved as fallback", true)
+        }
 
         // Show beautiful loading dialog
         val dialogViews = showBeautifulLoadingDialog(activity)
@@ -549,26 +690,53 @@ class AdManager() {
         val timeoutMillis = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
         var adLoaded = false
         var timeoutTriggered = false
+        var dialogDismissed = false
+
+        // Helper to safely dismiss dialog only once
+        fun dismissDialogOnce(onDismissed: () -> Unit) {
+            if (!dialogDismissed) {
+                dialogDismissed = true
+                animateDialogDismissal(dialogViews, onDismissed)
+            } else {
+                onDismissed()
+            }
+        }
+
+        // Helper to show cached fallback ad
+        fun showCachedFallback(): Boolean {
+            if (cachedAdFallback != null) {
+                Log.d("AdManager", "Showing cached fallback ad")
+                AdDebugUtils.logEvent(currentAdUnitId, "showingCachedFallback", "Fresh load failed, showing cached fallback", true)
+                mInterstitialAd = cachedAdFallback
+                val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+                dismissDialogOnce {
+                    showAd(activity, callback, effectiveAutoReload) // Reload after showing fallback
+                }
+                return true
+            }
+            return false
+        }
 
         InterstitialAd.load(activity, currentAdUnitId, adRequest, object : InterstitialAdLoadCallback() {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                // Always save the ad for future use (improves show rate)
+                // Always save the ad
                 mInterstitialAd = interstitialAd
                 adLoaded = true
 
                 if (timeoutTriggered) {
-                    // Timeout already triggered, but SAVE the ad for next time (don't waste it!)
+                    // Timeout already triggered, but ad loaded - it's saved for next time
                     Log.d("AdManager", "Ad loaded after timeout - saved for next show")
-                    AdDebugUtils.logEvent(currentAdUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show (not wasted)", true)
+                    AdDebugUtils.logEvent(currentAdUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
                     return
                 }
 
                 Log.d("AdManager", "Fresh interstitial ad loaded for force show")
                 AdDebugUtils.logEvent(currentAdUnitId, "onAdLoaded", "Fresh interstitial loaded for force show", true)
 
-                // Animate dialog dismissal
-                animateDialogDismissal(dialogViews) {
-                    showAd(activity, callback, false) // No reload - next force call fetches fresh anyway
+                val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+                // Animate dialog dismissal and show fresh ad
+                dismissDialogOnce {
+                    showAd(activity, callback, effectiveAutoReload)
                 }
             }
 
@@ -588,8 +756,11 @@ class AdManager() {
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
-                animateDialogDismissal(dialogViews) {
-                    callback.onNextAction()
+                // Try cached fallback before giving up
+                if (!showCachedFallback()) {
+                    dismissDialogOnce {
+                        callback.onNextAction()
+                    }
                 }
             }
         })
@@ -600,8 +771,12 @@ class AdManager() {
                 timeoutTriggered = true
                 Log.d("AdManager", "Force show interstitial timed out")
                 AdDebugUtils.logEvent(currentAdUnitId, "onTimeout", "Force show interstitial timed out", false)
-                animateDialogDismissal(dialogViews) {
-                    callback.onNextAction()
+
+                // Try cached fallback on timeout
+                if (!showCachedFallback()) {
+                    dismissDialogOnce {
+                        callback.onNextAction()
+                    }
                 }
             }
         }, timeoutMillis)
@@ -724,10 +899,41 @@ class AdManager() {
         }
     }
 
+    /**
+     * Check if ANY interstitial ad is ready in the pool.
+     * @return true if at least one ad is available to show
+     */
     fun isReady(): Boolean {
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
-        return mInterstitialAd != null && !purchaseProvider.isPurchased()
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) return false
+
+        // Check pool first, then legacy single ad
+        return adPool.isNotEmpty() || mInterstitialAd != null
     }
+
+    /**
+     * Check if a specific ad unit has an ad ready.
+     * @param adUnitId The ad unit ID to check
+     * @return true if this specific ad unit has an ad ready
+     */
+    fun isReady(adUnitId: String): Boolean {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) return false
+
+        return adPool.containsKey(adUnitId)
+    }
+
+    /**
+     * Get the number of ads currently in the pool.
+     * @return Number of ready ads
+     */
+    fun getPoolSize(): Int = adPool.size
+
+    /**
+     * Get all ad unit IDs that currently have ads ready.
+     * @return Set of ad unit IDs with ready ads
+     */
+    fun getReadyAdUnits(): Set<String> = adPool.keys.toSet()
 
     fun isDisplayingAd(): Boolean {
         return isDisplayingAd
@@ -764,76 +970,122 @@ class AdManager() {
         return elapsed > effectiveInterval
     }
     
+    /**
+     * Get any available ad from the pool.
+     * Returns the ad and its ad unit ID, or null if no ad is available.
+     */
+    private fun getAnyAvailableAd(): Pair<String, InterstitialAd>? {
+        // Try pool first
+        for ((unitId, ad) in adPool) {
+            return Pair(unitId, ad)
+        }
+
+        // Fallback to legacy single ad
+        mInterstitialAd?.let { ad ->
+            adUnitId?.let { unitId ->
+                return Pair(unitId, ad)
+            }
+        }
+
+        return null
+    }
+
     private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
-        if (isReady()) {
-            mInterstitialAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
-                override fun onAdDismissedFullScreenContent() {
-                    isDisplayingAd = false
-                    mInterstitialAd = null
-                    AdDebugUtils.logEvent(adUnitId ?: "", "onAdDismissed", "Interstitial ad dismissed", true)
-                    callback.onNextAction()
+        if (!isReady()) {
+            callback.onNextAction()
+            return
+        }
 
-                    // Log Firebase event for ad dismissed
-                    val params = Bundle().apply {
-                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    }
-                    firebaseAnalytics.logEvent("ad_dismissed", params)
+        // Get any available ad from the pool
+        val adPair = getAnyAvailableAd()
+        if (adPair == null) {
+            Log.w("AdManager", "No ad available in pool")
+            callback.onNextAction()
+            return
+        }
 
-                    // CRITICAL: Preload next ad immediately for better show rate
-                    if (reloadAd) {
-                        // Reset retry attempts for fresh start
-                        adUnitId?.let { retryAttempts.remove(it) }
-                        // Load immediately in background
-                        loadInterstitialAd(activity, adUnitId ?: "")
-                    }
+        val (shownAdUnitId, interstitialAd) = adPair
+
+        // Remove from pool (it's being shown)
+        adPool.remove(shownAdUnitId)
+
+        Log.d("AdManager", "Showing ad from unit: $shownAdUnitId (remaining in pool: ${adPool.size})")
+        AdDebugUtils.logEvent(shownAdUnitId, "showingFromPool", "Pool size after: ${adPool.size}", true)
+
+        interstitialAd.fullScreenContentCallback = object : FullScreenContentCallback() {
+            override fun onAdDismissedFullScreenContent() {
+                isDisplayingAd = false
+                mInterstitialAd = null
+                AdDebugUtils.logEvent(shownAdUnitId, "onAdDismissed", "Interstitial ad dismissed", true)
+                callback.onNextAction()
+
+                // Log Firebase event for ad dismissed
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
                 }
+                firebaseAnalytics.logEvent("ad_dismissed", params)
 
-                override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                    isDisplayingAd = false
-                    mInterstitialAd = null
-                    Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
-                    AdDebugUtils.logEvent(adUnitId ?: "", "onFailedToShow", "Interstitial failed to show: ${adError.message}", false)
-                    callback.onNextAction()
-
-                    // Log Firebase event for ad failed to show
-                    val params = Bundle().apply {
-                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                        putString("ad_error_code", adError.code.toString())
-                        if (AdManageKitConfig.enablePerformanceMetrics) {
-                            putString("error_message", adError.message)
-                        }
-                    }
-                    firebaseAnalytics.logEvent("ad_failed_to_show", params)
-                }
-
-                override fun onAdShowedFullScreenContent() {
-                    isDisplayingAd = true
-                    lastAdShowTime = System.currentTimeMillis()
-                    adDisplayCount++
-                    AdDebugUtils.logEvent(adUnitId ?: "", "onAdImpression", "Interstitial ad shown", true)
-
-                    // Log Firebase event for ad impression
-                    val params = Bundle().apply {
-                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    }
-                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                // CRITICAL: Reload the SPECIFIC unit that was shown
+                if (reloadAd) {
+                    retryAttempts.remove(shownAdUnitId)
+                    Log.d("AdManager", "Auto-reloading ad unit: $shownAdUnitId")
+                    loadInterstitialAd(activity, shownAdUnitId)
                 }
             }
-            mInterstitialAd?.onPaidEventListener =
-                OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
-                    val adValueInStandardUnits = adValue.valueMicros / 1000000.0
 
-                    // Log Firebase event for paid event
-                    val params = Bundle()
-                    params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                    params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-                    firebaseAnalytics!!.logEvent("ad_paid_event", params)
+            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                isDisplayingAd = false
+                mInterstitialAd = null
+                Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
+                AdDebugUtils.logEvent(shownAdUnitId, "onFailedToShow", "Interstitial failed to show: ${adError.message}", false)
+                callback.onNextAction()
+
+                // Log Firebase event for ad failed to show
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
+                    putString("ad_error_code", adError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", adError.message)
+                    }
                 }
-            mInterstitialAd?.show(activity)
-        } else {
-            callback.onNextAction()
+                firebaseAnalytics.logEvent("ad_failed_to_show", params)
+
+                // Still try to reload on show failure
+                if (reloadAd) {
+                    retryAttempts.remove(shownAdUnitId)
+                    loadInterstitialAd(activity, shownAdUnitId)
+                }
+            }
+
+            override fun onAdShowedFullScreenContent() {
+                isDisplayingAd = true
+                lastAdShowTime = System.currentTimeMillis()
+                adDisplayCount++
+                AdDebugUtils.logEvent(shownAdUnitId, "onAdImpression", "Interstitial ad shown", true)
+
+                // Log Firebase event for ad impression (standard event)
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
+                }
+                firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+
+                // Log detailed impression with per-user tracking
+                logAdImpression(shownAdUnitId, "interstitial")
+            }
         }
+
+        interstitialAd.onPaidEventListener = OnPaidEventListener { adValue ->
+            val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+
+            // Log Firebase event for paid event
+            val params = Bundle()
+            params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
+            params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+            params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+            firebaseAnalytics.logEvent("ad_paid_event", params)
+        }
+
+        interstitialAd.show(activity)
     }
     
     /**
@@ -1035,5 +1287,146 @@ class AdManager() {
         }
 
         handler.post(checkRunnable)
+    }
+
+    // =================== FIREBASE ANALYTICS TRACKING ===================
+
+    // Counters for session-level tracking
+    private var sessionAdRequests = 0
+    private var sessionAdFills = 0
+    private var sessionAdImpressions = 0
+
+    /**
+     * Log when an ad is requested (load initiated).
+     * Use this to calculate fill rate = fills / requests
+     */
+    private fun logAdRequest(adUnitId: String, adType: String) {
+        if (!::firebaseAnalytics.isInitialized) return
+
+        sessionAdRequests++
+
+        val params = Bundle().apply {
+            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            putString("ad_type", adType)
+            putLong("session_requests", sessionAdRequests.toLong())
+            putInt("pool_size", adPool.size)
+        }
+        firebaseAnalytics.logEvent("ad_request", params)
+
+        // Update user property for total lifetime requests
+        firebaseAnalytics.setUserProperty("total_ad_requests", sessionAdRequests.toString())
+    }
+
+    /**
+     * Log when an ad is successfully loaded (fill).
+     * Fill rate = fills / requests
+     */
+    private fun logAdFill(adUnitId: String, adType: String) {
+        if (!::firebaseAnalytics.isInitialized) return
+
+        sessionAdFills++
+
+        val fillRate = if (sessionAdRequests > 0) {
+            (sessionAdFills.toFloat() / sessionAdRequests * 100).toInt()
+        } else 0
+
+        val params = Bundle().apply {
+            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            putString("ad_type", adType)
+            putLong("session_fills", sessionAdFills.toLong())
+            putLong("session_requests", sessionAdRequests.toLong())
+            putInt("fill_rate_percent", fillRate)
+            putInt("pool_size", adPool.size)
+        }
+        firebaseAnalytics.logEvent("ad_fill", params)
+
+        // Update user properties
+        firebaseAnalytics.setUserProperty("total_ad_fills", sessionAdFills.toString())
+        firebaseAnalytics.setUserProperty("ad_fill_rate", "$fillRate%")
+    }
+
+    /**
+     * Log when an ad is actually shown to the user (impression).
+     * Show rate = impressions / fills
+     */
+    private fun logAdImpression(adUnitId: String, adType: String) {
+        if (!::firebaseAnalytics.isInitialized) return
+
+        sessionAdImpressions++
+
+        val showRate = if (sessionAdFills > 0) {
+            (sessionAdImpressions.toFloat() / sessionAdFills * 100).toInt()
+        } else 0
+
+        val fillRate = if (sessionAdRequests > 0) {
+            (sessionAdFills.toFloat() / sessionAdRequests * 100).toInt()
+        } else 0
+
+        val params = Bundle().apply {
+            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            putString("ad_type", adType)
+            putLong("session_impressions", sessionAdImpressions.toLong())
+            putLong("session_fills", sessionAdFills.toLong())
+            putLong("session_requests", sessionAdRequests.toLong())
+            putInt("show_rate_percent", showRate)
+            putInt("fill_rate_percent", fillRate)
+            putLong("total_ads_shown", adDisplayCount.toLong())
+        }
+        firebaseAnalytics.logEvent("ad_impression_detailed", params)
+
+        // Update user properties for segmentation
+        firebaseAnalytics.setUserProperty("total_ads_shown", adDisplayCount.toString())
+        firebaseAnalytics.setUserProperty("ad_show_rate", "$showRate%")
+    }
+
+    /**
+     * Log when an ad is not shown (skipped, no fill, timeout, etc.)
+     */
+    private fun logAdNotShown(adUnitId: String, reason: String) {
+        if (!::firebaseAnalytics.isInitialized) return
+
+        val params = Bundle().apply {
+            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            putString("reason", reason)
+            putInt("pool_size", adPool.size)
+            putLong("session_requests", sessionAdRequests.toLong())
+            putLong("session_fills", sessionAdFills.toLong())
+        }
+        firebaseAnalytics.logEvent("ad_not_shown", params)
+    }
+
+    /**
+     * Get current session ad statistics.
+     * Useful for debugging and in-app analytics display.
+     */
+    fun getAdStats(): Map<String, Any> {
+        val fillRate = if (sessionAdRequests > 0) {
+            (sessionAdFills.toFloat() / sessionAdRequests * 100)
+        } else 0f
+
+        val showRate = if (sessionAdFills > 0) {
+            (sessionAdImpressions.toFloat() / sessionAdFills * 100)
+        } else 0f
+
+        return mapOf(
+            "session_requests" to sessionAdRequests,
+            "session_fills" to sessionAdFills,
+            "session_impressions" to sessionAdImpressions,
+            "fill_rate_percent" to fillRate,
+            "show_rate_percent" to showRate,
+            "total_ads_shown" to adDisplayCount,
+            "pool_size" to adPool.size,
+            "ready_units" to getReadyAdUnits()
+        )
+    }
+
+    /**
+     * Reset session ad statistics.
+     * Call this at the start of a new session if needed.
+     */
+    fun resetAdStats() {
+        sessionAdRequests = 0
+        sessionAdFills = 0
+        sessionAdImpressions = 0
     }
 }

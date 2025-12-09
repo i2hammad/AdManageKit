@@ -108,11 +108,23 @@ class MyApplication : Application() {
             // appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND
             // nativeLoadingStrategy = AdLoadingStrategy.ON_DEMAND
 
+            // Option 4: FRESH_WITH_CACHE_FALLBACK - Best for RecyclerView/lists
+            // - Always tries to load fresh ad first
+            // - Falls back to cache if fresh load fails
+            // - Shows shimmer while loading fresh (native ads)
+            // - Best for: RecyclerViews, feeds with multiple ad slots
+            // nativeLoadingStrategy = AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK
+
             // You can also mix strategies for different ad types:
             // Example: Smooth app opens, aggressive interstitials, instant natives
             // appOpenLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
             // interstitialLoadingStrategy = AdLoadingStrategy.ON_DEMAND
             // nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+
+            // =================== CROSS AD UNIT FALLBACK ===================
+            // Enable to allow native ads from ANY cached ad unit when requested unit has no cache
+            // Useful for RecyclerView scenarios where showing any ad is better than empty space
+            enableCrossAdUnitFallback = false
 
             // =================== CACHE MANAGEMENT ===================
             cacheCleanupInterval = (5 * 60).seconds // 5 minutes for testing

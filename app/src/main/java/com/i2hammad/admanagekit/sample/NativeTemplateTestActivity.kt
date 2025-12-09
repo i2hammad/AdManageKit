@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.gms.ads.AdError
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdTemplate
 import com.i2hammad.admanagekit.admob.NativeTemplateView
@@ -28,9 +29,15 @@ class NativeTemplateTestActivity : AppCompatActivity() {
     private lateinit var btnLoadAd: Button
     private lateinit var tvCurrentTemplate: TextView
     private lateinit var tvTemplateInfo: TextView
+    private lateinit var switchVideoAd: SwitchMaterial
+    private lateinit var tvAdUnitInfo: TextView
 
-    private val adUnitId = "ca-app-pub-3940256099942544/2247696110" // Test ad unit
-//    private val adUnitId = "ca-app-pub-3940256099942544/1044960115" // Test ad unit
+    // Test ad units
+    private val standardAdUnitId = "ca-app-pub-3940256099942544/2247696110" // Test native ad unit
+    private val videoAdUnitId = "ca-app-pub-3940256099942544/1044960115" // Test video native unit
+
+    private val currentAdUnitId: String
+        get() = if (switchVideoAd.isChecked) videoAdUnitId else standardAdUnitId
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +60,23 @@ class NativeTemplateTestActivity : AppCompatActivity() {
         btnLoadAd = findViewById(R.id.btnLoadAd)
         tvCurrentTemplate = findViewById(R.id.tvCurrentTemplate)
         tvTemplateInfo = findViewById(R.id.tvTemplateInfo)
+        switchVideoAd = findViewById(R.id.switchVideoAd)
+        tvAdUnitInfo = findViewById(R.id.tvAdUnitInfo)
+
+        // Setup video ad switch listener
+        switchVideoAd.setOnCheckedChangeListener { _, isChecked ->
+            updateAdUnitInfo(isChecked)
+            loadAd()
+        }
+        updateAdUnitInfo(switchVideoAd.isChecked)
+    }
+
+    private fun updateAdUnitInfo(isVideoAd: Boolean) {
+        tvAdUnitInfo.text = if (isVideoAd) {
+            "Video Native Ad (1044960115)"
+        } else {
+            "Standard Native Ad (2247696110)"
+        }
     }
 
     private fun setupSpinner() {
@@ -107,7 +131,8 @@ class NativeTemplateTestActivity : AppCompatActivity() {
 
     private fun loadAd() {
         val currentTemplate = nativeTemplateView.getTemplate()
-        Log.d(TAG, "Loading ad for template: ${currentTemplate.name}")
+        val adUnitId = currentAdUnitId
+        Log.d(TAG, "Loading ad for template: ${currentTemplate.name}, adUnit: $adUnitId")
 
         btnLoadAd.isEnabled = false
         btnLoadAd.text = "Loading..."
@@ -162,6 +187,7 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.SOCIAL_FEED -> "Instagram/Facebook sponsored post style"
             NativeAdTemplate.GRADIENT_CARD -> "Hero card with gradient overlay on media"
             NativeAdTemplate.PILL_BANNER -> "Compact pill-shaped banner with rounded corners"
+            NativeAdTemplate.MEDIUM_HORIZONTAL -> "Horizontal split: 55% media left, 45% content right"
             NativeAdTemplate.SPOTLIGHT -> "Centered hero with large icon & full-width CTA"
 
             // Video Templates

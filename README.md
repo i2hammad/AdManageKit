@@ -5,24 +5,31 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `2.9.0`** adds **Enhanced Billing**, **6 New Native Templates**, and critical **Bug Fixes**.
+**Latest Version `3.0.0`** adds **Ad Pool System**, **Smart Splash Ads**, and **Enhanced Analytics**.
 
-## What's New in 2.9.0
+## What's New in 3.0.0
 
-### Billing Module Enhancements
-- **Purchase Categories**: CONSUMABLE, FEATURE_UNLOCK, LIFETIME_PREMIUM, REMOVE_ADS
-- **Subscription Lifecycle**: Active, Cancelled, Expired state detection
-- **Upgrade/Downgrade**: Full subscription change support with proration modes
-- **Manual Consumption**: Full control over consumable product flow
-- **Enhanced PurchaseResult**: originalJson, signature, account identifiers
+### Ad Pool System
+- **Multiple Ad Units**: Load multiple interstitial ad units into a pool for maximum show rate
+- **Auto-Selection**: Shows ANY available ad from the pool when requested
+- **Duplicate Prevention**: Automatically skips duplicate load requests
 
-### Native Ad Templates
-- **6 New Templates**: APP_STORE, SOCIAL_FEED, GRADIENT_CARD, PILL_BANNER, SPOTLIGHT, MEDIA_CONTENT_SPLIT
-- **AdChoices Control**: Configure placement position programmatically or via XML
+### Smart Splash Ads
+- **showOrWaitForAd()**: Single method handles all splash scenarios automatically
+- **Intelligent Behavior**: Shows cached ad immediately, waits if loading, or fetches fresh
 
-### Bug Fixes
-- Fixed dialog crash when activity destroyed (View not attached to window manager)
-- Fixed welcome dialog crash on non-Material themes
+### App Open Ad Prefetching
+- **prefetchNextAd()**: Prefetch ads before external intents for instant display on return
+- **isAdLoading()**: Check if ad is currently being fetched
+
+### Enhanced Analytics
+- **Session Tracking**: Fill rate, show rate, and impression tracking
+- **getAdStats()**: Access session-level ad performance metrics
+
+### Technical Improvements
+- Modern `WindowInsetsController` API (replaces deprecated systemUiVisibility)
+- Thread-safe ad pool with `ConcurrentHashMap`
+- Cross-ad-unit fallback for native ads
 
 ## Screenshots
 
@@ -55,12 +62,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.9.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.9.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.0.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.0.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -68,7 +75,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.9.0'
 ## Features
 
 ### NativeTemplateView (v2.6.0+)
-- **23 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, spotlight, and more
+- **24 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, spotlight, and more
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
 - **AdChoices Control**: Configure placement position (v2.9.0+)
@@ -181,6 +188,7 @@ class MyApp : Application() {
 | `social_feed` | Feed integration (v2.9.0+) |
 | `gradient_card` | Premium feel (v2.9.0+) |
 | `pill_banner` | Inline placement (v2.9.0+) |
+| `medium_horizontal` | 55/45 media-content split (v3.0.0+) |
 | `spotlight` | High visibility (v2.9.0+) |
 | `media_content_split` | Balanced display (v2.9.0+) |
 | `video_small/medium/large` | Video content |
@@ -423,7 +431,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
-- [Release Notes v2.9.0](docs/release-notes/RELEASE_NOTES_v2.9.0.md)
+- [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
 - [API Reference](docs/API_REFERENCE.md)
 
 ### Wiki (Billing)
@@ -448,6 +456,50 @@ Output: `build/dokka/htmlMultiModule/index.html`
 ---
 
 ## Migration Guide
+
+### Migrating to 3.0.0
+
+Version 3.0.0 is **fully backward compatible**. Optionally adopt new features:
+
+#### Smart Splash Ads (Recommended)
+
+Replace separate load + show calls with single `showOrWaitForAd()`:
+
+```kotlin
+// Before (v2.9.0) - Two-step approach
+AdManager.getInstance().loadInterstitialAdForSplash(this, adUnitId, 10_000, object : AdManagerCallback() {
+    override fun onNextAction() {
+        AdManager.getInstance().forceShowInterstitial(this@SplashActivity, callback)
+    }
+})
+
+// After (v3.0.0) - Single smart call
+AdManager.getInstance().showOrWaitForAd(
+    activity = this,
+    callback = object : AdManagerCallback() {
+        override fun onNextAction() { navigateNext() }
+    },
+    timeoutMillis = 10_000
+)
+```
+
+#### Ad Pool for Higher Show Rate
+
+```kotlin
+// Before (single ad unit)
+AdManager.getInstance().loadInterstitialAd(context, "single_unit")
+
+// After (multiple ad units for redundancy)
+AdManager.getInstance().loadMultipleAdUnits(context, "high_ecpm", "medium_ecpm", "fallback")
+```
+
+#### App Open Ad Prefetching
+
+```kotlin
+// Prefetch before external intents
+appOpenManager.prefetchNextAd()
+startActivityForResult(cameraIntent, REQUEST_CODE)
+```
 
 ### Migrating to 2.9.0
 

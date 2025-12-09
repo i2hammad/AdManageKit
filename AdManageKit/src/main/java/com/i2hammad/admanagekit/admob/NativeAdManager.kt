@@ -207,9 +207,18 @@ object NativeAdManager {
     /**
      * Retrieves a cached native ad for the specified ad unit with enhanced tracking.
      *
+     * **IMPORTANT: Destructive Read Pattern**
+     * This method REMOVES the ad from cache when retrieved. This is by design:
+     * - Each cached ad should only be displayed once
+     * - Prevents stale ad references and memory leaks
+     * - Ensures proper ad lifecycle management
+     *
+     * If you need to check cache availability without consuming, use [getCacheSize] instead.
+     *
      * @param adUnitId The ad unit ID
-     * @param enableFallbackToAnyAd If true, returns any available cached ad when specific ad unit has no cache
-     * @return A cached native ad, or null if none available
+     * @param enableFallbackToAnyAd If true, returns any available cached ad when specific ad unit has no cache.
+     *        Fallback priority: same base ad unit variants → cross ad unit (if enableCrossAdUnitFallback = true)
+     * @return A cached native ad, or null if none available. The returned ad is REMOVED from cache.
      */
     @JvmOverloads
     fun getCachedNativeAd(adUnitId: String, enableFallbackToAnyAd: Boolean = false): NativeAd? {
@@ -342,9 +351,75 @@ object NativeAdManager {
             }
         }
 
-        // No cached ads found for the same ad unit
+        // No cached ads found for the same ad unit - try cross-ad-unit fallback if enabled
+        if (AdManageKitConfig.enableCrossAdUnitFallback) {
+            logDebug("Same ad unit fallback failed, trying cross-ad-unit fallback for $requestedAdUnitId")
+            return getCrossAdUnitFallback(requestedAdUnitId)
+        }
+
         cacheMisses.incrementAndGet()
         logDebug("Fallback failed for $requestedAdUnitId: no cached ads available for the same ad unit")
+        return null
+    }
+
+    /**
+     * Cross ad unit fallback - returns ANY available cached ad from ANY ad unit.
+     * Used when enableCrossAdUnitFallback is true and no ads are found for the same base ad unit.
+     *
+     * @param requestedAdUnitId The originally requested ad unit ID (for logging)
+     * @return A cached native ad from any ad unit, or null if no ads are cached
+     */
+    private fun getCrossAdUnitFallback(requestedAdUnitId: String): NativeAd? {
+        val currentTime = System.currentTimeMillis()
+        val availableAdUnits = cachedAds.keys.toList()
+
+        // Sort by ad units with most cached ads (prioritize units with more ads)
+        val sortedAdUnits = availableAdUnits.sortedByDescending { adUnitId ->
+            cachedAds[adUnitId]?.size ?: 0
+        }
+
+        for (fallbackAdUnitId in sortedAdUnits) {
+            synchronized(getLockForAdUnit(fallbackAdUnitId)) {
+                val adList = cachedAds[fallbackAdUnitId]
+                if (adList != null && adList.isNotEmpty()) {
+                    // Clean up expired ads first
+                    cleanupExpiredAds(fallbackAdUnitId, adList, currentTime)
+
+                    // Get the most recent valid ad
+                    val validAd = adList.lastOrNull()
+
+                    if (validAd != null) {
+                        // Update access statistics
+                        validAd.lastAccessTime = currentTime
+                        validAd.accessCount++
+
+                        // Remove from cache
+                        adList.remove(validAd)
+
+                        // Update performance counters
+                        cacheHits.incrementAndGet()
+                        totalAdsServed.incrementAndGet()
+
+                        val ageMs = validAd.getAgeMs(currentTime)
+                        logDebug("Cross-ad-unit fallback hit: requested $requestedAdUnitId, served from $fallbackAdUnitId (age: ${ageMs}ms)")
+
+                        // Track analytics with cross-fallback flag
+                        trackEvent("native_ad_served", mapOf(
+                            "ad_unit_id" to requestedAdUnitId,
+                            "fallback_ad_unit_id" to fallbackAdUnitId,
+                            "age_ms" to ageMs,
+                            "access_count" to validAd.accessCount,
+                            "source" to "cache_fallback_cross_unit"
+                        ))
+
+                        return validAd.ad
+                    }
+                }
+            }
+        }
+
+        cacheMisses.incrementAndGet()
+        logDebug("Cross-ad-unit fallback failed for $requestedAdUnitId: no cached ads available in any ad unit")
         return null
     }
 

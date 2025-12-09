@@ -114,12 +114,44 @@
                         android:textSize="12sp"
                         android:textColor="#757575" />
 
+                    <!-- Ad Type Toggle -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Use Video Native Ad"
+                            android:textSize="14sp"
+                            android:textColor="#424242" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchVideoAd"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/tvAdUnitInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:text="Standard Native Ad"
+                        android:textSize="11sp"
+                        android:textColor="#9E9E9E" />
+
                     <!-- Load Button -->
                     <Button
                         android:id="@+id/btnLoadAd"
                         android:layout_width="match_parent"
                         android:layout_height="48dp"
-                        android:layout_marginTop="16dp"
+                        android:layout_marginTop="12dp"
                         android:text="Load Ad"
                         android:textAllCaps="false"
                         android:backgroundTint="?attr/colorPrimary" />
@@ -156,7 +188,7 @@
                         android:id="@+id/nativeTemplateView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        app:adTemplate="pill_banner" />
+                        app:adTemplate="medium_horizontal" />
 
                 </FrameLayout>
 
@@ -179,7 +211,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Available Templates (17)"
+                        android:text="Available Templates (24)"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="#212121" />
@@ -188,7 +220,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Standard Templates (11):\ncard_modern, material3, minimal, compact_horizontal, story_style, full_width_banner, grid_card, list_item, featured, overlay_dark, magazine"
+                        android:text="Standard Templates (18):\ncard_modern, material3, minimal, compact_horizontal, story_style, full_width_banner, grid_card, list_item, featured, overlay_dark, magazine, media_content_split, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, spotlight"
                         android:textSize="12sp"
                         android:textColor="#616161"
                         android:lineSpacingExtra="4dp" />

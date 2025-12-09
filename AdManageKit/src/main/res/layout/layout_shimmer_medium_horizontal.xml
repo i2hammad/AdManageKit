@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/ads_bg_lib"
+    android:orientation="horizontal"
+    android:padding="8dp">
+
+    <!-- Left side: Media placeholder (55% width) -->
+    <View
+        android:layout_width="0dp"
+        android:layout_height="140dp"
+        android:layout_weight="0.55"
+        android:background="@color/lightTransparent" />
+
+    <!-- Right side: Content placeholders (45% width) -->
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.45"
+        android:layout_gravity="center_vertical"
+        android:layout_marginStart="8dp"
+        android:orientation="vertical">
+
+        <!-- Ad badge placeholder -->
+        <View
+            android:layout_width="30dp"
+            android:layout_height="16dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- App icon placeholder -->
+        <View
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="4dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- Headline placeholder -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="12dp"
+            android:layout_marginTop="6dp"
+            android:background="@color/lightTransparent" />
+
+        <View
+            android:layout_width="80dp"
+            android:layout_height="10dp"
+            android:layout_marginTop="4dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- Body placeholder -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="10dp"
+            android:layout_marginTop="4dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- CTA Button placeholder -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/lightTransparent" />
+
+    </LinearLayout>
+
+</LinearLayout>

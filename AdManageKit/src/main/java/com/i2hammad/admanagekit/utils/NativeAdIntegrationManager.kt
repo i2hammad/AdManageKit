@@ -28,33 +28,53 @@ object NativeAdIntegrationManager {
     // Screen type identifiers
     enum class ScreenType(val suffix: String) {
         SMALL("_small"),
-        MEDIUM("_medium"), 
+        MEDIUM("_medium"),
         LARGE("_large"),
         GENERIC("_generic")
     }
-    
+
+    // Error codes
+    /** Error code for cache miss when using ONLY_CACHE strategy */
+    const val ERROR_CODE_CACHE_MISS = 1002
+
     // Ad request tracking
     private val screenAdRequests = ConcurrentHashMap<String, AtomicLong>()
     private val activeScreens = ConcurrentHashMap<String, ScreenContext>()
 
-    // Temporary cache for passing cached ads to callers
-    private var temporarilyCachedAd: NativeAd? = null
-    private var cachedAdScreenKey: String? = null
+    // Thread-safe temporary cache for passing cached ads to callers
+    // Uses ConcurrentHashMap to prevent race conditions in concurrent scenarios (e.g., RecyclerView)
+    private val temporarilyCachedAds = ConcurrentHashMap<String, NativeAd>()
+
+    /**
+     * Stores a temporarily cached ad for a specific screen key.
+     * Thread-safe for concurrent access from multiple screens/RecyclerView items.
+     */
+    private fun setTemporaryCachedAd(screenKey: String, ad: NativeAd) {
+        temporarilyCachedAds[screenKey] = ad
+        logDebug("Stored temporarily cached ad for $screenKey")
+    }
 
     /**
      * Retrieves and clears a temporarily cached ad if available.
      * This is used when the integration manager finds a cached ad and needs to pass it to the caller.
+     * Thread-safe: Uses ConcurrentHashMap.remove() which is atomic.
      */
     fun getAndClearTemporaryCachedAd(screenKey: String): NativeAd? {
-        return if (cachedAdScreenKey == screenKey) {
-            val ad = temporarilyCachedAd
-            temporarilyCachedAd = null
-            cachedAdScreenKey = null
+        val ad = temporarilyCachedAds.remove(screenKey)
+        if (ad != null) {
             logDebug("Retrieved temporarily cached ad for $screenKey")
-            ad
-        } else {
-            null
         }
+        return ad
+    }
+
+    /**
+     * Clears all temporarily cached ads.
+     * Useful for cleanup on low memory or activity destruction.
+     */
+    fun clearAllTemporaryCachedAds() {
+        val count = temporarilyCachedAds.size
+        temporarilyCachedAds.clear()
+        logDebug("Cleared $count temporarily cached ads")
     }
     
     /**
@@ -96,16 +116,8 @@ object NativeAdIntegrationManager {
         trackScreenUsage(screenKey, baseAdUnitId, screenType)
 
         // Determine behavior based on loading strategy (use override if provided, otherwise use global config)
-        // IMPORTANT: ONLY_CACHE is NOT recommended for native ads - convert to HYBRID
-        // Native ads should use HYBRID or ON_DEMAND only (shimmer UX, no dialogs)
-        val requestedStrategy = loadingStrategy ?: AdManageKitConfig.nativeLoadingStrategy
-        val effectiveStrategy = if (requestedStrategy == AdLoadingStrategy.ONLY_CACHE) {
-            logDebug("⚠️ ONLY_CACHE not recommended for native ads, converting to HYBRID")
-            AdLoadingStrategy.HYBRID
-        } else {
-            requestedStrategy
-        }
-        logDebug("Loading ad for screen: $screenKey, adUnit: $enhancedAdUnitId, strategy: $effectiveStrategy (requested: $requestedStrategy, override: ${loadingStrategy != null}), useCachedAd: $useCachedAd")
+        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.nativeLoadingStrategy
+        logDebug("Loading ad for screen: $screenKey, adUnit: $enhancedAdUnitId, strategy: $effectiveStrategy, useCachedAd: $useCachedAd")
 
         when (effectiveStrategy) {
             AdLoadingStrategy.ON_DEMAND -> {
@@ -118,9 +130,31 @@ object NativeAdIntegrationManager {
                 loadNewAd(enhancedAdUnitId, enhancedCallback)
             }
 
-            // Note: ONLY_CACHE is converted to HYBRID above for native ads
-            // This case should never execute but is kept for completeness
-            AdLoadingStrategy.ONLY_CACHE,
+            AdLoadingStrategy.ONLY_CACHE -> {
+                // Only show if cached, fail immediately if not (no network call)
+                // Ideal for smooth UX where showing nothing is better than waiting
+                if (NativeAdManager.enableCachingNativeAds) {
+                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
+
+                    if (cachedAd != null) {
+                        logDebug("ONLY_CACHE strategy: cache hit for $screenKey, serving cached ad")
+                        setTemporaryCachedAd(screenKey, cachedAd)
+                        callback?.onAdLoaded()
+                        return
+                    }
+                }
+
+                // No cached ad - fail immediately (no network call)
+                logDebug("ONLY_CACHE strategy: cache miss for $screenKey, failing immediately (no network)")
+                callback?.onFailedToLoad(
+                    com.google.android.gms.ads.AdError(
+                        ERROR_CODE_CACHE_MISS,
+                        "No cached ad available (ONLY_CACHE strategy)",
+                        "AdManageKit"
+                    )
+                )
+            }
+
             AdLoadingStrategy.HYBRID -> {
                 // Try cache first, load fresh if not available
                 if (useCachedAd && NativeAdManager.enableCachingNativeAds) {
@@ -128,8 +162,7 @@ object NativeAdIntegrationManager {
 
                     if (cachedAd != null) {
                         logDebug("HYBRID strategy: cache hit for $screenKey, serving cached ad")
-                        temporarilyCachedAd = cachedAd
-                        cachedAdScreenKey = screenKey
+                        setTemporaryCachedAd(screenKey, cachedAd)
                         return // Let the caller handle displaying the cached ad
                     } else {
                         logDebug("HYBRID strategy: cache miss for $screenKey, loading new ad")
@@ -142,6 +175,17 @@ object NativeAdIntegrationManager {
                     callback, loadNewAd, retryAttempt, loadingStrategy
                 )
                 loadNewAd(enhancedAdUnitId, enhancedCallback)
+            }
+
+            AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
+                // Load fresh ad first, fall back to cache if loading fails
+                // Ideal for RecyclerView scenarios
+                logDebug("FRESH_WITH_CACHE_FALLBACK strategy: loading fresh ad for $screenKey")
+                val freshWithFallbackCallback = createFreshWithCacheFallbackCallback(
+                    activity, baseAdUnitId, screenType, enhancedAdUnitId, screenKey,
+                    callback, loadNewAd, retryAttempt, loadingStrategy
+                )
+                loadNewAd(enhancedAdUnitId, freshWithFallbackCallback)
             }
         }
     }
@@ -340,14 +384,119 @@ object NativeAdIntegrationManager {
             }
         }
     }
-    
+
+    /**
+     * Creates callback for FRESH_WITH_CACHE_FALLBACK strategy.
+     * - Tries to load fresh ad first
+     * - On success: caches the ad and notifies callback
+     * - On failure: falls back to cached ad if available
+     *
+     * Ideal for RecyclerView scenarios where ads may be requested multiple times.
+     */
+    private fun createFreshWithCacheFallbackCallback(
+        activity: Activity,
+        baseAdUnitId: String,
+        screenType: ScreenType,
+        enhancedAdUnitId: String,
+        screenKey: String,
+        originalCallback: AdLoadCallback?,
+        loadNewAd: (String, AdLoadCallback?) -> Unit,
+        retryAttempt: Int,
+        loadingStrategy: AdLoadingStrategy?
+    ): AdLoadCallback {
+        return object : AdLoadCallback() {
+            override fun onAdLoaded() {
+                // Cancel any pending retry for this ad unit
+                AdRetryManager.getInstance().cancelRetry(enhancedAdUnitId)
+
+                logDebug("FRESH_WITH_CACHE_FALLBACK: Ad loaded successfully for $screenKey (attempt ${retryAttempt + 1})")
+
+                // Note: The actual NativeAd object is handled by the caller (NativeBanner views)
+                // They will cache it via NativeAdManager after receiving this callback
+                originalCallback?.onAdLoaded()
+            }
+
+            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+                logDebug("FRESH_WITH_CACHE_FALLBACK: Fresh load failed for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
+
+                // Fall back to cached ad
+                if (NativeAdManager.enableCachingNativeAds) {
+                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
+                    if (cachedAd != null) {
+                        logDebug("FRESH_WITH_CACHE_FALLBACK: Using cached ad as fallback for $screenKey")
+                        setTemporaryCachedAd(screenKey, cachedAd)
+                        originalCallback?.onAdLoaded()
+                        return
+                    }
+                }
+
+                // No cached ad available, check if we should retry
+                val shouldRetry = when (error) {
+                    is LoadAdError -> {
+                        // Retry for network errors and internal errors
+                        error.code in listOf(0, 2)
+                    }
+                    else -> false
+                }
+
+                if (shouldRetry) {
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = enhancedAdUnitId,
+                        attempt = retryAttempt
+                    ) {
+                        loadNativeAdWithCaching(
+                            activity = activity,
+                            baseAdUnitId = baseAdUnitId,
+                            screenType = screenType,
+                            useCachedAd = false,
+                            loadingStrategy = loadingStrategy,
+                            callback = originalCallback,
+                            retryAttempt = retryAttempt + 1,
+                            loadNewAd = loadNewAd
+                        )
+                    }
+                } else {
+                    // No retry, no cache - pass error to callback
+                    originalCallback?.onFailedToLoad(error)
+                }
+            }
+
+            override fun onAdClicked() {
+                logDebug("Ad clicked for $screenKey")
+                originalCallback?.onAdClicked()
+            }
+
+            override fun onAdClosed() {
+                originalCallback?.onAdClosed()
+            }
+
+            override fun onAdImpression() {
+                logDebug("Ad impression for $screenKey")
+                originalCallback?.onAdImpression()
+            }
+
+            override fun onAdOpened() {
+                originalCallback?.onAdOpened()
+            }
+
+            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+                logDebug("Paid event for $screenKey: ${adValue.valueMicros}")
+                originalCallback?.onPaidEvent(adValue)
+            }
+        }
+    }
+
     /**
      * Caches a native ad with screen-aware strategy.
      *
      * NOTE: Only use this for PRELOADING ads that will be displayed later.
      * Do NOT cache ads that are being displayed immediately - they should be consumed, not cached.
      * Ads expire after 1 hour, so caching displayed ads wastes memory and causes stale references.
+     *
+     * @since 2.1.0
+     * @suppress This is an advanced API for custom preloading scenarios.
      */
+    @Suppress("unused")
     fun cacheNativeAdWithScreenContext(
         baseAdUnitId: String,
         screenType: ScreenType,
@@ -378,7 +527,11 @@ object NativeAdIntegrationManager {
     
     /**
      * Preloads ads for active screens based on usage patterns.
+     * Requires enableSmartPreloading = true in AdManageKitConfig.
+     *
+     * @suppress This is an advanced API for smart preloading scenarios.
      */
+    @Suppress("unused")
     fun preloadAdsForActiveScreens(onComplete: ((Int, Int) -> Unit)? = null) {
         if (!NativeAdManager.enableCachingNativeAds || !AdManageKitConfig.enableSmartPreloading) {
             onComplete?.invoke(0, 0)
@@ -450,7 +603,10 @@ object NativeAdIntegrationManager {
     
     /**
      * Clears screen usage tracking and caches for a specific screen.
+     *
+     * @suppress This is an advanced API for cache management.
      */
+    @Suppress("unused")
     fun clearScreenCache(screenKey: String) {
         activeScreens[screenKey]?.let { context ->
             val screenSpecificKey = "${context.adUnitId}${context.screenType.suffix}"
@@ -464,8 +620,12 @@ object NativeAdIntegrationManager {
     }
     
     /**
-     * Optimizes cache distribution across screens.
+     * Optimizes cache distribution across screens based on usage patterns.
+     * Redistributes cache capacity from low-usage to high-usage screens.
+     *
+     * @suppress This is an advanced API for cache optimization.
      */
+    @Suppress("unused")
     fun optimizeCacheDistribution() {
         val stats = getScreenUsageStats()
         logDebug("Cache optimization: analyzing ${stats.size} active screens")

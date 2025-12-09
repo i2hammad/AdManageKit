@@ -485,6 +485,13 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                     showWithDialog(showCallback, onComplete)
                 }
             }
+
+            AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
+                // Try fresh first, fall back to cache if fresh load fails/times out
+                // AdManager.forceShowInterstitialInternal now preserves cached ad as fallback
+                if (debugMode) android.util.Log.d("InterstitialBuilder", "FRESH_WITH_CACHE_FALLBACK: Fetching fresh, cached ad as fallback")
+                showWithDialog(showCallback, onComplete)
+            }
         }
     }
 

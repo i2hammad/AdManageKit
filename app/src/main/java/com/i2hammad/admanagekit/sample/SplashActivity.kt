@@ -132,7 +132,7 @@ class SplashActivity : AppCompatActivity() {
         Log.d("SplashActivity", "forceShowSplashAd: Attempting to show interstitial ad")
         statusTextView.text = "Showing interstitial ad..."
 
-        AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
+        AdManager.getInstance().showInterstitialIfReady(this, object : AdManagerCallback() {
             override fun onNextAction() {
                 super.onNextAction()
                 Log.d("SplashActivity", "forceShowSplashAd: Interstitial ad shown or dismissed")

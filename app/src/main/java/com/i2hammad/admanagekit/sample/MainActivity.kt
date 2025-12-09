@@ -111,7 +111,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Medium Native Ad Skipped (No Cache)", Toast.LENGTH_SHORT).show()
                 }
             },
-            loadingStrategy = AdLoadingStrategy.ONLY_CACHE  // Override: Only show cached ads
+            loadingStrategy = AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK  // Override: Only show cached ads
         )
 
         // =================== EXAMPLE 3: Override with ON_DEMAND Strategy ===================
@@ -170,6 +170,7 @@ class MainActivity : AppCompatActivity() {
             AdLoadingStrategy.ON_DEMAND -> "Always fetches fresh ad with shimmer"
             AdLoadingStrategy.ONLY_CACHE -> "Only shows cached ads, skips if not available"
             AdLoadingStrategy.HYBRID -> "Shows cached instantly, or fetches if needed"
+            AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> "Fresh with Cache Fallback"
         }
     }
 

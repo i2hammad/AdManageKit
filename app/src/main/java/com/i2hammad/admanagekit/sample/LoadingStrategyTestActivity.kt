@@ -44,10 +44,20 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
     private lateinit var statusTextView: TextView
     private lateinit var cacheStatusTextView: TextView
     private lateinit var smartPreloadSwitch: SwitchMaterial
+    private lateinit var crossAdUnitFallbackSwitch: SwitchMaterial
+    private lateinit var adPoolStatusTextView: TextView
+    private lateinit var adStatsTextView: TextView
     private lateinit var nativeLargeView: NativeLarge
     private lateinit var nativeMediumView: NativeBannerMedium
     private lateinit var nativeSmallView: NativeBannerSmall
     private lateinit var bannerView: BannerAdView
+
+    // Multiple ad unit IDs for ad pool testing
+    private val interstitialAdUnitIds = listOf(
+        "ca-app-pub-3940256099942544/1033173712",  // Test interstitial 1
+        "ca-app-pub-3940256099942544/1033173712",  // Test interstitial 2 (same ID for testing)
+        "ca-app-pub-3940256099942544/1033173712"   // Test interstitial 3
+    )
 
     // Current strategy
     private var currentStrategy: AdLoadingStrategy = AdLoadingStrategy.HYBRID
@@ -60,6 +70,8 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
         setupListeners()
         updateStatusText()
         updateCacheStatus()
+        updateAdPoolStatus()
+        updateAdStats()
 
         logTestInfo()
     }
@@ -69,13 +81,17 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
         statusTextView = findViewById(R.id.statusTextView)
         cacheStatusTextView = findViewById(R.id.cacheStatusTextView)
         smartPreloadSwitch = findViewById(R.id.switchSmartPreload)
+        crossAdUnitFallbackSwitch = findViewById(R.id.switchCrossAdUnitFallback)
+        adPoolStatusTextView = findViewById(R.id.adPoolStatusTextView)
+        adStatsTextView = findViewById(R.id.adStatsTextView)
         nativeLargeView = findViewById(R.id.nativeLargeTest)
         nativeMediumView = findViewById(R.id.nativeMediumTest)
         nativeSmallView = findViewById(R.id.nativeSmallTest)
         bannerView = findViewById(R.id.bannerViewTest)
 
-        // Set initial smart preload state
+        // Set initial states from config
         smartPreloadSwitch.isChecked = AdManageKitConfig.enableSmartPreloading
+        crossAdUnitFallbackSwitch.isChecked = AdManageKitConfig.enableCrossAdUnitFallback
 
         findViewById<Button>(R.id.btnTestInterstitial).setOnClickListener {
             testInterstitial()
@@ -108,6 +124,15 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnClearCache).setOnClickListener {
             clearCache()
         }
+
+        // Ad Pool buttons
+        findViewById<Button>(R.id.btnLoadAdPool).setOnClickListener {
+            loadAdPool()
+        }
+
+        findViewById<Button>(R.id.btnShowFromPool).setOnClickListener {
+            showAdFromPool()
+        }
     }
 
     private fun setupListeners() {
@@ -116,6 +141,7 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                 R.id.radioOnDemand -> AdLoadingStrategy.ON_DEMAND
                 R.id.radioOnlyCache -> AdLoadingStrategy.ONLY_CACHE
                 R.id.radioHybrid -> AdLoadingStrategy.HYBRID
+                R.id.radioFreshWithFallback -> AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK
                 else -> AdLoadingStrategy.HYBRID
             }
 
@@ -134,6 +160,16 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
             val status = if (isChecked) "ENABLED" else "DISABLED"
             Toast.makeText(this, "Smart Preload manually $status", Toast.LENGTH_SHORT).show()
             Log.d(TAG, "Smart Preload manually changed to: $isChecked")
+        }
+
+        crossAdUnitFallbackSwitch.setOnCheckedChangeListener { _, isChecked ->
+            // Toggle cross ad unit fallback for native ads
+            AdManageKitConfig.enableCrossAdUnitFallback = isChecked
+            updateCacheStatus()
+
+            val status = if (isChecked) "ENABLED" else "DISABLED"
+            Toast.makeText(this, "Cross Ad Unit Fallback $status", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Cross Ad Unit Fallback changed to: $isChecked")
         }
     }
 
@@ -160,6 +196,11 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                         smartPreloadSwitch.isChecked = true
                     }
                     AdLoadingStrategy.HYBRID -> {
+                        // HYBRID: Enable smart preload (use cache when available)
+                        enableSmartPreloading = true
+                        smartPreloadSwitch.isChecked = true
+                    }
+                    AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
                         // HYBRID: Enable smart preload (use cache when available)
                         enableSmartPreloading = true
                         smartPreloadSwitch.isChecked = true
@@ -209,6 +250,16 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                 ✓ Good balance of UX & coverage
                 ✓ Smart preload: ENABLED
                 ⚠ May show dialog if cache miss
+            """.trimIndent()
+
+            AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> """
+                FRESH_WITH_CACHE_FALLBACK (Best for RecyclerView)
+                ✓ Always tries fresh ad first
+                ✓ Falls back to cache if fresh fails
+                ✓ Shows shimmer while loading (native)
+                ✓ Best for lists with multiple ad slots
+                ✓ Smart preload: ENABLED
+                ⚠ May delay display while fetching fresh
             """.trimIndent()
         }
 
@@ -558,6 +609,96 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
             ONLY_CACHE strategy will now skip ads until preload.
             ═══════════════════════════════════════════════════
         """.trimIndent())
+    }
+
+    // =================== AD POOL METHODS ===================
+
+    /**
+     * Load multiple ad units into the ad pool
+     */
+    private fun loadAdPool() {
+        Log.d(TAG, "Loading ${interstitialAdUnitIds.size} ad units into pool...")
+        showToast("Loading ${interstitialAdUnitIds.size} ad units into pool...")
+
+        val adManager = AdManager.getInstance()
+        adManager.loadMultipleAdUnits(this, interstitialAdUnitIds)
+
+        // Update pool status after a delay
+        adPoolStatusTextView.postDelayed({
+            updateAdPoolStatus()
+            updateAdStats()
+        }, 3000)
+    }
+
+    /**
+     * Show any available ad from the pool
+     */
+    private fun showAdFromPool() {
+        val adManager = AdManager.getInstance()
+
+        if (!adManager.isReady()) {
+            showToast("No ads in pool. Load first!")
+            Log.d(TAG, "No ads available in pool")
+            return
+        }
+
+        Log.d(TAG, "Showing ad from pool (size: ${adManager.getPoolSize()})...")
+        showToast("Showing ad from pool...")
+
+        adManager.showInterstitialIfReady(this, object : com.i2hammad.admanagekit.admob.AdManagerCallback() {
+            override fun onNextAction() {
+                Log.d(TAG, "Ad from pool completed")
+                updateAdPoolStatus()
+                updateAdStats()
+            }
+        })
+    }
+
+    /**
+     * Update ad pool status display
+     */
+    private fun updateAdPoolStatus() {
+        val adManager = AdManager.getInstance()
+        val poolSize = adManager.getPoolSize()
+        val readyUnits = adManager.getReadyAdUnits()
+
+        val statusBuilder = StringBuilder()
+        statusBuilder.append("Pool Size: $poolSize\n")
+
+        if (readyUnits.isNotEmpty()) {
+            statusBuilder.append("Ready Units:\n")
+            readyUnits.forEachIndexed { index, unit ->
+                val shortUnit = unit.takeLast(10)
+                statusBuilder.append("  ${index + 1}. ...$shortUnit\n")
+            }
+        } else {
+            statusBuilder.append("No ads ready in pool")
+        }
+
+        adPoolStatusTextView.text = statusBuilder.toString()
+    }
+
+    /**
+     * Update ad statistics display
+     */
+    private fun updateAdStats() {
+        val adManager = AdManager.getInstance()
+        val stats = adManager.getAdStats()
+
+        val requests = stats["session_requests"] as? Int ?: 0
+        val fills = stats["session_fills"] as? Int ?: 0
+        val impressions = stats["session_impressions"] as? Int ?: 0
+        val fillRate = stats["fill_rate_percent"] as? Float ?: 0f
+        val showRate = stats["show_rate_percent"] as? Float ?: 0f
+        val totalShown = stats["total_ads_shown"] as? Int ?: 0
+
+        adStatsTextView.text = """
+            Requests: $requests | Fills: $fills | Shown: $impressions
+            Fill Rate: ${fillRate.toInt()}% | Show Rate: ${showRate.toInt()}%
+            Total Ads Shown (lifetime): $totalShown
+        """.trimIndent()
+
+        Log.d(TAG, "Ad Stats: $stats")
     }
 
     // =================== HELPER METHODS ===================
