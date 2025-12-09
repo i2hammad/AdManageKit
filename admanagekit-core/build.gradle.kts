@@ -44,7 +44,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-core"
-                version = "2.9.0"
+                version = "3.1.0"
             }
         }
     }

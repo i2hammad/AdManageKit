@@ -349,7 +349,7 @@ class NativeTemplateView @JvmOverloads constructor(
                     }
                 }
             ) { enhancedAdUnitId, enhancedCallback ->
-                loadNewAdInternal(context, enhancedAdUnitId, enhancedCallback, useCachedAd)
+                loadNewAdInternal(context, enhancedAdUnitId, enhancedCallback, useCachedAd, loadingStrategy)
             }
 
             // Check for cached ad from integration manager
@@ -403,10 +403,12 @@ class NativeTemplateView @JvmOverloads constructor(
         context: Context,
         adUnitId: String,
         callback: AdLoadCallback?,
-        useCachedAd: Boolean = false
+        useCachedAd: Boolean = false,
+        loadingStrategy: AdLoadingStrategy? = null
     ) {
         val adPlaceholder: FrameLayout = binding.flAdPlaceholder
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainer
+        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.nativeLoadingStrategy
 
         // Build AdLoader on background thread as recommended by Google
         CoroutineScope(Dispatchers.IO).launch {
@@ -431,9 +433,14 @@ class NativeTemplateView @JvmOverloads constructor(
                         binding.root.visibility = VISIBLE
                         adPlaceholder.visibility = VISIBLE
 
-                        // NOTE: Do NOT cache ad here - it's being displayed immediately
-                        // Caching is only for preloaded ads that will be shown later
-                        // Ads expire after 1 hour, so we should only cache ads we intend to show later
+                        // For FRESH_WITH_CACHE_FALLBACK strategy: cache successfully loaded ads
+                        // This builds up the cache for future fallback scenarios (e.g., RecyclerView)
+                        if (effectiveStrategy == AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK &&
+                            NativeAdManager.enableCachingNativeAds) {
+                            NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
+                            AdDebugUtils.logEvent(adUnitId, "cachedForFallback",
+                                "Cached fresh ad for future FRESH_WITH_CACHE_FALLBACK fallback", true)
+                        }
 
                         populateNativeAdView(nativeAd, nativeAdView)
                         shimmerFrameLayout.visibility = GONE

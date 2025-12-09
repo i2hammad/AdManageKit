@@ -411,8 +411,8 @@ object NativeAdIntegrationManager {
 
                 logDebug("FRESH_WITH_CACHE_FALLBACK: Ad loaded successfully for $screenKey (attempt ${retryAttempt + 1})")
 
-                // Note: The actual NativeAd object is handled by the caller (NativeBanner views)
-                // They will cache it via NativeAdManager after receiving this callback
+                // The caller (NativeTemplateView, NativeBanner views) handles caching the ad
+                // when FRESH_WITH_CACHE_FALLBACK strategy is used - see forNativeAd callback
                 originalCallback?.onAdLoaded()
             }
 
