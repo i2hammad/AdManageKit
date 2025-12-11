@@ -8,7 +8,7 @@
         android:layout_height="300dp"
         android:orientation="vertical">
 
-        <com.google.android.gms.ads.nativead.NativeAdView
+        <com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
             android:id="@+id/native_ad_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -44,7 +44,8 @@
                         android:layout_alignParentEnd="true"
                         android:gravity="end"
                         android:orientation="horizontal" >
-                        <com.google.android.gms.ads.nativead.AdChoicesView
+
+                        <com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView
                             android:id="@+id/ad_choices_view"
                             android:layout_width="match_parent"
                             android:layout_height="match_parent" />
@@ -82,7 +83,7 @@
                     </LinearLayout>
                 </RelativeLayout>
 
-                <com.google.android.gms.ads.nativead.MediaView
+                <com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
                     android:id="@+id/media_view"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
@@ -149,7 +150,7 @@
                 android:text="Ad"
                 android:textColor="#ffffff"
                 android:textSize="12sp" />
-        </com.google.android.gms.ads.nativead.NativeAdView>
+        </com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView>
 
         <com.facebook.shimmer.ShimmerFrameLayout
             android:id="@+id/shimmer_container_native"

@@ -1,6 +1,7 @@
 package com.i2hammad.admanagekit.admob
 
 import com.google.android.gms.ads.AdError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 
 /**
  * Interface defining a callback for ad management actions.
@@ -17,8 +18,9 @@ abstract class AdManagerCallback {
         // Default implementation
     }
 
-    open fun onFailedToLoad(error: AdError?) {
+    open fun onFailedToLoad(error: LoadAdError?) {
         // Default implementation
+
     }
 
     open fun onAdLoaded() {

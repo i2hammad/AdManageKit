@@ -1,8 +1,9 @@
 package com.i2hammad.admanagekit.sample
 
 import android.app.Application
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.RequestConfiguration
+import com.google.android.libraries.ads.mobile.sdk.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
+import kotlinx.coroutines.launch
 import com.i2hammad.admanagekit.admob.AppOpenManager
 import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
 import com.i2hammad.admanagekit.billing.AppPurchase
@@ -28,10 +29,10 @@ class MyApplication : Application() {
 //        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
 //        If you do not want to use billing library for it
         BillingConfig.setPurchaseProvider(NoPurchaseProvider())
-        
+
         // Configure AdManageKit with comprehensive settings
         configureAdManageKit()
-        
+
         initBilling()
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
@@ -48,7 +49,7 @@ class MyApplication : Application() {
             testMode = true // Use test ads for testing
             privacyCompliantMode = true
             enableDebugOverlay = true // Show debug overlay for testing
-            
+
             // =================== PERFORMANCE SETTINGS ===================
             defaultAdTimeout = 15.seconds
             appOpenAdTimeout = 10.seconds
@@ -58,7 +59,7 @@ class MyApplication : Application() {
             enableWelcomeBackDialog = true
             appOpenFetchFreshAd = true
             welcomeDialogAppIcon = R.mipmap.ic_launcher_round
-            
+
             // =================== RELIABILITY FEATURES ===================
             autoRetryFailedAds = true
             maxRetryAttempts = 3
@@ -67,14 +68,14 @@ class MyApplication : Application() {
             enableExponentialBackoff = true
             baseRetryDelay = 1.seconds
             maxRetryDelay = 10.seconds
-            
+
             // =================== ADVANCED FEATURES ===================
             enableSmartPreloading = false
             enableAdaptiveIntervals = true
             enablePerformanceMetrics = true
             enableAutoCacheCleanup = true
             enableLRUEviction = true
-            
+
             // =================== AD-SPECIFIC SETTINGS ===================
             defaultInterstitialInterval = 15.seconds
             defaultBannerRefreshInterval = 60.seconds
@@ -129,22 +130,25 @@ class MyApplication : Application() {
             // =================== CACHE MANAGEMENT ===================
             cacheCleanupInterval = (5 * 60).seconds // 5 minutes for testing
         }
-        
+
         // Validate configuration
         if (!AdManageKitConfig.validate()) {
             android.util.Log.w("MyApplication", "AdManageKit configuration validation failed")
         }
-        
+
         // Log configuration summary
         android.util.Log.d("MyApplication", AdManageKitConfig.getConfigSummary())
-        
+
         // Check production readiness
         if (!AdManageKitConfig.isProductionReady()) {
             android.util.Log.w("MyApplication", "AdManageKit configuration is not production ready!")
         }
-        
+
         // Enable debug overlay in debug mode
-        android.util.Log.d("MyApplication", "AdManageKit configured for TESTING mode with enhanced logging and debug features")
+        android.util.Log.d(
+            "MyApplication",
+            "AdManageKit configured for TESTING mode with enhanced logging and debug features"
+        )
     }
 
 
@@ -152,7 +156,11 @@ class MyApplication : Application() {
 
 
         val listPurchaseItem = listOf(
-            PurchaseItem("life_time", AppPurchase.TYPE_IAP.PURCHASE, PurchaseItem.PurchaseCategory.LIFETIME_PREMIUM), // lifetime premium
+            PurchaseItem(
+                "life_time",
+                AppPurchase.TYPE_IAP.PURCHASE,
+                PurchaseItem.PurchaseCategory.LIFETIME_PREMIUM
+            ), // lifetime premium
             PurchaseItem("sub_monthly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
             PurchaseItem("sub_half_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
             PurchaseItem("sub_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION)
@@ -175,15 +183,23 @@ class MyApplication : Application() {
 
 
     fun initAds() {
-
+        android.util.Log.d("MyApplication", "Initializing GMA Next-Gen SDK on background thread")
         val testDeviceIds: List<String> = mutableListOf(
             "EC60C39375F6619F5C03850A0E440646"
         )
-        val configuration: RequestConfiguration =
-            RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
-        MobileAds.setRequestConfiguration(configuration)
-        MobileAds.initialize(this)
 
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            try {
+                val configuration: RequestConfiguration =
+                    RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
+                MobileAds.setRequestConfiguration(configuration)
+                MobileAds.initialize(this@MyApplication) {
+                    android.util.Log.d("MyApplication", "GMA Next-Gen SDK Initialized")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MyApplication", "GMA Next-Gen SDK Initialization failed", e)
+            }
+        }
     }
 
     companion object {

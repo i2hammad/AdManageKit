@@ -12,12 +12,16 @@ import android.widget.ImageView
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdLoader
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdView
+//import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallback
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -119,10 +123,10 @@ class NativeLarge @JvmOverloads constructor(
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
             callback?.onFailedToLoad(
-                AdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
+                LoadAdError(
+                    LoadAdError.ErrorCode.INTERNAL_ERROR,
                     AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                  null
                 )
             )
             return
@@ -146,7 +150,7 @@ class NativeLarge @JvmOverloads constructor(
                         callback?.onAdLoaded()
                     }
 
-                    override fun onFailedToLoad(error: AdError?) {
+                    override fun onFailedToLoad(error: LoadAdError?) {
                         // Hide shimmer and container when ad fails to load (e.g., ONLY_CACHE with no cache)
                         binding.shimmerContainerNative.visibility = View.GONE
                         binding.adUnit.visibility = View.GONE
@@ -170,7 +174,7 @@ class NativeLarge @JvmOverloads constructor(
                         callback?.onAdOpened()
                     }
 
-                    override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+                    override fun onPaidEvent(adValue: com.google.android.libraries.ads.mobile.sdk.common.AdValue) {
                         callback?.onPaidEvent(adValue)
                     }
                 }
@@ -180,9 +184,15 @@ class NativeLarge @JvmOverloads constructor(
             }
 
             // 🔧 FIX: Check if integration manager found a cached ad and display it
-            val temporaryCachedAd = com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.getAndClearTemporaryCachedAd(screenKey)
+            val temporaryCachedAd =
+                com.i2hammad.admanagekit.utils.NativeAdIntegrationManager.getAndClearTemporaryCachedAd(screenKey)
             if (temporaryCachedAd != null) {
-                AdDebugUtils.logEvent(adUnitId, "foundCachedAd", "Found cached ad from integration manager - displaying it", true)
+                AdDebugUtils.logEvent(
+                    adUnitId,
+                    "foundCachedAd",
+                    "Found cached ad from integration manager - displaying it",
+                    true
+                )
                 displayAd(temporaryCachedAd)
             }
         } else {
@@ -190,7 +200,7 @@ class NativeLarge @JvmOverloads constructor(
             loadNewAdInternal(context, adUnitId, callback, useCachedAd)
         }
     }
-    
+
     /**
      * Internal method to load a new ad from the network.
      */
@@ -212,93 +222,97 @@ class NativeLarge @JvmOverloads constructor(
         nativeAdView.advertiserView = nativeAdView.findViewById(R.id.tertiary)
         nativeAdView.adChoicesView = nativeAdView.findViewById(R.id.ad_choices_view)
 
-        val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
-            viewGroup.visibility = View.VISIBLE
-            nativeAdView.visibility = View.VISIBLE
-            shimmerFrameLayout.visibility = View.GONE
-            binding.root.visibility = View.VISIBLE
+        // Build load request
+        val request = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
+            .build()
 
-            // NOTE: Do NOT cache ad here - it's being displayed immediately
-            // Caching is only for preloaded ads that will be shown later
-            // Ads expire after 1 hour, so caching displayed ads wastes memory
-
-            populateNativeAdView(nativeAd, nativeAdView)
-
-            nativeAd.setOnPaidEventListener { adValue ->
-                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-                }
-                firebaseAnalytics!!.logEvent("ad_paid_event", params)
-            }
-        }.withAdListener(object : AdListener() {
-            override fun onAdImpression() {
-                super.onAdImpression()
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                }
-                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                AdDebugUtils.logEvent(adUnitId, "onAdImpression", "NativeLarge impression", true)
-                callback?.onAdImpression()
-            }
-
-            override fun onAdLoaded() {
-                super.onAdLoaded()
+        NativeAdLoader.load(request, object : NativeAdLoaderCallback {
+            override fun onNativeAdLoaded(nativeAd: NativeAd) {
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "NativeLarge loaded successfully", true)
+
+                // Set callbacks on the ad object itself
+                nativeAd.adEventCallback = object : NativeAdEventCallback {
+                    override fun onAdImpression() {
+                        val params = Bundle().apply {
+                            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        }
+                        firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                        AdDebugUtils.logEvent(adUnitId, "onAdImpression", "NativeLarge impression", true)
+                        callback?.onAdImpression()
+                    }
+
+                    override fun onAdClicked() {
+                        AdDebugUtils.logEvent(adUnitId, "onAdClicked", "NativeLarge clicked", true)
+                        callback?.onAdClicked()
+                    }
+
+                    override fun onAdDismissedFullScreenContent() {
+                        AdDebugUtils.logEvent(adUnitId, "onAdClosed", "NativeLarge closed", true)
+                        callback?.onAdClosed()
+                    }
+
+                    override fun onAdShowedFullScreenContent() {
+                        AdDebugUtils.logEvent(adUnitId, "onAdOpened", "NativeLarge opened", true)
+                        callback?.onAdOpened()
+                    }
+
+                    override fun onAdPaid(adValue: AdValue) {
+                        super.onAdPaid(adValue)
+                            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                            val params = Bundle().apply {
+                                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                            }
+                            firebaseAnalytics!!.logEvent("ad_paid_event", params)
+                    }
+                }
+
+                viewGroup.visibility = View.VISIBLE
+                nativeAdView.visibility = View.VISIBLE
+                shimmerFrameLayout.visibility = View.GONE
+                binding.root.visibility = View.VISIBLE
+
+                populateNativeAdView(nativeAd, nativeAdView)
+
+
                 callback?.onAdLoaded()
             }
 
-            override fun onAdFailedToLoad(adError: LoadAdError) {
+            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
                 // Try to use cached ad if available and not explicitly requesting a new ad
                 if (NativeAdManager.enableCachingNativeAds && !useCachedAd) {
                     // First try specific ad unit, then fallback to any cached ad
                     val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId, enableFallbackToAnyAd = true)
                     if (cachedAd != null) {
-                        AdDebugUtils.logEvent(adUnitId, "usedFallbackCache", "Used fallback cached ad after network failure", true)
+                        AdDebugUtils.logEvent(
+                            adUnitId,
+                            "usedFallbackCache",
+                            "Used fallback cached ad after network failure",
+                            true
+                        )
                         displayAd(cachedAd)
                         callback?.onAdLoaded()
                         return
                     }
                 }
 
-                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeLarge failed: ${adError.message}", false)
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeLarge failed: ${loadAdError.message}", false)
                 viewGroup.visibility = View.GONE
                 nativeAdView.visibility = View.GONE
                 shimmerFrameLayout.visibility = View.GONE
 
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", adError.code.toString())
+                    putString("ad_error_code", loadAdError.code.toString())
                     if (AdManageKitConfig.enablePerformanceMetrics) {
-                        putString("error_message", adError.message)
+                        putString("error_message", loadAdError.message)
                     }
                 }
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(adError)
-            }
-
-            override fun onAdOpened() {
-                super.onAdOpened()
-                AdDebugUtils.logEvent(adUnitId, "onAdOpened", "NativeLarge opened", true)
-                callback?.onAdOpened()
-            }
-
-            override fun onAdClicked() {
-                super.onAdClicked()
-                AdDebugUtils.logEvent(adUnitId, "onAdClicked", "NativeLarge clicked", true)
-                callback?.onAdClicked()
-            }
-
-            override fun onAdClosed() {
-                super.onAdClosed()
-                AdDebugUtils.logEvent(adUnitId, "onAdClosed", "NativeLarge closed", true)
-                callback?.onAdClosed()
+                callback?.onFailedToLoad(loadAdError)
             }
         })
-
-        builder.build().loadAd(AdRequest.Builder().build())
     }
 
     fun displayAd(preloadedNativeAd: NativeAd) {
@@ -309,10 +323,10 @@ class NativeLarge @JvmOverloads constructor(
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
             callback?.onFailedToLoad(
-                AdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
+                LoadAdError(
+                    LoadAdError.ErrorCode.INTERNAL_ERROR,
                     AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                    null
                 )
             )
             return
@@ -327,15 +341,7 @@ class NativeLarge @JvmOverloads constructor(
         nativeAdView.advertiserView = nativeAdView.findViewById(R.id.tertiary)
         nativeAdView.adChoicesView = nativeAdView.findViewById(R.id.ad_choices_view)
 
-        preloadedNativeAd.setOnPaidEventListener { adValue ->
-            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-            val params = Bundle().apply {
-                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-            }
-            firebaseAnalytics!!.logEvent("ad_paid_event", params)
-        }
+
 
         populateNativeAdView(preloadedNativeAd, nativeAdView)
         viewGroup.visibility = View.VISIBLE
@@ -385,7 +391,7 @@ class NativeLarge @JvmOverloads constructor(
             }
         }
 
-        nativeAdView.setNativeAd(nativeAd)
+        nativeAdView.registerNativeAd(nativeAd, mediaView = )
     }
 
     fun hideAd() {

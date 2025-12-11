@@ -43,5 +43,6 @@ dependencies {
     implementation(project(":AdManageKit"))
     implementation(project(":admanagekit-billing"))
     implementation(libs.androidx.work.runtime)
-//    implementation(libs.play.services.ads)
+    // GMA Next-Gen SDK
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
 }

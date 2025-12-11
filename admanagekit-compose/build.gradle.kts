@@ -83,8 +83,8 @@ afterEvaluate {
             create<MavenPublication>("maven") {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
-                artifactId = "ad-manage-kit-compose"
-                version = "3.1.0"
+                artifactId = "ad-manage-kit-compose-nextgen"
+                version = "4.0.0"
             }
         }
     }

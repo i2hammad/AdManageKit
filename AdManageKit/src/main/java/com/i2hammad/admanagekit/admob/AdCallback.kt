@@ -1,6 +1,6 @@
 package com.i2hammad.admanagekit.admob
 
-import com.google.android.gms.ads.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 
 /**
  * Java-friendly callbacks for InterstitialAdBuilder.

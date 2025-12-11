@@ -18,10 +18,19 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.ads.mediation.admob.AdMobAdapter
-import com.google.android.gms.ads.*
+import com.google.android.gms.ads.AdError
+// import com.google.ads.mediation.admob.AdMobAdapter // Deprecated/Removed in Next-Gen?
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+//import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
+import com.i2hammad.admanagekit.admob.AdManager.Companion.PURCHASED_APP_ERROR_MESSAGE
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
@@ -32,14 +41,14 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Enhanced BannerAdView with improved reliability, performance, and lifecycle management.
- * 
+ *
  * This view provides advanced banner ad functionality including:
  * - Memory leak prevention with WeakReference holders
  * - Automatic retry logic
  * - Lifecycle-aware ad refresh
  * - Performance monitoring and debug integration
  * - Thread-safe operations
- * 
+ *
  * @since 1.0.0 (Enhanced in 2.1.0)
  */
 class BannerAdView @JvmOverloads constructor(
@@ -47,14 +56,14 @@ class BannerAdView @JvmOverloads constructor(
 ) : FrameLayout(context, attrs, defStyleAttr), LifecycleEventObserver {
 
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private var adView: AdView? = null
+    private var bannerAd: BannerAd? = null
     private var shimmerFrameLayout: ShimmerFrameLayout
     private var layBannerAd: FrameLayout
-    
+
     // Enhanced memory management with WeakReference
-    private var activityRef: WeakReference<Activity>? = null 
+    private var activityRef: WeakReference<Activity>? = null
     var callback: AdLoadCallback? = null
-    
+
     // Enhanced features
     private var currentAdUnitId: String? = null
     private var isAdLoading = AtomicBoolean(false)
@@ -63,7 +72,7 @@ class BannerAdView @JvmOverloads constructor(
     private var refreshRunnable: Runnable? = null
     private var autoRefreshEnabled = false
     private val refreshIntervalSeconds get() = AdManageKitConfig.defaultBannerRefreshInterval.inWholeSeconds.toInt()
-    
+
     // Performance tracking
     private var loadStartTime: Long = 0
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
@@ -87,14 +96,18 @@ class BannerAdView @JvmOverloads constructor(
                     startAutoRefresh()
                 }
             }
+
             Lifecycle.Event.ON_PAUSE -> {
                 pauseAd()
                 stopAutoRefresh()
             }
+
             Lifecycle.Event.ON_DESTROY -> {
                 cleanup()
             }
-            else -> { /* Handle other events if needed */ }
+
+            else -> { /* Handle other events if needed */
+            }
         }
     }
 
@@ -168,7 +181,7 @@ class BannerAdView @JvmOverloads constructor(
 
         loadBannerInternal(adUnitId, collapsible, placement, callback)
     }
-    
+
     /**
      * Internal method that handles the actual ad loading with enhanced features.
      */
@@ -183,85 +196,91 @@ class BannerAdView @JvmOverloads constructor(
             AdDebugUtils.logDebug("BannerAdView", "Ad loading already in progress for $adUnitId")
             return
         }
-        
+
         val attempt = loadAttempt.get()
         loadStartTime = System.currentTimeMillis()
-        
+
         // Check purchase status
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             handleAdLoadFailure(
                 adUnitId,
-                AdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
-                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN
-                ),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, PURCHASED_APP_ERROR_MESSAGE, null),
                 callback,
                 "User has purchased app"
             )
             return
         }
-        
+
         // Use activity safely with WeakReference
         val activity = activityRef?.get()
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             handleAdLoadFailure(
                 adUnitId,
-                LoadAdError(9997, "Activity not available", "AdManageKit", null, null),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Activity not available", null),
                 callback,
                 "Activity reference is null or invalid"
             )
             return
         }
-        
+
         try {
             // Make sure the banner is visible during loading
             visibility = View.VISIBLE
             shimmerFrameLayout.visibility = View.VISIBLE
             shimmerFrameLayout.startShimmer()
-            
-            // Create and configure AdView
+
+            // Calculate ad size
             val calculatedAdSize = getAdSize()
-            adView = AdView(activity).apply {
-                setAdUnitId(adUnitId)
-                setAdSize(calculatedAdSize)
-            }
-            
+
             // Build ad request
-            val builder = AdRequest.Builder()
+            val builder = BannerAdRequest.Builder(adUnitId, calculatedAdSize)
 
             // Add collapsible extras if needed
             if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
+
                 val extras = Bundle()
-                extras.putString("collapsible", placement.value)
-                builder.addNetworkExtrasBundle(AdMobAdapter::class.java, extras)
+                extras.putString("collapsible", placement.value);
+                builder.setGoogleExtrasBundle(extras)
 
                 AdDebugUtils.logDebug("BannerAdView", "Loading collapsible banner with placement: ${placement.value}")
+
             }
-            
-            // Configure ad listener with enhanced functionality
-            adView?.adListener = createEnhancedAdListener(adUnitId, callback)
-            
-            // Configure paid event listener with enhanced tracking
-            adView?.onPaidEventListener = OnPaidEventListener { adValue ->
-                handlePaidEvent(adUnitId, adValue, callback)
-            }
-            
+
             // Adjust shimmer to match ad size
             adjustShimmerLayout()
-            
+
             // Load the ad
             val adRequest = builder.build()
-            adView?.loadAd(adRequest)
-            
+
             // Notify callback of load start
             callback?.onAdLoadStarted()
-            
+
+            BannerAd.load(adRequest, object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<BannerAd> {
+                override fun onAdLoaded(ad: BannerAd) {
+                    bannerAd = ad
+
+                    // Configure callbacks
+                    ad.adEventCallback = createEnhancedAdEventCallback(adUnitId, callback)
+
+
+                    handleAdLoadSuccess(adUnitId, callback)
+                }
+
+                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                    handleAdLoadFailure(
+                        adUnitId,
+                        loadAdError,
+                        callback,
+                        "AdMob load failure: ${loadAdError.message}"
+                    )
+                }
+            })
+
         } catch (e: Exception) {
             handleAdLoadFailure(
                 adUnitId,
-                LoadAdError(9998, "Exception during ad load: ${e.message}", "AdManageKit", null, null),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Exception during ad load: ${e.message}", null),
                 callback,
                 "Exception occurred: ${e.message}"
             )
@@ -278,31 +297,32 @@ class BannerAdView @JvmOverloads constructor(
     }
 
     /**
-     * Creates enhanced ad listener with improved error handling.
+     * Creates enhanced ad event callback for BannerAd.
      */
-    private fun createEnhancedAdListener(adUnitId: String, callback: AdLoadCallback?): AdListener {
-        return object : AdListener() {
-            override fun onAdLoaded() {
-                handleAdLoadSuccess(adUnitId, callback)
-            }
-
-            override fun onAdFailedToLoad(adError: LoadAdError) {
-                handleAdLoadFailure(adUnitId, adError, callback, "AdMob load failure")
-            }
-
+    private fun createEnhancedAdEventCallback(adUnitId: String, callback: AdLoadCallback?): BannerAdEventCallback {
+        return object : BannerAdEventCallback {
             override fun onAdClicked() {
                 AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Banner ad clicked", true)
                 callback?.onAdClicked()
             }
 
-            override fun onAdClosed() {
-                AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Banner ad closed", true)
+            override fun onAdShowedFullScreenContent() {
+                AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Banner ad showed full screen", true)
+                callback?.onAdOpened()
+            }
+
+            override fun onAdDismissedFullScreenContent() {
+                AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Banner ad dismissed full screen", true)
                 callback?.onAdClosed()
             }
 
-            override fun onAdOpened() {
-                AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Banner ad opened", true)
-                callback?.onAdOpened()
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
+                AdDebugUtils.logEvent(
+                    adUnitId,
+                    "onAdFailedToShow",
+                    "Banner ad failed to show full screen: ${fullScreenContentError.message}",
+                    false
+                )
             }
 
             override fun onAdImpression() {
@@ -315,14 +335,25 @@ class BannerAdView @JvmOverloads constructor(
                     }
                 }
                 firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                
-                AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Banner ad impression (load time: ${loadTime}ms)", true)
+
+                AdDebugUtils.logEvent(
+                    adUnitId,
+                    "onAdImpression",
+                    "Banner ad impression (load time: ${loadTime}ms)",
+                    true
+                )
                 AdDebugUtils.logPerformance(adUnitId, "AdImpression", loadTime)
                 callback?.onAdImpression()
             }
+
+            override fun onAdPaid(value: AdValue) {
+                super.onAdPaid(value)
+
+                handlePaidEvent(adUnitId, value, callback)
+            }
         }
     }
-    
+
     /**
      * Handles successful ad loading with enhanced features.
      */
@@ -330,52 +361,59 @@ class BannerAdView @JvmOverloads constructor(
         ensureMainThread {
             // Update UI
             layBannerAd.removeAllViews()
-            adView?.let { adView ->
-                val parent = adView.parent as? ViewGroup
-                parent?.removeView(adView)
-                layBannerAd.addView(adView)
+            // Update UI
+            layBannerAd.removeAllViews()
+            bannerAd?.let { ad ->
+                try {
+                    val activity = activityRef?.get()
+                    if (activity != null) {
+                        layBannerAd.addView(ad.getView(activity))
+                    }
+                } catch (e: Exception) {
+                    AdDebugUtils.logError("BannerAdView", "Failed to add banner view: ${e.message}", e)
+                }
             }
             shimmerFrameLayout.stopShimmer()
             shimmerFrameLayout.visibility = View.GONE
-            
+
             // Update state
             isAdLoading.set(false)
             loadAttempt.set(0) // Reset attempt counter on success
-            
+
             // Make sure the banner is visible after successful load
             visibility = View.VISIBLE
-            
+
             // Start auto-refresh if enabled
             if (autoRefreshEnabled) {
                 scheduleNextRefresh()
             }
-            
+
             val loadTime = System.currentTimeMillis() - loadStartTime
             AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Banner ad loaded successfully in ${loadTime}ms", true)
             AdDebugUtils.logPerformance(adUnitId, "AdLoad", loadTime)
-            
+
             callback?.onAdLoaded()
         }
     }
-    
+
     /**
      * Handles ad loading failure with basic retry logic.
      */
     private fun handleAdLoadFailure(
-        adUnitId: String, 
-        error: AdError, 
-        callback: AdLoadCallback?, 
+        adUnitId: String,
+        error: LoadAdError,
+        callback: AdLoadCallback?,
         reason: String
     ) {
         ensureMainThread {
             // Update UI - stop shimmer but keep view visible for retries
             shimmerFrameLayout.stopShimmer()
             shimmerFrameLayout.visibility = View.GONE
-            
+
             // Update state
             isAdLoading.set(false)
             val attempt = loadAttempt.incrementAndGet()
-            
+
             // Log failure analytics
             val params = Bundle().apply {
                 putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
@@ -386,9 +424,9 @@ class BannerAdView @JvmOverloads constructor(
                 }
             }
             firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-            
+
             AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "$reason (attempt $attempt)", false)
-            
+
             // Retry logic based on configuration
             if (attempt <= maxRetryAttempts && AdManageKitConfig.autoRetryFailedAds) {
                 val retryDelay = if (AdManageKitConfig.enableExponentialBackoff) {
@@ -399,10 +437,20 @@ class BannerAdView @JvmOverloads constructor(
                 } else {
                     2000L // Default 2 second delay
                 }
-                
+
                 Handler(Looper.getMainLooper()).postDelayed({
-                    AdDebugUtils.logEvent(adUnitId, "RetryAttempt", "Retrying ad load (attempt $attempt) after ${retryDelay}ms", true)
-                    loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback) // Retry without collapsible
+                    AdDebugUtils.logEvent(
+                        adUnitId,
+                        "RetryAttempt",
+                        "Retrying ad load (attempt $attempt) after ${retryDelay}ms",
+                        true
+                    )
+                    loadBannerInternal(
+                        adUnitId,
+                        false,
+                        CollapsibleBannerPlacement.BOTTOM,
+                        callback
+                    ) // Retry without collapsible
                 }, retryDelay)
             } else {
                 // Max retries reached or retry disabled - hide the entire banner view
@@ -412,7 +460,7 @@ class BannerAdView @JvmOverloads constructor(
             }
         }
     }
-    
+
     /**
      * Handles paid event with enhanced tracking.
      */
@@ -428,15 +476,20 @@ class BannerAdView @JvmOverloads constructor(
             }
         }
         firebaseAnalytics?.logEvent("ad_paid_event", params)
-        
-        AdDebugUtils.logEvent(adUnitId, "onPaidEvent", "Ad revenue: $adValueInStandardUnits ${adValue.currencyCode}", true)
-        
+
+        AdDebugUtils.logEvent(
+            adUnitId,
+            "onPaidEvent",
+            "Ad revenue: $adValueInStandardUnits ${adValue.currencyCode}",
+            true
+        )
+
         callback?.onPaidEvent(adValue)
     }
 
     private fun getAdSize(): AdSize {
         val displayMetrics = DisplayMetrics()
-        
+
         return activityRef?.get()?.let { activity ->
             val windowManager = activity.windowManager
             val adWidthPixels = if (layBannerAd.width > 0) {
@@ -446,7 +499,7 @@ class BannerAdView @JvmOverloads constructor(
                     val windowMetrics: WindowMetrics = windowManager.currentWindowMetrics
                     windowMetrics.bounds.width().toFloat()
                 } else {
-                    @Suppress("DEPRECATION") 
+                    @Suppress("DEPRECATION")
                     val display = windowManager.defaultDisplay
                     display?.getMetrics(displayMetrics)
                     displayMetrics.widthPixels.toFloat()
@@ -458,7 +511,7 @@ class BannerAdView @JvmOverloads constructor(
             AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, adWidth)
         } ?: AdSize.BANNER // Fallback to standard banner size
     }
-    
+
     /**
      * Ensures code runs on the main thread.
      */
@@ -469,67 +522,67 @@ class BannerAdView @JvmOverloads constructor(
             Handler(Looper.getMainLooper()).post(action)
         }
     }
-    
+
     // =================== AUTO-REFRESH METHODS ===================
-    
+
     /**
      * Enables automatic ad refresh with the specified interval.
-     * 
+     *
      * @param intervalSeconds Refresh interval in seconds (minimum 30 seconds)
      */
     fun enableAutoRefresh(intervalSeconds: Int = 30) {
         this.autoRefreshEnabled = true
         val configuredInterval = maxOf(intervalSeconds, 30) // Minimum 30 seconds per AdMob policy
-        
+
         AdDebugUtils.logDebug("BannerAdView", "Auto-refresh enabled with ${configuredInterval}s interval")
         scheduleNextRefresh()
     }
-    
+
     /**
      * Disables automatic ad refresh.
      */
     fun disableAutoRefresh() {
         this.autoRefreshEnabled = false
         stopAutoRefresh()
-        
+
         AdDebugUtils.logDebug("BannerAdView", "Auto-refresh disabled")
     }
-    
+
     private fun startAutoRefresh() {
         if (autoRefreshEnabled) {
             scheduleNextRefresh()
         }
     }
-    
+
     private fun stopAutoRefresh() {
         refreshRunnable?.let { runnable ->
             refreshHandler?.removeCallbacks(runnable)
         }
         refreshRunnable = null
     }
-    
+
     private fun scheduleNextRefresh() {
         if (!autoRefreshEnabled) return
-        
+
         stopAutoRefresh() // Clear any existing scheduled refresh
-        
+
         refreshRunnable = Runnable {
             currentAdUnitId?.let { adUnitId ->
                 AdDebugUtils.logEvent(adUnitId, "AutoRefresh", "Auto-refreshing banner ad", true)
                 loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
             }
         }
-        
+
         refreshHandler?.postDelayed(refreshRunnable!!, refreshIntervalSeconds * 1000L)
     }
-    
+
     // =================== LIFECYCLE METHODS ===================
-    
+
     private fun cleanup() {
         try {
             stopAutoRefresh()
-            adView?.destroy()
-            
+            bannerAd?.destroy()
+
             AdDebugUtils.logDebug("BannerAdView", "Cleanup completed for ad: $currentAdUnitId")
         } catch (e: Exception) {
             AdDebugUtils.logError("BannerAdView", "Error during cleanup: ${e.message}", e)
@@ -537,19 +590,19 @@ class BannerAdView @JvmOverloads constructor(
     }
 
     fun hideAd() {
-        adView?.visibility = View.GONE
+        layBannerAd.visibility = View.GONE
         shimmerFrameLayout.visibility = View.GONE
     }
 
     fun showAd() {
         visibility = View.VISIBLE
-        if (adView != null && !isAdLoading.get()) {
+        if (bannerAd != null && !isAdLoading.get()) {
             // Ad is loaded, show the ad
-            adView?.visibility = View.VISIBLE
+            layBannerAd.visibility = View.VISIBLE
             shimmerFrameLayout.visibility = View.GONE
         } else {
             // No ad loaded or loading in progress, show shimmer
-            adView?.visibility = View.GONE
+            layBannerAd.visibility = View.GONE
             shimmerFrameLayout.visibility = View.VISIBLE
             shimmerFrameLayout.startShimmer()
         }
@@ -560,15 +613,15 @@ class BannerAdView @JvmOverloads constructor(
     }
 
     fun resumeAd() {
-        adView?.resume()
+        // bannerAd?.resume() // Not available in Next-Gen SDK
     }
 
     fun pauseAd() {
-        adView?.pause()
+        // bannerAd?.pause() // Not available in Next-Gen SDK
     }
-    
+
     // =================== NEW CONVENIENCE METHODS ===================
-    
+
     /**
      * Refreshes the current ad manually.
      */
@@ -578,21 +631,21 @@ class BannerAdView @JvmOverloads constructor(
             loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
         }
     }
-    
+
     /**
      * Checks if an ad is currently loaded and ready to display.
      */
     fun isAdLoaded(): Boolean {
-        return adView != null && !isAdLoading.get()
+        return bannerAd != null && !isAdLoading.get()
     }
-    
+
     /**
      * Gets current loading state.
      */
     fun isLoading(): Boolean {
         return isAdLoading.get()
     }
-    
+
     /**
      * Gets the current load attempt number.
      */

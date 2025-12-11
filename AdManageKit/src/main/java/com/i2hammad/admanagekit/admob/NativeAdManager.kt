@@ -3,7 +3,7 @@ package com.i2hammad.admanagekit.admob
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.config.AdManageKitConfig
@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Enhanced native ad caching manager with advanced features.
- * 
+ *
  * This manager provides sophisticated caching functionality including:
  * - LRU eviction with configurable cache sizes
  * - Automatic background cleanup of expired ads
@@ -24,44 +24,44 @@ import java.util.concurrent.atomic.AtomicLong
  * - Memory usage optimization
  * - Thread-safe operations with fine-grained locking
  * - Cache warming and preloading capabilities
- * 
+ *
  * @since 1.0.0 (Enhanced in 2.1.0)
  */
 object NativeAdManager {
-    
+
     // Cache configuration - using AdManageKitConfig
     val cacheExpiryMs: Long get() = AdManageKitConfig.nativeCacheExpiry.inWholeMilliseconds
     val maxCachedAdsPerUnit: Int get() = AdManageKitConfig.maxCachedAdsPerUnit
     val enableBackgroundCleanup: Boolean get() = AdManageKitConfig.enableAutoCacheCleanup
     val cleanupIntervalMinutes: Long get() = AdManageKitConfig.cacheCleanupInterval.inWholeMinutes
     val enableAnalytics: Boolean get() = AdManageKitConfig.enablePerformanceMetrics
-    
+
     // Thread-safe cache storage
     private val cachedAds = ConcurrentHashMap<String, MutableList<CachedAd>>()
     private val cacheLocks = ConcurrentHashMap<String, Any>()
-    
+
     // Performance tracking
     private val cacheHits = AtomicLong(0)
     private val cacheMisses = AtomicLong(0)
     private val totalAdsServed = AtomicLong(0)
     private val totalMemoryFreed = AtomicLong(0)
-    
+
     // Background cleanup
     private var cleanupExecutor: ScheduledExecutorService? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    
+
     // Firebase Analytics instance
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    
+
     /**
      * Controls whether native ad caching is enabled.
      * When disabled, ads are not cached and getCachedNativeAd returns null.
      */
     var enableCachingNativeAds: Boolean = true
-    
+
     /**
      * Enhanced data class representing a cached native ad with comprehensive metadata.
-     * 
+     *
      * @param ad The native ad object
      * @param cachedTime When the ad was first cached
      * @param lastAccessTime When the ad was last accessed (for LRU)
@@ -83,14 +83,14 @@ object NativeAdManager {
                 return 50 * 1024L // 50KB
             }
         }
-        
+
         /**
          * Checks if this cached ad is expired.
          */
         fun isExpired(currentTime: Long, expiryMs: Long): Boolean {
             return (currentTime - cachedTime) > expiryMs
         }
-        
+
         /**
          * Gets the age of this cached ad in milliseconds.
          */
@@ -98,16 +98,16 @@ object NativeAdManager {
             return currentTime - cachedTime
         }
     }
-    
+
     // =================== INITIALIZATION ===================
-    
+
     init {
         // Initialize background cleanup if enabled
         if (enableBackgroundCleanup) {
             startBackgroundCleanup()
         }
     }
-    
+
     /**
      * Initializes Firebase Analytics for performance tracking.
      * Call this from your Application class for analytics support.
@@ -116,23 +116,23 @@ object NativeAdManager {
         this.firebaseAnalytics = analytics
         logDebug("NativeAdManager initialized with analytics: ${analytics != null}")
     }
-    
+
     // =================== UTILITY METHODS ===================
-    
+
     /**
      * Gets a thread-safe lock object for the specified ad unit.
      */
     private fun getLockForAdUnit(adUnitId: String): Any {
         return cacheLocks.getOrPut(adUnitId) { Any() }
     }
-    
+
     /**
      * Logs debug information if debug mode is enabled.
      */
     private fun logDebug(message: String) {
         AdDebugUtils.logDebug("NativeAdManager", message)
     }
-    
+
     /**
      * Tracks analytics event if analytics is enabled.
      */
@@ -151,10 +151,10 @@ object NativeAdManager {
             firebaseAnalytics?.logEvent(eventName, bundle)
         }
     }
-    
+
     /**
      * Caches a native ad for the specified ad unit with enhanced LRU eviction and analytics.
-     * 
+     *
      * @param adUnitId The ad unit ID
      * @param ad The native ad to cache
      */
@@ -163,14 +163,14 @@ object NativeAdManager {
             logDebug("Caching disabled, not caching ad for $adUnitId")
             return
         }
-        
+
         synchronized(getLockForAdUnit(adUnitId)) {
             val adList = cachedAds.getOrPut(adUnitId) { mutableListOf() }
             val currentTime = System.currentTimeMillis()
-            
+
             // Clean up expired ads first
             val expiredCount = cleanupExpiredAds(adUnitId, adList, currentTime)
-            
+
             // Check if we need to evict old ads due to size limit
             var evictedCount = 0
             while (adList.size >= maxCachedAdsPerUnit) {
@@ -181,29 +181,31 @@ object NativeAdManager {
                     adList.remove(oldestAd)
                     evictedCount++
                     totalMemoryFreed.addAndGet(oldestAd.approximateSize)
-                    
+
                     logDebug("Evicted LRU ad for $adUnitId (cache size: ${adList.size})")
                 } else {
                     break
                 }
             }
-            
+
             // Add the new ad
             val cachedAd = CachedAd(ad, currentTime, source = "network")
             adList.add(cachedAd)
-            
+
             logDebug("Cached ad for $adUnitId (size: ${adList.size}, expired: $expiredCount, evicted: $evictedCount)")
-            
+
             // Track analytics
-            trackEvent("native_ad_cached", mapOf(
-                "ad_unit_id" to adUnitId,
-                "cache_size" to adList.size,
-                "expired_cleaned" to expiredCount,
-                "evicted_count" to evictedCount
-            ))
+            trackEvent(
+                "native_ad_cached", mapOf(
+                    "ad_unit_id" to adUnitId,
+                    "cache_size" to adList.size,
+                    "expired_cleaned" to expiredCount,
+                    "evicted_count" to evictedCount
+                )
+            )
         }
     }
-    
+
     /**
      * Retrieves a cached native ad for the specified ad unit with enhanced tracking.
      *
@@ -265,12 +267,14 @@ object NativeAdManager {
                 logDebug("Cache hit for $adUnitId: served ad aged ${ageMs}ms, access count: ${validAd.accessCount}")
 
                 // Track analytics
-                trackEvent("native_ad_served", mapOf(
-                    "ad_unit_id" to adUnitId,
-                    "age_ms" to ageMs,
-                    "access_count" to validAd.accessCount,
-                    "source" to "cache"
-                ))
+                trackEvent(
+                    "native_ad_served", mapOf(
+                        "ad_unit_id" to adUnitId,
+                        "age_ms" to ageMs,
+                        "access_count" to validAd.accessCount,
+                        "source" to "cache"
+                    )
+                )
 
                 validAd.ad
             } else {
@@ -337,13 +341,15 @@ object NativeAdManager {
                         logDebug("Fallback cache hit: requested $requestedAdUnitId, served from $fallbackAdUnitId (age: ${ageMs}ms)")
 
                         // Track analytics with fallback flag
-                        trackEvent("native_ad_served", mapOf(
-                            "ad_unit_id" to requestedAdUnitId,
-                            "fallback_ad_unit_id" to fallbackAdUnitId,
-                            "age_ms" to ageMs,
-                            "access_count" to validAd.accessCount,
-                            "source" to "cache_fallback_same_unit"
-                        ))
+                        trackEvent(
+                            "native_ad_served", mapOf(
+                                "ad_unit_id" to requestedAdUnitId,
+                                "fallback_ad_unit_id" to fallbackAdUnitId,
+                                "age_ms" to ageMs,
+                                "access_count" to validAd.accessCount,
+                                "source" to "cache_fallback_same_unit"
+                            )
+                        )
 
                         return validAd.ad
                     }
@@ -404,13 +410,15 @@ object NativeAdManager {
                         logDebug("Cross-ad-unit fallback hit: requested $requestedAdUnitId, served from $fallbackAdUnitId (age: ${ageMs}ms)")
 
                         // Track analytics with cross-fallback flag
-                        trackEvent("native_ad_served", mapOf(
-                            "ad_unit_id" to requestedAdUnitId,
-                            "fallback_ad_unit_id" to fallbackAdUnitId,
-                            "age_ms" to ageMs,
-                            "access_count" to validAd.accessCount,
-                            "source" to "cache_fallback_cross_unit"
-                        ))
+                        trackEvent(
+                            "native_ad_served", mapOf(
+                                "ad_unit_id" to requestedAdUnitId,
+                                "fallback_ad_unit_id" to fallbackAdUnitId,
+                                "age_ms" to ageMs,
+                                "access_count" to validAd.accessCount,
+                                "source" to "cache_fallback_cross_unit"
+                            )
+                        )
 
                         return validAd.ad
                     }
@@ -446,19 +454,19 @@ object NativeAdManager {
         MEDIUM_LOWER("_medium"),
         LARGE_LOWER("_large")
     }
-    
+
     /**
      * Cleans up expired ads from the cache for a specific ad unit.
-     * 
+     *
      * @return Number of ads that were cleaned up
      */
     private fun cleanupExpiredAds(adUnitId: String, adList: MutableList<CachedAd>, currentTime: Long): Int {
         val iterator = adList.iterator()
         var removedCount = 0
-        
+
         while (iterator.hasNext()) {
             val cachedAd = iterator.next()
-            
+
             if (cachedAd.isExpired(currentTime, cacheExpiryMs)) {
                 cachedAd.ad.destroy()
                 iterator.remove()
@@ -466,17 +474,17 @@ object NativeAdManager {
                 totalMemoryFreed.addAndGet(cachedAd.approximateSize)
             }
         }
-        
+
         if (removedCount > 0) {
             logDebug("Cleaned up $removedCount expired ads for $adUnitId")
         }
-        
+
         return removedCount
     }
-    
+
     /**
      * Clears cached ads for a specific ad unit.
-     * 
+     *
      * @param adUnitId The ad unit ID to clear cache for
      */
     fun clearCachedAd(adUnitId: String) {
@@ -488,7 +496,7 @@ object NativeAdManager {
             cachedAds.remove(adUnitId)
         }
     }
-    
+
     /**
      * Clears all cached ads and resets the cache manager.
      */
@@ -502,24 +510,24 @@ object NativeAdManager {
                 }
             }
         }
-        
+
         cachedAds.clear()
         cacheLocks.clear()
     }
-    
+
     /**
      * Performs cleanup of expired ads across all ad units.
      */
     fun performCleanup() {
         val currentTime = System.currentTimeMillis()
         val adUnitsToRemove = mutableListOf<String>()
-        
+
         for ((adUnitId, _) in cachedAds) {
             synchronized(getLockForAdUnit(adUnitId)) {
                 val adList = cachedAds[adUnitId]
                 if (adList != null) {
                     cleanupExpiredAds(adUnitId, adList, currentTime)
-                    
+
                     // Mark empty ad units for removal
                     if (adList.isEmpty()) {
                         adUnitsToRemove.add(adUnitId)
@@ -527,22 +535,22 @@ object NativeAdManager {
                 }
             }
         }
-        
+
         // Remove empty ad units
         adUnitsToRemove.forEach { adUnitId ->
             cachedAds.remove(adUnitId)
         }
     }
-    
+
     /**
      * Gets cache statistics for debugging purposes.
-     * 
+     *
      * @return Map of ad unit ID to cache statistics
      */
     fun getCacheStatistics(): Map<String, String> {
         val stats = mutableMapOf<String, String>()
         val currentTime = System.currentTimeMillis()
-        
+
         for ((adUnitId, _) in cachedAds) {
             synchronized(getLockForAdUnit(adUnitId)) {
                 val adList = cachedAds[adUnitId]
@@ -553,27 +561,27 @@ object NativeAdManager {
                         ageMs > cacheExpiryMs
                     }
                     val validAds = totalAds - expiredAds
-                    
+
                     stats[adUnitId] = "Total: $totalAds, Valid: $validAds, Expired: $expiredAds"
                 }
             }
         }
-        
+
         return stats.toMap()
     }
-    
+
     // =================== BACKGROUND CLEANUP ===================
-    
+
     /**
      * Starts the background cleanup service.
      */
     private fun startBackgroundCleanup() {
         if (cleanupExecutor != null) return // Already started
-        
+
         cleanupExecutor = Executors.newSingleThreadScheduledExecutor { r ->
             Thread(r, "NativeAdManager-Cleanup").apply { isDaemon = true }
         }
-        
+
         cleanupExecutor?.scheduleWithFixedDelay({
             try {
                 performCleanup()
@@ -581,10 +589,10 @@ object NativeAdManager {
                 logDebug("Error during background cleanup: ${e.message}")
             }
         }, cleanupIntervalMinutes, cleanupIntervalMinutes, TimeUnit.MINUTES)
-        
+
         logDebug("Background cleanup started with ${cleanupIntervalMinutes}min interval")
     }
-    
+
     /**
      * Stops the background cleanup service.
      */
@@ -593,9 +601,9 @@ object NativeAdManager {
         cleanupExecutor = null
         logDebug("Background cleanup stopped")
     }
-    
+
     // =================== PERFORMANCE MONITORING ===================
-    
+
     /**
      * Gets comprehensive performance statistics.
      */
@@ -604,7 +612,7 @@ object NativeAdManager {
         val hitRate = if (totalRequests > 0) {
             (cacheHits.get().toDouble() / totalRequests * 100).toInt()
         } else 0
-        
+
         return mapOf(
             "cache_hits" to cacheHits.get(),
             "cache_misses" to cacheMisses.get(),
@@ -618,7 +626,7 @@ object NativeAdManager {
             "background_cleanup_enabled" to enableBackgroundCleanup
         )
     }
-    
+
     /**
      * Resets performance counters.
      */
@@ -629,7 +637,7 @@ object NativeAdManager {
         totalMemoryFreed.set(0)
         logDebug("Performance stats reset")
     }
-    
+
     // =================== CACHE WARMING & PRELOADING ===================
 
     /**
@@ -669,14 +677,17 @@ object NativeAdManager {
             size = size,
             useCachedAd = false, // Force fresh load
             callback = object : com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback {
-                override fun onAdLoaded(nativeAdView: com.google.android.gms.ads.nativead.NativeAdView, nativeAd: com.google.android.gms.ads.nativead.NativeAd) {
+                override fun onAdLoaded(
+                    nativeAdView: com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView,
+                    nativeAd: com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
+                ) {
                     // Manually cache the ad for later retrieval (preloading purpose)
                     setCachedNativeAd(adUnitId, nativeAd)
                     logDebug("✅ Preloaded and cached native ad for $adUnitId (cache size: ${getCacheSize(adUnitId)})")
                     onSuccess?.invoke()
                 }
 
-                override fun onAdFailedToLoad(error: com.google.android.gms.ads.AdError) {
+                override fun onAdFailedToLoad(error: com.google.android.libraries.ads.mobile.sdk.common.AdError) {
                     logDebug("❌ Failed to preload native ad for $adUnitId: ${error.message}")
                     onFailure?.invoke(error.message)
                 }
@@ -685,7 +696,7 @@ object NativeAdManager {
                 override fun onAdImpression() {}
                 override fun onAdOpened() {}
                 override fun onAdClosed() {}
-                override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {}
+                override fun onPaidEvent(adValue: com.google.android.libraries.ads.mobile.sdk.common.AdValue) {}
             }
         )
     }
@@ -790,7 +801,7 @@ object NativeAdManager {
         logDebug("Cache warming completed: $warmedUnits units processed")
         onComplete?.invoke(warmedUnits, totalUnits)
     }
-    
+
     /**
      * Gets the cache size for a specific ad unit.
      */
@@ -799,14 +810,14 @@ object NativeAdManager {
             return cachedAds[adUnitId]?.size ?: 0
         }
     }
-    
+
     /**
      * Gets the total number of cached ads across all ad units.
      */
     fun getTotalCacheSize(): Int {
         return cachedAds.values.sumOf { it.size }
     }
-    
+
     /**
      * Checks if there are cached ads for the specified ad unit.
      */

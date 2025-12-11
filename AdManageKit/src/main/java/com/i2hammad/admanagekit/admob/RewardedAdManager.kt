@@ -4,12 +4,14 @@ import android.app.Activity
 import android.content.Context
 import android.os.Bundle
 import android.util.Log
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.OnPaidEventListener
-import com.google.android.gms.ads.OnUserEarnedRewardListener
-import com.google.android.gms.ads.rewarded.RewardedAd
-import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.rewarded.OnUserEarnedRewardListener
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.core.BillingConfig
 
@@ -38,9 +40,9 @@ object RewardedAdManager {
             return
         }
         isLoading = true
-        val adRequest = AdRequest.Builder().build()
-        RewardedAd.load(context, adUnitId, adRequest, object : RewardedAdLoadCallback() {
-            override fun onAdFailedToLoad(adError: com.google.android.gms.ads.LoadAdError) {
+        val adRequest = AdRequest.Builder(adUnitId).build()
+        RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
+            override fun onAdFailedToLoad(adError: LoadAdError) {
                 isLoading = false
                 rewardedAd = null
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
@@ -67,7 +69,7 @@ object RewardedAdManager {
         onUserEarnedRewardListener: OnUserEarnedRewardListener,
         onAdDismissedListener: OnAdDismissedListener
     ) {
-        rewardedAd?.fullScreenContentCallback = object : FullScreenContentCallback() {
+        rewardedAd?.adEventCallback = object : RewardedAdEventCallback {
             override fun onAdClicked() {
                 Log.d(TAG, "Ad was clicked.")
             }
@@ -79,12 +81,10 @@ object RewardedAdManager {
                 onAdDismissedListener.onAdDismissed()
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
-                Log.e(TAG, "Ad failed to show fullscreen content.")
+            override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
+                Log.e(TAG, "Ad failed to show fullscreen content: ${fullScreenContentError.message}")
                 rewardedAd = null
                 onAdDismissedListener.onAdDismissed()
-
-
             }
 
             override fun onAdImpression() {
@@ -99,18 +99,25 @@ object RewardedAdManager {
             override fun onAdShowedFullScreenContent() {
                 Log.d(TAG, "Ad showed fullscreen content.")
             }
+
+            override fun onAdPaid(value: AdValue) {
+                super.onAdPaid(value)
+
+                val adValueInStandardUnits = value.valueMicros / 1000000.0
+
+                // Log Firebase event for paid event
+                val params = Bundle()
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                params.putString(FirebaseAnalytics.Param.CURRENCY, value.currencyCode)
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
+            }
         }
 
-        rewardedAd?.onPaidEventListener = OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
-            val adValueInStandardUnits = adValue.valueMicros / 1000000.0
-
-            // Log Firebase event for paid event
-            val params = Bundle()
-            params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-            params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-            params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-            firebaseAnalytics?.logEvent("ad_paid_event", params)
-        }
+//        rewardedAd?.onPaidEventListener =
+//            OnPaidEventListener { adValue -> // Convert the value from micros to the standard currency unit
+//
+//            }
 
         rewardedAd?.let {
             it.show(activity, onUserEarnedRewardListener)

@@ -1,7 +1,10 @@
 package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
-import com.google.android.gms.ads.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 
@@ -378,8 +381,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         everyNthCall?.let { nth ->
             if (callCount % nth != 0) {
                 if (debugMode) {
-                    android.util.Log.d("InterstitialBuilder",
-                        "Not Nth time (call #$callCount, showing every ${nth}th), skipping ad")
+                    android.util.Log.d(
+                        "InterstitialBuilder",
+                        "Not Nth time (call #$callCount, showing every ${nth}th), skipping ad"
+                    )
                 }
                 onComplete()
                 return
@@ -390,8 +395,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         maxShows?.let { max ->
             if (adManager.getAdDisplayCount() >= max) {
                 if (debugMode) {
-                    android.util.Log.d("InterstitialBuilder",
-                        "Max shows limit reached (${adManager.getAdDisplayCount()}/$max), skipping ad")
+                    android.util.Log.d(
+                        "InterstitialBuilder",
+                        "Max shows limit reached (${adManager.getAdDisplayCount()}/$max), skipping ad"
+                    )
                 }
                 onComplete()
                 return
@@ -405,8 +412,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             if (!forceShow && timeSinceLastAd < minInterval) {
                 if (debugMode) {
                     val remainingMs = minInterval - timeSinceLastAd
-                    android.util.Log.d("InterstitialBuilder",
-                        "Min interval not met (${timeSinceLastAd}ms < ${minInterval}ms, ${remainingMs}ms remaining), skipping ad")
+                    android.util.Log.d(
+                        "InterstitialBuilder",
+                        "Min interval not met (${timeSinceLastAd}ms < ${minInterval}ms, ${remainingMs}ms remaining), skipping ad"
+                    )
                 }
                 onComplete()
                 return
@@ -425,10 +434,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                 onComplete()
             }
 
-            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(error: com.google.android.libraries.ads.mobile.sdk.common.AdError?) {
                 if (debugMode) android.util.Log.e("InterstitialBuilder", "Ad failed: ${error?.message}")
                 error?.let {
-                    val loadError = LoadAdError(it.code, it.message, it.domain, it.cause, null)
+                    val loadError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, it.message, null)
                     onAdFailedCallback?.invoke(loadError)
                 }
                 onComplete()
@@ -462,7 +471,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                 // Only show if ad is already ready (cached), skip if not
                 val effectiveAutoReload = autoReload ?: AdManageKitConfig.interstitialAutoReload
                 if (adManager.isReady()) {
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "ONLY_CACHE: Ad ready, showing cached ad (autoReload=$effectiveAutoReload)")
+                    if (debugMode) android.util.Log.d(
+                        "InterstitialBuilder",
+                        "ONLY_CACHE: Ad ready, showing cached ad (autoReload=$effectiveAutoReload)"
+                    )
                     // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
                     adManager.showInterstitialIfReady(activity, showCallback, effectiveAutoReload)
                 } else {
@@ -476,12 +488,18 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                 val effectiveAutoReload = autoReload ?: AdManageKitConfig.interstitialAutoReload
                 if (adManager.isReady()) {
                     // Ad is ready, show cached ad instantly
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad cached, showing cached ad (autoReload=$effectiveAutoReload)")
+                    if (debugMode) android.util.Log.d(
+                        "InterstitialBuilder",
+                        "HYBRID: Ad cached, showing cached ad (autoReload=$effectiveAutoReload)"
+                    )
                     // Use showInterstitialIfReady to show CACHED ad (not forceShow which fetches fresh!)
                     adManager.showInterstitialIfReady(activity, showCallback, effectiveAutoReload)
                 } else {
                     // Ad not ready, fetch with dialog
-                    if (debugMode) android.util.Log.d("InterstitialBuilder", "HYBRID: Ad not cached, fetching with dialog")
+                    if (debugMode) android.util.Log.d(
+                        "InterstitialBuilder",
+                        "HYBRID: Ad not cached, fetching with dialog"
+                    )
                     showWithDialog(showCallback, onComplete)
                 }
             }
@@ -489,7 +507,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
             AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
                 // Try fresh first, fall back to cache if fresh load fails/times out
                 // AdManager.forceShowInterstitialInternal now preserves cached ad as fallback
-                if (debugMode) android.util.Log.d("InterstitialBuilder", "FRESH_WITH_CACHE_FALLBACK: Fetching fresh, cached ad as fallback")
+                if (debugMode) android.util.Log.d(
+                    "InterstitialBuilder",
+                    "FRESH_WITH_CACHE_FALLBACK: Fetching fresh, cached ad as fallback"
+                )
                 showWithDialog(showCallback, onComplete)
             }
         }
@@ -555,13 +576,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
 
         if (index >= allUnits.size) {
             // All ad units failed
-            val error = LoadAdError(
-                0,
-                "All ad units failed to load (tried ${allUnits.size} units)",
-                "AdManageKit",
-                null,
-                null
-            )
+            val error = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "All ad units failed to load (tried ${allUnits.size} units)", null)
             onFailure(error)
             return
         }
@@ -569,27 +584,25 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         val currentUnit = allUnits[index]
         val isLastUnit = index == allUnits.size - 1
 
-        adManager.loadInterstitialAd(
-            activity,
-            currentUnit,
-            object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) {
-                    // Ad loaded successfully
-                    onAdLoadedCallback?.invoke()
-                    onSuccess()
-                }
+        val adRequest = AdRequest.Builder(currentUnit).build()
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    if (isLastUnit) {
-                        // This was the last fallback, fail completely
-                        onFailure(error)
-                    } else {
-                        // Try next fallback
-                        loadWithFallback(index + 1, onSuccess, onFailure)
-                    }
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
+            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                // Ad loaded successfully
+                onAdLoadedCallback?.invoke()
+                onSuccess()
+            }
+
+            override fun onAdFailedToLoad(error: LoadAdError) {
+                if (isLastUnit) {
+                    // This was the last fallback, fail completely
+                    onFailure(error)
+                } else {
+                    // Try next fallback
+                    loadWithFallback(index + 1, onSuccess, onFailure)
                 }
             }
-        )
+        })
     }
 }
 
