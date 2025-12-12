@@ -5,22 +5,29 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.1.0`** adds **FRESH_WITH_CACHE_FALLBACK caching fix** and **MEDIUM_HORIZONTAL template**.
+**Latest Version `4.0.0`** brings **GMA Next-Gen SDK migration**, **Preloader system**, and **Single-Activity app support**.
 
-## What's New in 3.1.0
+## What's New in 4.0.0
 
-### FRESH_WITH_CACHE_FALLBACK Strategy Fix
-- **Auto-Caching**: Successfully loaded ads are now properly cached for future fallback
-- **RecyclerView Optimized**: Fresh ads build up the cache over time for better fallback availability
-- **Complete Implementation**: Strategy now works as documented
+### GMA Next-Gen SDK Migration
+- **Full Migration**: Updated to Google Mobile Ads Next-Gen SDK
+- **Background Thread Safety**: All callbacks now properly dispatch to main thread
+- **Modern Architecture**: Uses new preloader-based ad loading system
 
-### New Native Template
-- **MEDIUM_HORIZONTAL**: 55% media (left) / 45% content (right) horizontal split layout
-- **24 Total Templates**: 18 standard + 6 video templates
+### Preloader System
+- **Efficient Loading**: All ad types support SDK preloaders (Interstitial, App Open, Native, Rewarded, Banner)
+- **Auto-Refill**: SDK automatically loads next ad after one is consumed
+- **Configurable**: Enable/disable and set buffer sizes per ad type
 
-### Test Activity Improvements
-- **Video Ad Toggle**: Switch between standard and video native ad test units
-- **Updated Template Notes**: Reflects all 24 available templates
+### Single-Activity App Support
+- **Screen Tag Exclusions**: Control app open ads by screen/destination
+- **Fragment Tag Exclusions**: Exclude specific fragments from showing ads
+- **Temporary Disable**: Pause ads during critical flows
+
+### Preloader Configuration
+- **Centralized Control**: Configure all preloaders via `AdManageKitConfig`
+- **Buffer Sizes**: Set how many ads to keep ready per type
+- **Per-Type Control**: Enable/disable preloaders individually
 
 ## What's New in 3.0.0
 
@@ -77,12 +84,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.1.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.1.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.0.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.0.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -112,12 +119,13 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.1.0'
 - **Banner Ads**: Auto-refresh, collapsible banners, smart retry
 - **Native Ads**: Small, Medium, Large formats with caching
 - **Interstitial Ads**: Time/count-based triggers, dialog support
-- **App Open Ads**: Lifecycle-aware with activity exclusion
+- **App Open Ads**: Lifecycle-aware with activity/screen/fragment exclusion
 
 ### Centralized Configuration
 - **AdManageKitConfig**: Single configuration point
 - Environment-specific settings (debug vs production)
 - Runtime configuration changes
+- **Preloader Control** (v4.0.0+): Enable/disable and configure preloaders per ad type
 
 ### Intelligent Native Ad Caching
 - Screen-aware caching prevents collisions
@@ -316,6 +324,31 @@ appOpenManager.forceShowAdIfAvailable(activity, callback)
 appOpenManager.skipNextAd()
 ```
 
+#### Single-Activity App Support (v4.0.0+)
+
+For apps with one activity and multiple fragments:
+
+```kotlin
+// Set current screen tag when navigating
+navController.addOnDestinationChangedListener { _, destination, _ ->
+    appOpenManager.setCurrentScreenTag(destination.label?.toString())
+}
+
+// Exclude specific screens
+appOpenManager.excludeScreenTags("Payment", "Onboarding", "Checkout")
+
+// Or use fragment tag provider
+appOpenManager.setFragmentTagProvider {
+    supportFragmentManager.fragments.lastOrNull()?.tag
+}
+appOpenManager.excludeFragmentTags("PaymentFragment", "OnboardingFragment")
+
+// Temporarily disable during critical flows
+appOpenManager.disableAppOpenAdsTemporarily()
+// ... perform operation ...
+appOpenManager.enableAppOpenAds()
+```
+
 ### Jetpack Compose
 
 ```kotlin
@@ -446,6 +479,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.0.0](docs/release-notes/RELEASE_NOTES_v4.0.0.md)
 - [Release Notes v3.1.0](docs/release-notes/RELEASE_NOTES_v3.1.0.md)
 - [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
 - [API Reference](docs/API_REFERENCE.md)
@@ -472,6 +506,38 @@ Output: `build/dokka/htmlMultiModule/index.html`
 ---
 
 ## Migration Guide
+
+### Migrating to 4.0.0
+
+Version 4.0.0 migrates to **GMA Next-Gen SDK** and is **largely backward compatible**.
+
+#### GMA SDK Change
+The library now uses `com.google.android.libraries.ads.mobile.sdk.*` internally. Your code doesn't need changes - all threading is handled automatically.
+
+#### New: Single-Activity App Support
+If you have one activity with multiple fragments, you can now control app open ads per screen:
+
+```kotlin
+// In Application class
+appOpenManager = AppOpenManager(this, adUnitId).apply {
+    excludeScreenTags("Payment", "Onboarding")
+}
+
+// In MainActivity - set current screen on navigation
+navController.addOnDestinationChangedListener { _, destination, _ ->
+    appOpenManager.setCurrentScreenTag(destination.label?.toString())
+}
+```
+
+#### Optional: Configure Preloaders
+```kotlin
+AdManageKitConfig.apply {
+    enableInterstitialPreloader = true  // default
+    enableAppOpenPreloader = true       // default
+    enableBannerPreloader = false       // opt-in
+    interstitialPreloaderBufferSize = 2
+}
+```
 
 ### Migrating to 3.0.0
 

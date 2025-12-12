@@ -20,14 +20,16 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.google.android.gms.ads.AdError
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
-import com.google.android.libraries.ads.mobile.sdk.common.Ad
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdPreloader
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
+import com.google.android.libraries.ads.mobile.sdk.common.ResponseInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.admob.AppOpenManager.Companion.isShowingAd
@@ -58,9 +60,26 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val excludedActivities: MutableSet<Class<*>> = HashSet()
     private val excludedActivityNames: MutableSet<String> = HashSet() // Cache for performance
 
+    // Fragment-based and tag-based exclusions for single-activity apps
+    private val excludedFragmentTags: MutableSet<String> = HashSet()
+    private val excludedScreenTags: MutableSet<String> = HashSet()
+    @Volatile
+    private var currentScreenTag: String? = null
+    private var fragmentTagProvider: (() -> String?)? = null
+
     private val skipNextAd = AtomicBoolean(false)
     private val isLoading = AtomicBoolean(false)  // Prevents concurrent ad requests
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
+
+    // Preloader state
+    private val preloaderActive = AtomicBoolean(false)
+
+    /**
+     * Enable preloader mode for more efficient ad loading.
+     * When enabled, uses AppOpenAdPreloader instead of manual loading.
+     * The SDK handles caching and background loading automatically.
+     */
+    var usePreloader: Boolean = true
 
     // Reusable handler for timeouts
     private val timeoutHandler = Handler(Looper.getMainLooper())
@@ -344,15 +363,28 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             }
 
             Log.d(LOG_TAG, "Showing ad on activity: ${currentActivity.javaClass.simpleName}")
-            val eventCallback = createAppOpenAdEventCallback("regular", null)
 
-            appOpenAd?.apply {
-//                setOnPaidEventListener(createPaidEventListener())
-                adEventCallback = eventCallback
-                try {
-                    show(currentActivity)
-                } catch (e: Exception) {
-                    Log.e(LOG_TAG, "Error showing ad: ${e.message}")
+            // Use preloader if active, otherwise use manually loaded ad
+            if (usePreloader && preloaderActive.get() && AppOpenAdPreloader.isAdAvailable(adUnitId)) {
+                val preloadedAd = pollPreloadedAd()
+                if (preloadedAd != null) {
+                    val eventCallback = createAppOpenAdEventCallback("preloaded", null)
+                    preloadedAd.adEventCallback = eventCallback
+                    try {
+                        preloadedAd.show(currentActivity)
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Error showing preloaded ad: ${e.message}")
+                    }
+                }
+            } else {
+                val eventCallback = createAppOpenAdEventCallback("regular", null)
+                appOpenAd?.apply {
+                    adEventCallback = eventCallback
+                    try {
+                        show(currentActivity)
+                    } catch (e: Exception) {
+                        Log.e(LOG_TAG, "Error showing ad: ${e.message}")
+                    }
                 }
             }
         } else if (!isAdAvailable() && currentActivity != null) {
@@ -392,6 +424,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
 
         val request = getAdRequest(adUnitId)
+        val mainHandler = Handler(Looper.getMainLooper())
         AppOpenAd.load(
             request,
             object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<AppOpenAd> {
@@ -405,12 +438,15 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         currentWelcomeDialog = dialogViews
                         Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
 
-                        if (!activity.isFinishing && !activity.isDestroyed) {
-                            showLoadedAd(activity, callback)
-                        } else {
-                            Log.d(LOG_TAG, "Activity not in valid state after ad load")
-                            dismissWelcomeDialogWithDelay(dialogViews)
-                            callback?.onNextAction()
+                        // Switch to main thread for UI operations
+                        mainHandler.post {
+                            if (!activity.isFinishing && !activity.isDestroyed) {
+                                showLoadedAd(activity, callback)
+                            } else {
+                                Log.d(LOG_TAG, "Activity not in valid state after ad load")
+                                dismissWelcomeDialogWithDelay(dialogViews)
+                                callback?.onNextAction()
+                            }
                         }
                     }
                 }
@@ -419,8 +455,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         logFailedToLoadEvent(error)
-                        animateDialogDismissal(dialogViews) {
-                            callback?.onNextAction()
+                        // Switch to main thread for UI operations
+                        mainHandler.post {
+                            animateDialogDismissal(dialogViews) {
+                                callback?.onNextAction()
+                            }
                         }
                     }
                 }
@@ -438,21 +477,28 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
 
         val request = getAdRequest(adUnitId)
+        val mainHandler = Handler(Looper.getMainLooper())
         AppOpenAd.load(
             request,
             object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<AppOpenAd> {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     appOpenAd = ad
-                    if (!activity.isFinishing) {
-                        showLoadedAd(activity, callback)
-                    } else {
-                        callback?.onNextAction()
+                    // Switch to main thread for UI operations
+                    mainHandler.post {
+                        if (!activity.isFinishing) {
+                            showLoadedAd(activity, callback)
+                        } else {
+                            callback?.onNextAction()
+                        }
                     }
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     logFailedToLoadEvent(error)
-                    callback?.onNextAction()
+                    // Switch to main thread for callback
+                    mainHandler.post {
+                        callback?.onNextAction()
+                    }
                 }
             }
         )
@@ -545,12 +591,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private fun getCurrentActivity(): Activity? = currentActivity
 
     /**
-     * Check if activity is excluded with performance optimization
+     * Check if activity is excluded with performance optimization.
+     * Also checks screen/fragment tags for single-activity apps.
      */
     private fun isActivityExcluded(activityClass: Class<*>): Boolean {
         val className = activityClass.name
 
-        // Fast path: check cache first
+        // Fast path: check activity cache first
         synchronized(excludedActivities) {
             if (excludedActivityNames.contains(className)) {
                 return true
@@ -560,18 +607,55 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             val isExcluded = excludedActivities.contains(activityClass)
             if (isExcluded) {
                 excludedActivityNames.add(className) // Cache for future lookups
+                return true
             }
-            return isExcluded
         }
+
+        // Check screen/fragment tag exclusions for single-activity apps
+        if (isCurrentScreenExcluded()) {
+            return true
+        }
+
+        return false
     }
 
     /**
-     * Create reusable full screen content callback
+     * Check if the current screen (fragment/destination) is excluded.
+     * Used for single-activity apps with multiple fragments.
      */
+    private fun isCurrentScreenExcluded(): Boolean {
+        // Check manually set current screen tag
+        val screenTag = currentScreenTag
+        if (screenTag != null) {
+            synchronized(excludedScreenTags) {
+                if (excludedScreenTags.contains(screenTag)) {
+                    Log.d(LOG_TAG, "Screen tag '$screenTag' is excluded from app open ads")
+                    return true
+                }
+            }
+        }
+
+        // Check fragment tag provider if set
+        val fragmentTag = fragmentTagProvider?.invoke()
+        if (fragmentTag != null) {
+            synchronized(excludedFragmentTags) {
+                if (excludedFragmentTags.contains(fragmentTag)) {
+                    Log.d(LOG_TAG, "Fragment tag '$fragmentTag' is excluded from app open ads")
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
     /**
      * Create reusable app open ad event callback
+     * Note: GMA Next-Gen SDK calls these callbacks on background threads,
+     * so we must switch to main thread for UI operations and user callbacks.
      */
     private fun createAppOpenAdEventCallback(type: String, callback: AdManagerCallback?): AppOpenAdEventCallback {
+        val mainHandler = Handler(Looper.getMainLooper())
         return object : AppOpenAdEventCallback {
             override fun onAdDismissedFullScreenContent() {
                 appOpenAd = null
@@ -582,11 +666,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 }
                 AdDebugUtils.logEvent(adUnitId, "onAdDismissed", logMessage, true)
 
-                // Clear dialog reference if still set
-                currentWelcomeDialog = null
+                // Switch to main thread for UI operations and callbacks
+                mainHandler.post {
+                    // Clear dialog reference if still set
+                    currentWelcomeDialog = null
 
 //                fetchAd()
-                callback?.onNextAction()
+                    callback?.onNextAction()
+                }
             }
 
             override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
@@ -603,36 +690,43 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     )
                 )
 
-                // Dismiss dialog immediately if ad fails to show
-                currentWelcomeDialog?.let { dialogViews ->
-                    dismissDialogSafely(dialogViews.dialog)
-                    currentWelcomeDialog = null
-                }
+                // Switch to main thread for UI operations and callbacks
+                mainHandler.post {
+                    // Dismiss dialog immediately if ad fails to show
+                    currentWelcomeDialog?.let { dialogViews ->
+                        dismissDialogSafely(dialogViews.dialog)
+                        currentWelcomeDialog = null
+                    }
 
-                callback?.onNextAction()
+                    callback?.onNextAction()
+                }
             }
 
             override fun onAdShowedFullScreenContent() {
                 isShowingAd.set(true)
                 isShownAd.set(true)
 
-                // Dismiss welcome dialog with delay NOW (while ad is showing)
-                dismissWelcomeDialogWithDelay(currentWelcomeDialog)
                 val logMessage = when (type) {
                     "forced" -> "App open ad shown (forced)"
                     else -> "App open ad shown"
                 }
                 AdDebugUtils.logEvent(adUnitId, "onAdImpression", logMessage, true)
 
-                if (type == "forced") {
-                    callback?.onAdLoaded()
+                // Switch to main thread for UI operations and callbacks
+                mainHandler.post {
+                    // Dismiss welcome dialog with delay NOW (while ad is showing)
+                    dismissWelcomeDialogWithDelay(currentWelcomeDialog)
+
+                    if (type == "forced") {
+                        callback?.onAdLoaded()
+                    }
                 }
 
                 logAdImpressionEvent()
             }
 
             override fun onAdImpression() {
-                // Usually redundant if onAdShowedFullScreenContent covers impression logic, 
+                // Usually redundant if onAdShowedFullScreenContent covers impression logic,
                 // but good for tracking if checking pure impressions
             }
 
@@ -689,6 +783,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Clean up resources and prevent memory leaks
      */
     fun cleanup() {
+        // Stop preloader if active
+        if (preloaderActive.get()) {
+            stopPreloading()
+        }
+
         // Cancel all pending timeouts
         synchronized(pendingTimeouts) {
             pendingTimeouts.forEach { timeoutHandler.removeCallbacks(it) }
@@ -709,6 +808,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         isShowingAd.set(false)
         skipNextAd.set(false)
         isLoading.set(false)
+        preloaderActive.set(false)
 
         // Unregister lifecycle callbacks
         try {
@@ -747,7 +847,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Request an ad
+     * Request an ad.
+     * If usePreloader is true, starts the preloader; otherwise uses traditional loading.
      */
     fun fetchAd() {
         // Don't fetch ads if user has purchased
@@ -756,7 +857,129 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             Log.d(LOG_TAG, "User has purchased, skipping ad fetch.")
             return
         }
-        fetchAdWithRetry(0)
+
+        if (usePreloader) {
+            startPreloading()
+        } else {
+            fetchAdWithRetry(0)
+        }
+    }
+
+    // =================== PRELOADER API ===================
+
+    /**
+     * Starts the AppOpenAdPreloader for this ad unit.
+     * The SDK will automatically load ads in the background and keep them ready.
+     */
+    fun startPreloading() {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d(LOG_TAG, "User has purchased, skipping preloader start.")
+            return
+        }
+
+        if (preloaderActive.get()) {
+            Log.d(LOG_TAG, "Preloader already active for $adUnitId")
+            return
+        }
+
+        Log.d(LOG_TAG, "Starting AppOpenAdPreloader for $adUnitId")
+
+        val preloadCallback = object : PreloadCallback {
+            override fun onAdPreloaded(preloadId: String, responseInfo: ResponseInfo) {
+                Log.d(LOG_TAG, "App open ad preloaded for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onPreloaded", "App open ad preloaded", true)
+            }
+
+            override fun onAdFailedToPreload(preloadId: String, adError: LoadAdError) {
+                Log.e(LOG_TAG, "App open ad failed to preload for $adUnitId: ${adError.message}")
+                AdDebugUtils.logEvent(adUnitId, "onFailedToPreload", "App open ad failed to preload: ${adError.message}", false)
+                logFailedToLoadEvent(adError)
+            }
+
+            override fun onAdsExhausted(preloadId: String) {
+                Log.d(LOG_TAG, "App open ads exhausted for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onAdsExhausted", "App open ads exhausted", false)
+            }
+        }
+
+        val adRequest = AdRequest.Builder(adUnitId).build()
+        val preloadConfig = PreloadConfiguration(adRequest)
+
+        AppOpenAdPreloader.start(adUnitId, preloadConfig, preloadCallback)
+        preloaderActive.set(true)
+
+        Log.d(LOG_TAG, "AppOpenAdPreloader started for $adUnitId")
+    }
+
+    /**
+     * Marks the AppOpenAdPreloader as inactive for this ad unit.
+     * Note: GMA Next-Gen SDK preloaders don't have a stop method - they run until app termination.
+     * This method just clears our tracking state.
+     */
+    fun stopPreloading() {
+        if (!preloaderActive.get()) {
+            Log.d(LOG_TAG, "Preloader not active for $adUnitId")
+            return
+        }
+
+        // Note: GMA Next-Gen SDK preloaders don't have stop() - they run until app termination
+        preloaderActive.set(false)
+        Log.d(LOG_TAG, "AppOpenAdPreloader marked inactive for $adUnitId (SDK preloader continues in background)")
+    }
+
+    /**
+     * Checks if a preloaded ad is available.
+     */
+    fun isPreloadedAdAvailable(): Boolean {
+        return AppOpenAdPreloader.isAdAvailable(adUnitId)
+    }
+
+    /**
+     * Polls (retrieves) a preloaded app open ad.
+     * The SDK will automatically load another ad in the background after polling.
+     *
+     * @return The app open ad if available, null otherwise
+     */
+    fun pollPreloadedAd(): AppOpenAd? {
+        val ad = AppOpenAdPreloader.pollAd(adUnitId)
+        if (ad != null) {
+            Log.d(LOG_TAG, "Polled preloaded app open ad for $adUnitId")
+            AdDebugUtils.logEvent(adUnitId, "pollAd", "Polled preloaded app open ad", true)
+        } else {
+            Log.d(LOG_TAG, "No preloaded app open ad available for $adUnitId")
+        }
+        return ad
+    }
+
+    /**
+     * Shows a preloaded ad if available.
+     * Uses the preloader's pollAd to get the ad and shows it.
+     *
+     * @param activity The activity to show the ad on
+     * @param callback Optional callback for ad events
+     * @return true if ad was shown, false if no ad available
+     */
+    fun showPreloadedAd(activity: Activity, callback: AdManagerCallback? = null): Boolean {
+        val ad = pollPreloadedAd()
+        if (ad == null) {
+            Log.d(LOG_TAG, "No preloaded ad to show")
+            callback?.onNextAction()
+            return false
+        }
+
+        // Set up event callback
+        val eventCallback = createAppOpenAdEventCallback("preloaded", callback)
+        ad.adEventCallback = eventCallback
+
+        try {
+            ad.show(activity)
+            return true
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Error showing preloaded ad: ${e.message}")
+            callback?.onNextAction()
+            return false
+        }
     }
 
     /**
@@ -1018,8 +1241,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     /**
      * Utility method that checks if ad exists and can be shown.
      * Thread-safe implementation.
+     * Checks both preloader and manually loaded ad.
      */
     fun isAdAvailable(): Boolean {
+        // Check preloader first if active
+        if (usePreloader && preloaderActive.get() && AppOpenAdPreloader.isAdAvailable(adUnitId)) {
+            return true
+        }
+        // Fallback to manually loaded ad
         return appOpenAd != null
     }
 
@@ -1128,6 +1357,136 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             excludedActivityNames.remove(activityClass.name) // Update cache
         }
     }
+
+    // =================== SCREEN/FRAGMENT TAG EXCLUSIONS ===================
+    // For single-activity apps with multiple fragments
+
+    /**
+     * Set the current screen tag. Call this when navigating between screens/fragments.
+     * If the screen tag is in the excluded list, app open ads won't show.
+     *
+     * Example usage with Navigation Component:
+     * ```kotlin
+     * navController.addOnDestinationChangedListener { _, destination, _ ->
+     *     appOpenManager.setCurrentScreenTag(destination.label?.toString())
+     * }
+     * ```
+     *
+     * @param tag The current screen/fragment tag
+     */
+    fun setCurrentScreenTag(tag: String?) {
+        currentScreenTag = tag
+        Log.d(LOG_TAG, "Current screen tag set to: $tag")
+    }
+
+    /**
+     * Get the current screen tag.
+     */
+    fun getCurrentScreenTag(): String? = currentScreenTag
+
+    /**
+     * Add a screen tag to the exclusion list.
+     * App open ads won't show when the current screen tag matches.
+     *
+     * @param tag The screen tag to exclude
+     */
+    fun excludeScreenTag(tag: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.add(tag)
+        }
+        Log.d(LOG_TAG, "Screen tag '$tag' excluded")
+    }
+
+    /**
+     * Add multiple screen tags to the exclusion list.
+     */
+    fun excludeScreenTags(vararg tags: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.addAll(tags)
+        }
+        Log.d(LOG_TAG, "Screen tags ${tags.toList()} excluded")
+    }
+
+    /**
+     * Remove a screen tag from the exclusion list.
+     */
+    fun includeScreenTag(tag: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.remove(tag)
+        }
+    }
+
+    /**
+     * Clear all screen tag exclusions.
+     */
+    fun clearScreenTagExclusions() {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.clear()
+        }
+    }
+
+    /**
+     * Set a fragment tag provider for automatic detection.
+     *
+     * Example:
+     * ```kotlin
+     * appOpenManager.setFragmentTagProvider {
+     *     supportFragmentManager.fragments.lastOrNull()?.tag
+     * }
+     * ```
+     */
+    fun setFragmentTagProvider(provider: (() -> String?)?) {
+        fragmentTagProvider = provider
+    }
+
+    /**
+     * Add a fragment tag to the exclusion list.
+     */
+    fun excludeFragmentTag(tag: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.add(tag)
+        }
+    }
+
+    /**
+     * Add multiple fragment tags to the exclusion list.
+     */
+    fun excludeFragmentTags(vararg tags: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.addAll(tags)
+        }
+    }
+
+    /**
+     * Remove a fragment tag from the exclusion list.
+     */
+    fun includeFragmentTag(tag: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.remove(tag)
+        }
+    }
+
+    /**
+     * Temporarily disable app open ads for a flow.
+     * Call enableAppOpenAds() when done.
+     */
+    fun disableAppOpenAdsTemporarily() {
+        skipNextAd.set(true)
+        Log.d(LOG_TAG, "App open ads temporarily disabled")
+    }
+
+    /**
+     * Re-enable app open ads.
+     */
+    fun enableAppOpenAds() {
+        skipNextAd.set(false)
+        Log.d(LOG_TAG, "App open ads re-enabled")
+    }
+
+    /**
+     * Check if app open ads are currently enabled.
+     */
+    fun areAppOpenAdsEnabled(): Boolean = !skipNextAd.get()
 
     override fun onStart(owner: LifecycleOwner) {
         val purchaseProvider = BillingConfig.getPurchaseProvider()

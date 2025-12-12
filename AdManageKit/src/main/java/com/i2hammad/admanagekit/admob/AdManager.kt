@@ -19,10 +19,15 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
+import com.google.android.libraries.ads.mobile.sdk.common.ResponseInfo
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdPreloader
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 import com.google.firebase.analytics.FirebaseAnalytics
@@ -82,6 +87,20 @@ class AdManager() {
 
     // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
+
+    // =================== PRELOADER STATE ===================
+
+    // Track active preloaders by ad unit ID
+    private val activePreloaders = ConcurrentHashMap<String, Boolean>()
+
+    /**
+     * Enable preloader mode for more efficient ad loading.
+     * When enabled, uses InterstitialAdPreloader instead of manual loading.
+     * The SDK handles caching and background loading automatically.
+     *
+     * Default: false (uses traditional ad pool approach)
+     */
+    var usePreloader: Boolean = false
 
     companion object {
         const val PURCHASED_APP_ERROR_CODE = 1001
@@ -226,6 +245,7 @@ class AdManager() {
         var callbackCalled = false  // Prevent double callbacks
 
         // Load the interstitial ad
+        val mainHandler = Handler(Looper.getMainLooper())
         InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad (improves show rate even if timeout already fired)
@@ -237,8 +257,11 @@ class AdManager() {
                 // Only call callback if not already called by timeout
                 if (!callbackCalled) {
                     callbackCalled = true
-                    callback.onNextAction()
-                    callback.onAdLoaded()
+                    // Switch to main thread for callback (may trigger UI operations)
+                    mainHandler.post {
+                        callback.onNextAction()
+                        callback.onAdLoaded()
+                    }
                 } else {
                     // Ad loaded after timeout - it's saved for next use (not wasted!)
                     AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
@@ -287,8 +310,11 @@ class AdManager() {
                 // Only call callback if not already called by timeout
                 if (!callbackCalled) {
                     callbackCalled = true
-                    callback.onNextAction()
-                    callback.onFailedToLoad(loadAdError)
+                    // Switch to main thread for callback (may trigger UI operations)
+                    mainHandler.post {
+                        callback.onNextAction()
+                        callback.onFailedToLoad(loadAdError)
+                    }
                 }
             }
         })
@@ -476,6 +502,7 @@ class AdManager() {
         val adRequest = AdRequest.Builder(adUnitId).build()
 
         isAdLoading = true
+        val mainHandler = Handler(Looper.getMainLooper())
         InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 mInterstitialAd = interstitialAd
@@ -483,7 +510,10 @@ class AdManager() {
                 Log.d("AdManager", "Interstitial ad loaded")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded with callback", true)
 
-                interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
+                // Switch to main thread for callback (may trigger UI operations)
+                mainHandler.post {
+                    interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
+                }
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -522,7 +552,11 @@ class AdManager() {
                     }
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
-                interstitialAdLoadCallback.onAdFailedToLoad(loadAdError)
+
+                // Switch to main thread for callback (may trigger UI operations)
+                mainHandler.post {
+                    interstitialAdLoadCallback.onAdFailedToLoad(loadAdError)
+                }
             }
         })
     }
@@ -731,6 +765,7 @@ class AdManager() {
             return false
         }
 
+        val mainHandler = Handler(Looper.getMainLooper())
         InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad
@@ -748,9 +783,11 @@ class AdManager() {
                 AdDebugUtils.logEvent(currentAdUnitId, "onAdLoaded", "Fresh interstitial loaded for force show", true)
 
                 val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
-                // Animate dialog dismissal and show fresh ad
-                dismissDialogOnce {
-                    showAd(activity, callback, effectiveAutoReload)
+                // Switch to main thread for UI operations (dialog dismissal/animation)
+                mainHandler.post {
+                    dismissDialogOnce {
+                        showAd(activity, callback, effectiveAutoReload)
+                    }
                 }
             }
 
@@ -775,10 +812,13 @@ class AdManager() {
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
-                // Try cached fallback before giving up
-                if (!showCachedFallback()) {
-                    dismissDialogOnce {
-                        callback.onNextAction()
+                // Switch to main thread for UI operations (dialog dismissal/animation)
+                mainHandler.post {
+                    // Try cached fallback before giving up
+                    if (!showCachedFallback()) {
+                        dismissDialogOnce {
+                            callback.onNextAction()
+                        }
                     }
                 }
             }
@@ -919,14 +959,23 @@ class AdManager() {
     }
 
     /**
-     * Check if ANY interstitial ad is ready in the pool.
+     * Check if ANY interstitial ad is ready in the pool or preloader.
      * @return true if at least one ad is available to show
      */
     fun isReady(): Boolean {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) return false
 
-        // Check pool first, then legacy single ad
+        // Check preloader first if enabled
+        if (usePreloader) {
+            for (adUnit in activePreloaders.keys) {
+                if (InterstitialAdPreloader.isAdAvailable(adUnit)) {
+                    return true
+                }
+            }
+        }
+
+        // Check pool, then legacy single ad
         return adPool.isNotEmpty() || mInterstitialAd != null
     }
 
@@ -1031,12 +1080,14 @@ class AdManager() {
         Log.d("AdManager", "Showing ad from unit: $shownAdUnitId (remaining in pool: ${adPool.size})")
         AdDebugUtils.logEvent(shownAdUnitId, "showingFromPool", "Pool size after: ${adPool.size}", true)
 
+        // Note: GMA Next-Gen SDK calls these callbacks on background threads,
+        // so we must switch to main thread for UI operations and user callbacks.
+        val eventMainHandler = Handler(Looper.getMainLooper())
         interstitialAd.adEventCallback = object : InterstitialAdEventCallback {
             override fun onAdDismissedFullScreenContent() {
                 isDisplayingAd = false
                 mInterstitialAd = null
                 AdDebugUtils.logEvent(shownAdUnitId, "onAdDismissed", "Interstitial ad dismissed", true)
-                callback.onNextAction()
 
                 // Log Firebase event for ad dismissed
                 val params = Bundle().apply {
@@ -1044,11 +1095,16 @@ class AdManager() {
                 }
                 firebaseAnalytics.logEvent("ad_dismissed", params)
 
-                // CRITICAL: Reload the SPECIFIC unit that was shown
-                if (reloadAd) {
-                    retryAttempts.remove(shownAdUnitId)
-                    Log.d("AdManager", "Auto-reloading ad unit: $shownAdUnitId")
-                    loadInterstitialAd(activity, shownAdUnitId)
+                // Switch to main thread for callback and potential UI operations
+                eventMainHandler.post {
+                    callback.onNextAction()
+
+                    // CRITICAL: Reload the SPECIFIC unit that was shown
+                    if (reloadAd) {
+                        retryAttempts.remove(shownAdUnitId)
+                        Log.d("AdManager", "Auto-reloading ad unit: $shownAdUnitId")
+                        loadInterstitialAd(activity, shownAdUnitId)
+                    }
                 }
             }
 
@@ -1062,7 +1118,6 @@ class AdManager() {
                     "Interstitial failed to show: ${fullScreenContentError.message}",
                     false
                 )
-                callback.onNextAction()
 
                 // Log Firebase event for ad failed to show
                 val params = Bundle().apply {
@@ -1073,10 +1128,15 @@ class AdManager() {
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_show", params)
 
-                // Still try to reload on show failure
-                if (reloadAd) {
-                    retryAttempts.remove(shownAdUnitId)
-                    loadInterstitialAd(activity, shownAdUnitId)
+                // Switch to main thread for callback and potential UI operations
+                eventMainHandler.post {
+                    callback.onNextAction()
+
+                    // Still try to reload on show failure
+                    if (reloadAd) {
+                        retryAttempts.remove(shownAdUnitId)
+                        loadInterstitialAd(activity, shownAdUnitId)
+                    }
                 }
             }
 
@@ -1097,7 +1157,7 @@ class AdManager() {
             }
 
             override fun onAdImpression() {
-                // Next-Gen SDK often separates onAdImpression from onAdShowedFullScreenContent, 
+                // Next-Gen SDK often separates onAdImpression from onAdShowedFullScreenContent,
                 // but for interstitials they are close. We already log impression in onAdShowedFullScreenContent.
                 // You can add additional logic here if needed.
             }
@@ -1344,6 +1404,245 @@ class AdManager() {
 
         handler.post(checkRunnable)
     }
+
+    // =================== PRELOADER API ===================
+
+    /**
+     * Starts the InterstitialAdPreloader for the specified ad unit.
+     * The SDK will automatically load ads in the background and keep them ready.
+     *
+     * @param adUnitId The ad unit ID to preload
+     * @param bufferSize Number of ads to keep preloaded (default: 1)
+     */
+    @JvmOverloads
+    fun startPreloading(adUnitId: String, bufferSize: Int = 1) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d("AdManager", "User has purchased, skipping preloader start for $adUnitId")
+            return
+        }
+
+        if (activePreloaders[adUnitId] == true) {
+            Log.d("AdManager", "Preloader already active for $adUnitId")
+            return
+        }
+
+        Log.d("AdManager", "Starting InterstitialAdPreloader for $adUnitId (buffer: $bufferSize)")
+
+        val preloadCallback = object : PreloadCallback {
+            override fun onAdPreloaded(preloadId: String, responseInfo: ResponseInfo) {
+                Log.d("AdManager", "Interstitial ad preloaded for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onPreloaded", "Interstitial ad preloaded", true)
+            }
+
+            override fun onAdFailedToPreload(preloadId: String, adError: LoadAdError) {
+                Log.e("AdManager", "Interstitial ad failed to preload for $adUnitId: ${adError.message}")
+                AdDebugUtils.logEvent(adUnitId, "onFailedToPreload", "Interstitial failed to preload: ${adError.message}", false)
+
+                // Log Firebase event
+                if (::firebaseAnalytics.isInitialized) {
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", adError.code.toString())
+                        putString("error_message", adError.message)
+                    }
+                    firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                }
+            }
+
+            override fun onAdsExhausted(preloadId: String) {
+                Log.d("AdManager", "Interstitial ads exhausted for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onAdsExhausted", "Interstitial ads exhausted", false)
+            }
+        }
+
+        val adRequest = AdRequest.Builder(adUnitId).build()
+        val preloadConfig = PreloadConfiguration(adRequest, bufferSize = bufferSize)
+
+        InterstitialAdPreloader.start(adUnitId, preloadConfig, preloadCallback)
+        activePreloaders[adUnitId] = true
+
+        // Set primary ad unit if not set
+        if (this.adUnitId == null) {
+            this.adUnitId = adUnitId
+        }
+
+        Log.d("AdManager", "InterstitialAdPreloader started for $adUnitId")
+    }
+
+    /**
+     * Marks the InterstitialAdPreloader as inactive for the specified ad unit.
+     * Note: GMA Next-Gen SDK preloaders don't have a stop method - they run until app termination.
+     * This method just clears our tracking state.
+     *
+     * @param adUnitId The ad unit ID to mark as inactive
+     */
+    fun stopPreloading(adUnitId: String) {
+        if (activePreloaders[adUnitId] != true) {
+            Log.d("AdManager", "No active preloader for $adUnitId")
+            return
+        }
+
+        // Note: GMA Next-Gen SDK preloaders don't have stop() - they run until app termination
+        activePreloaders.remove(adUnitId)
+        Log.d("AdManager", "InterstitialAdPreloader marked inactive for $adUnitId (SDK preloader continues in background)")
+    }
+
+    /**
+     * Marks all preloaders as inactive.
+     * Note: SDK preloaders continue running - this just clears our tracking.
+     */
+    fun stopAllPreloading() {
+        activePreloaders.clear()
+        Log.d("AdManager", "All preloaders marked inactive")
+    }
+
+    /**
+     * Checks if a preloaded interstitial ad is available.
+     *
+     * @param adUnitId The ad unit ID to check (optional, checks primary if not provided)
+     * @return true if an ad is available
+     */
+    @JvmOverloads
+    fun isPreloadedAdAvailable(adUnitId: String? = null): Boolean {
+        val effectiveAdUnitId = adUnitId ?: this.adUnitId ?: return false
+        return InterstitialAdPreloader.isAdAvailable(effectiveAdUnitId)
+    }
+
+    /**
+     * Polls (retrieves) a preloaded interstitial ad.
+     * The SDK will automatically load another ad in the background after polling.
+     *
+     * @param adUnitId The ad unit ID (optional, uses primary if not provided)
+     * @return The interstitial ad if available, null otherwise
+     */
+    @JvmOverloads
+    fun pollPreloadedAd(adUnitId: String? = null): InterstitialAd? {
+        val effectiveAdUnitId = adUnitId ?: this.adUnitId ?: return null
+        val ad = InterstitialAdPreloader.pollAd(effectiveAdUnitId)
+        if (ad != null) {
+            Log.d("AdManager", "Polled preloaded interstitial ad for $effectiveAdUnitId")
+            AdDebugUtils.logEvent(effectiveAdUnitId, "pollAd", "Polled preloaded interstitial", true)
+        } else {
+            Log.d("AdManager", "No preloaded interstitial available for $effectiveAdUnitId")
+        }
+        return ad
+    }
+
+    /**
+     * Shows a preloaded interstitial ad if available.
+     *
+     * @param activity The activity to show the ad on
+     * @param callback Callback for ad events
+     * @param adUnitId Optional ad unit ID (uses primary if not provided)
+     * @return true if ad was shown, false if no ad available
+     */
+    @JvmOverloads
+    fun showPreloadedAd(
+        activity: Activity,
+        callback: AdManagerCallback,
+        adUnitId: String? = null
+    ): Boolean {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onNextAction()
+            return false
+        }
+
+        val effectiveAdUnitId = adUnitId ?: this.adUnitId ?: run {
+            callback.onNextAction()
+            return false
+        }
+
+        val ad = pollPreloadedAd(effectiveAdUnitId)
+        if (ad == null) {
+            Log.d("AdManager", "No preloaded ad to show for $effectiveAdUnitId")
+            callback.onNextAction()
+            return false
+        }
+
+        // Set up event callback
+        // Note: GMA Next-Gen SDK calls these callbacks on background threads,
+        // so we must switch to main thread for UI operations and user callbacks.
+        val preloadedEventMainHandler = Handler(Looper.getMainLooper())
+        ad.adEventCallback = object : InterstitialAdEventCallback {
+            override fun onAdDismissedFullScreenContent() {
+                isDisplayingAd = false
+                AdDebugUtils.logEvent(effectiveAdUnitId, "onAdDismissed", "Preloaded interstitial dismissed", true)
+
+                if (::firebaseAnalytics.isInitialized) {
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, effectiveAdUnitId)
+                    }
+                    firebaseAnalytics.logEvent("ad_dismissed", params)
+                }
+
+                // Switch to main thread for callback
+                preloadedEventMainHandler.post {
+                    callback.onNextAction()
+                }
+            }
+
+            override fun onAdFailedToShowFullScreenContent(error: FullScreenContentError) {
+                isDisplayingAd = false
+                Log.e("AdManager", "Preloaded ad failed to show: ${error.message}")
+                AdDebugUtils.logEvent(effectiveAdUnitId, "onFailedToShow", "Preloaded ad failed: ${error.message}", false)
+
+                // Switch to main thread for callback
+                preloadedEventMainHandler.post {
+                    callback.onNextAction()
+                }
+            }
+
+            override fun onAdShowedFullScreenContent() {
+                isDisplayingAd = true
+                lastAdShowTime = System.currentTimeMillis()
+                adDisplayCount++
+                AdDebugUtils.logEvent(effectiveAdUnitId, "onAdImpression", "Preloaded interstitial shown", true)
+
+                if (::firebaseAnalytics.isInitialized) {
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, effectiveAdUnitId)
+                    }
+                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                }
+            }
+
+            override fun onAdImpression() {
+                // Already handled in onAdShowedFullScreenContent
+            }
+
+            override fun onAdClicked() {
+                AdDebugUtils.logEvent(effectiveAdUnitId, "onAdClicked", "Preloaded interstitial clicked", true)
+            }
+
+            override fun onAdPaid(value: AdValue) {
+                val adValueInStandardUnits = value.valueMicros / 1_000_000.0
+                if (::firebaseAnalytics.isInitialized) {
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, effectiveAdUnitId)
+                        putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                        putString(FirebaseAnalytics.Param.CURRENCY, value.currencyCode)
+                    }
+                    firebaseAnalytics.logEvent("ad_paid_event", params)
+                }
+            }
+        }
+
+        try {
+            ad.show(activity)
+            return true
+        } catch (e: Exception) {
+            Log.e("AdManager", "Error showing preloaded interstitial: ${e.message}")
+            callback.onNextAction()
+            return false
+        }
+    }
+
+    /**
+     * Get list of ad units with active preloaders.
+     */
+    fun getActivePreloaders(): List<String> = activePreloaders.keys.toList()
 
     // =================== FIREBASE ANALYTICS TRACKING ===================
 

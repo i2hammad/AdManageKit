@@ -16,7 +16,7 @@ import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
-import com.google.android.gms.ads.AdError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import android.util.Log
 
 class MainActivity : AppCompatActivity() {
@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this@MainActivity, "Small Native Ad Loaded (Global)", Toast.LENGTH_SHORT).show()
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 Log.e("AdManageKit", "❌ NativeBannerSmall failed: ${error?.message} (Global Strategy)")
                 Toast.makeText(this@MainActivity, "Small Native Ad Failed: ${error?.code}", Toast.LENGTH_SHORT).show()
             }
@@ -106,7 +106,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Medium Native Ad Loaded (Cached)", Toast.LENGTH_SHORT).show()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e("AdManageKit", "❌ NativeBannerMedium skipped - no cache available (ONLY_CACHE)")
                     Toast.makeText(this@MainActivity, "Medium Native Ad Skipped (No Cache)", Toast.LENGTH_SHORT).show()
                 }
@@ -128,7 +128,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, "Large Native Ad Loaded (Fresh)", Toast.LENGTH_SHORT).show()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e("AdManageKit", "❌ NativeLarge failed to load: ${error?.message} (ON_DEMAND)")
                     Toast.makeText(this@MainActivity, "Large Native Ad Failed", Toast.LENGTH_SHORT).show()
                 }

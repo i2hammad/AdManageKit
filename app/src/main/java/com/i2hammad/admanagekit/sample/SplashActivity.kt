@@ -8,8 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.i2hammad.admanagekit.AdConfig
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
@@ -157,7 +156,7 @@ class SplashActivity : AppCompatActivity() {
                 showAppOpenAd()
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 super.onFailedToLoad(error)
                 Log.e("SplashActivity", "forceLoadAppOpen: Failed to load app open ad: ${error?.message}")
                 statusTextView.text = "Failed to load app open ad."

@@ -434,11 +434,10 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                 onComplete()
             }
 
-            override fun onFailedToLoad(error: com.google.android.libraries.ads.mobile.sdk.common.AdError?) {
+            override fun onFailedToLoad(error: com.google.android.libraries.ads.mobile.sdk.common.LoadAdError?) {
                 if (debugMode) android.util.Log.e("InterstitialBuilder", "Ad failed: ${error?.message}")
                 error?.let {
-                    val loadError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, it.message, null)
-                    onAdFailedCallback?.invoke(loadError)
+                    onAdFailedCallback?.invoke(it)
                 }
                 onComplete()
             }

@@ -8,7 +8,7 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.google.android.gms.ads.AdError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
@@ -380,7 +380,7 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                     updateCacheStatus()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e(TAG, "❌ Native Large failed: ${error?.message} ($currentStrategy)")
                     showToast("Native Large failed: ${error?.message}")
                     updateCacheStatus()
@@ -412,7 +412,7 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                     updateCacheStatus()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e(TAG, "❌ Native Medium failed: ${error?.message} ($currentStrategy)")
                     showToast("Native Medium failed: ${error?.message}")
                     updateCacheStatus()
@@ -444,7 +444,7 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                     updateCacheStatus()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e(TAG, "❌ Native Small failed: ${error?.message} ($currentStrategy)")
                     showToast("Native Small failed: ${error?.message}")
                     updateCacheStatus()
@@ -478,7 +478,7 @@ class LoadingStrategyTestActivity : AppCompatActivity() {
                     updateCacheStatus()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e(TAG, "❌ Banner failed: ${error?.message}")
                     showToast("Banner failed: ${error?.message}")
                     updateCacheStatus()

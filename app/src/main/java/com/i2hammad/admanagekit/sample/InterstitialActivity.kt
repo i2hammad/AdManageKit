@@ -10,21 +10,16 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
-import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
-import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import android.util.Log
-import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 
 class InterstitialActivity : AppCompatActivity() {
     lateinit var statusTextView: TextView
@@ -61,7 +56,7 @@ class InterstitialActivity : AppCompatActivity() {
                     Log.d("AdManageKit", "✅ NativeBannerMedium loaded in InterstitialActivity")
                 }
                 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e("InterstitialActivity", "❌ NativeBannerMedium failed in InterstitialActivity: ${error?.message}")
                 }
             })
@@ -97,7 +92,7 @@ class InterstitialActivity : AppCompatActivity() {
             this,
             "ca-app-pub-3940256099942544/9214589741",
             object : AdLoadCallback() {
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     super.onFailedToLoad(error)
                     bannerContainer.visibility = View.GONE
 
@@ -123,22 +118,23 @@ class InterstitialActivity : AppCompatActivity() {
         btnInterstitialAd.isEnabled = true
         AdManager.getInstance().loadInterstitialAd(this,
             "ca-app-pub-3940256099942544/1033173712",
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(onAdLoaded: InterstitialAd) {
-                    super.onAdLoaded(onAdLoaded)
-                    statusTextView.text = "Interstitial ad loaded successfully."
-                    btnInterstitialAd.text = "Show interstitial Ad and Load Native Ads"
+            object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<InterstitialAd> {
+                override fun onAdLoaded(ad: InterstitialAd) {
+                    runOnUiThread {
+                        statusTextView.text = "Interstitial ad loaded successfully."
+                        btnInterstitialAd.text = "Show interstitial Ad and Load Native Ads"
 
+                    }
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    super.onAdFailedToLoad(loadAdError)
-                    statusTextView.text = "Interstitial ad failed to load."
-                    btnInterstitialAd.text = "Load Native Ads"
+                    runOnUiThread {
+                        statusTextView.text = "Interstitial ad failed to load."
+                        btnInterstitialAd.text = "Load Native Ads"
+
+                    }
                 }
             })
-
-
     }
 
     override fun onResume() {

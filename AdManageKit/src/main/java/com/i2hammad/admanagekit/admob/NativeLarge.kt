@@ -3,6 +3,8 @@ package com.i2hammad.admanagekit.admob
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.util.Log
 import android.view.LayoutInflater
@@ -11,9 +13,6 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.android.gms.ads.AdError
-//import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
-import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
@@ -22,6 +21,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallback
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
+import com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -39,6 +39,7 @@ class NativeLarge @JvmOverloads constructor(
         LayoutNativeLargeBinding.inflate(LayoutInflater.from(context), this)
     private var firebaseAnalytics: FirebaseAnalytics? = null
     private lateinit var adUnitId: String
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // =================== DEPRECATED METHODS (use loadingStrategy instead) ===================
 
@@ -116,7 +117,7 @@ class NativeLarge @JvmOverloads constructor(
         loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
-        val nativeAdView: NativeAdView = binding.nativeAdView
+        val nativeAdView = binding.nativeAdView as NativeAdView
         val viewGroup = binding.adUnit
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -210,11 +211,11 @@ class NativeLarge @JvmOverloads constructor(
         callback: AdLoadCallback?,
         useCachedAd: Boolean = false
     ) {
-        val nativeAdView: NativeAdView = binding.nativeAdView
+        val nativeAdView = binding.nativeAdView as NativeAdView
         val viewGroup = binding.adUnit
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
 
-        nativeAdView.mediaView = binding.mediaView
+        // Note: mediaView is read-only in Next-Gen SDK - handled via registerNativeAd()
         nativeAdView.headlineView = nativeAdView.findViewById(R.id.primary)
         nativeAdView.bodyView = nativeAdView.findViewById(R.id.secondary)
         nativeAdView.callToActionView = nativeAdView.findViewById(R.id.cta)
@@ -268,15 +269,17 @@ class NativeLarge @JvmOverloads constructor(
                     }
                 }
 
-                viewGroup.visibility = View.VISIBLE
-                nativeAdView.visibility = View.VISIBLE
-                shimmerFrameLayout.visibility = View.GONE
-                binding.root.visibility = View.VISIBLE
+                // Switch to main thread for all UI operations
+                mainHandler.post {
+                    viewGroup.visibility = View.VISIBLE
+                    nativeAdView.visibility = View.VISIBLE
+                    shimmerFrameLayout.visibility = View.GONE
+                    binding.root.visibility = View.VISIBLE
 
-                populateNativeAdView(nativeAd, nativeAdView)
+                    populateNativeAdView(nativeAd, nativeAdView)
 
-
-                callback?.onAdLoaded()
+                    callback?.onAdLoaded()
+                }
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -291,32 +294,38 @@ class NativeLarge @JvmOverloads constructor(
                             "Used fallback cached ad after network failure",
                             true
                         )
-                        displayAd(cachedAd)
-                        callback?.onAdLoaded()
+                        mainHandler.post {
+                            displayAd(cachedAd)
+                            callback?.onAdLoaded()
+                        }
                         return
                     }
                 }
 
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeLarge failed: ${loadAdError.message}", false)
-                viewGroup.visibility = View.GONE
-                nativeAdView.visibility = View.GONE
-                shimmerFrameLayout.visibility = View.GONE
 
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", loadAdError.code.toString())
-                    if (AdManageKitConfig.enablePerformanceMetrics) {
-                        putString("error_message", loadAdError.message)
+                // Switch to main thread for UI operations
+                mainHandler.post {
+                    viewGroup.visibility = View.GONE
+                    nativeAdView.visibility = View.GONE
+                    shimmerFrameLayout.visibility = View.GONE
+
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", loadAdError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", loadAdError.message)
+                        }
                     }
+                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    callback?.onFailedToLoad(loadAdError)
                 }
-                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(loadAdError)
             }
         })
     }
 
     fun displayAd(preloadedNativeAd: NativeAd) {
-        val nativeAdView: NativeAdView = binding.nativeAdView
+        val nativeAdView = binding.nativeAdView as NativeAdView
         val viewGroup = binding.adUnit
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -333,7 +342,7 @@ class NativeLarge @JvmOverloads constructor(
         }
 
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
-        nativeAdView.mediaView = binding.mediaView
+        // Note: mediaView is read-only in Next-Gen SDK - handled via registerNativeAd()
         nativeAdView.headlineView = nativeAdView.findViewById(R.id.primary)
         nativeAdView.bodyView = nativeAdView.findViewById(R.id.secondary)
         nativeAdView.callToActionView = nativeAdView.findViewById(R.id.cta)
@@ -391,7 +400,9 @@ class NativeLarge @JvmOverloads constructor(
             }
         }
 
-        nativeAdView.registerNativeAd(nativeAd, mediaView = )
+        // Register the native ad with the view - Next-Gen SDK requires mediaView parameter
+        val mediaView: MediaView? = nativeAdView.findViewById(R.id.media_view)
+        nativeAdView.registerNativeAd(nativeAd, mediaView)
     }
 
     fun hideAd() {

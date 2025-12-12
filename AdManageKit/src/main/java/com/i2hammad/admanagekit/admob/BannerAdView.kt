@@ -18,16 +18,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.android.gms.ads.AdError
-// import com.google.ads.mediation.admob.AdMobAdapter // Deprecated/Removed in Next-Gen?
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdPreloader
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
-//import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.PreloadConfiguration
+import com.google.android.libraries.ads.mobile.sdk.common.ResponseInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.admob.AdManager.Companion.PURCHASED_APP_ERROR_MESSAGE
@@ -76,6 +77,10 @@ class BannerAdView @JvmOverloads constructor(
     // Performance tracking
     private var loadStartTime: Long = 0
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
+
+    // Preloader tracking
+    private var preloaderActive = AtomicBoolean(false)
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     init {
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true)
@@ -298,22 +303,30 @@ class BannerAdView @JvmOverloads constructor(
 
     /**
      * Creates enhanced ad event callback for BannerAd.
+     * Note: GMA Next-Gen SDK calls these callbacks on background threads,
+     * so we must switch to main thread for UI operations and user callbacks.
      */
     private fun createEnhancedAdEventCallback(adUnitId: String, callback: AdLoadCallback?): BannerAdEventCallback {
         return object : BannerAdEventCallback {
             override fun onAdClicked() {
                 AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Banner ad clicked", true)
-                callback?.onAdClicked()
+                ensureMainThread {
+                    callback?.onAdClicked()
+                }
             }
 
             override fun onAdShowedFullScreenContent() {
                 AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Banner ad showed full screen", true)
-                callback?.onAdOpened()
+                ensureMainThread {
+                    callback?.onAdOpened()
+                }
             }
 
             override fun onAdDismissedFullScreenContent() {
                 AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Banner ad dismissed full screen", true)
-                callback?.onAdClosed()
+                ensureMainThread {
+                    callback?.onAdClosed()
+                }
             }
 
             override fun onAdFailedToShowFullScreenContent(fullScreenContentError: FullScreenContentError) {
@@ -343,13 +356,17 @@ class BannerAdView @JvmOverloads constructor(
                     true
                 )
                 AdDebugUtils.logPerformance(adUnitId, "AdImpression", loadTime)
-                callback?.onAdImpression()
+                ensureMainThread {
+                    callback?.onAdImpression()
+                }
             }
 
             override fun onAdPaid(value: AdValue) {
                 super.onAdPaid(value)
 
-                handlePaidEvent(adUnitId, value, callback)
+                ensureMainThread {
+                    handlePaidEvent(adUnitId, value, callback)
+                }
             }
         }
     }
@@ -651,5 +668,238 @@ class BannerAdView @JvmOverloads constructor(
      */
     fun getCurrentAttempt(): Int {
         return loadAttempt.get()
+    }
+
+    // =================== PRELOADER METHODS ===================
+
+    /**
+     * Start the BannerAdPreloader for the specified ad unit.
+     * Preloading is optional for banners since they display inline and auto-refresh.
+     *
+     * Note: Call this method early (e.g., in Application.onCreate()) to have ads ready.
+     *
+     * @param adUnitId The banner ad unit ID to preload
+     */
+    fun startPreloading(adUnitId: String) {
+        if (!AdManageKitConfig.enableBannerPreloader) {
+            AdDebugUtils.logDebug("BannerAdView", "Banner preloader disabled in config")
+            return
+        }
+
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            Log.d("BannerAdView", "User has purchased, skipping preloader start")
+            return
+        }
+
+        if (preloaderActive.get()) {
+            Log.d("BannerAdView", "Preloader already active for $adUnitId")
+            return
+        }
+
+        Log.d("BannerAdView", "Starting BannerAdPreloader for $adUnitId")
+
+        // Note: GMA Next-Gen SDK calls these callbacks on background threads
+        val preloadCallback = object : PreloadCallback {
+            override fun onAdPreloaded(preloadId: String, responseInfo: ResponseInfo) {
+                Log.d("BannerAdView", "Banner ad preloaded for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onPreloaded", "Banner ad preloaded", true)
+            }
+
+            override fun onAdFailedToPreload(preloadId: String, adError: LoadAdError) {
+                Log.e("BannerAdView", "Banner ad failed to preload for $adUnitId: ${adError.message}")
+                AdDebugUtils.logEvent(adUnitId, "onFailedToPreload", "Banner ad failed to preload: ${adError.message}", false)
+            }
+
+            override fun onAdsExhausted(preloadId: String) {
+                Log.d("BannerAdView", "Banner ads exhausted for $adUnitId")
+                AdDebugUtils.logEvent(adUnitId, "onAdsExhausted", "Banner ads exhausted", false)
+            }
+        }
+
+        val activity = activityRef?.get()
+        val adSize = if (activity != null) getAdSize() else AdSize.BANNER
+        val adRequest = BannerAdRequest.Builder(adUnitId, adSize).build()
+        val preloadConfig = PreloadConfiguration(adRequest, bufferSize = AdManageKitConfig.bannerPreloaderBufferSize)
+
+        BannerAdPreloader.start(adUnitId, preloadConfig, preloadCallback)
+        preloaderActive.set(true)
+        currentAdUnitId = adUnitId
+
+        Log.d("BannerAdView", "BannerAdPreloader started for $adUnitId")
+    }
+
+    /**
+     * Stop tracking the preloader (preloader continues in background until app termination).
+     */
+    fun stopPreloading() {
+        if (!preloaderActive.get()) {
+            Log.d("BannerAdView", "Preloader not active")
+            return
+        }
+
+        preloaderActive.set(false)
+        Log.d("BannerAdView", "BannerAdPreloader tracking stopped")
+    }
+
+    /**
+     * Load banner from preloader if available, otherwise load directly.
+     *
+     * @param context Activity context
+     * @param adUnitId Ad unit ID
+     * @param callback Optional callback for ad lifecycle events
+     */
+    fun loadBannerFromPreloader(
+        context: Activity?,
+        adUnitId: String?,
+        callback: AdLoadCallback? = null
+    ) {
+        if (isInEditMode || context == null || adUnitId == null) return
+
+        this.activityRef = WeakReference(context)
+        this.currentAdUnitId = adUnitId
+        this.callback = callback
+
+        // Register lifecycle observer if possible
+        if (context is LifecycleOwner) {
+            context.lifecycle.addObserver(this)
+        }
+
+        // Check purchase status
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            handleAdLoadFailure(
+                adUnitId,
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, PURCHASED_APP_ERROR_MESSAGE, null),
+                callback,
+                "User has purchased app"
+            )
+            return
+        }
+
+        // Try to get ad from preloader if enabled
+        if (AdManageKitConfig.enableBannerPreloader && BannerAdPreloader.isAdAvailable(adUnitId)) {
+            val preloadedAd = BannerAdPreloader.pollAd(adUnitId)
+            if (preloadedAd != null) {
+                AdDebugUtils.logEvent(adUnitId, "usedPreloader", "Using preloaded banner ad", true)
+                displayPreloadedAd(preloadedAd, adUnitId, callback)
+                return
+            }
+        }
+
+        // Fallback to direct loading
+        loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
+    }
+
+    /**
+     * Display a preloaded banner ad.
+     */
+    private fun displayPreloadedAd(ad: BannerAd, adUnitId: String, callback: AdLoadCallback?) {
+        mainHandler.post {
+            try {
+                // Destroy previous ad
+                bannerAd?.destroy()
+                bannerAd = ad
+
+                // Configure callbacks
+                ad.adEventCallback = createEnhancedAdEventCallback(adUnitId, callback)
+
+                // Display the ad
+                layBannerAd.removeAllViews()
+
+                val activity = activityRef?.get()
+                if (activity != null && !activity.isFinishing && !activity.isDestroyed) {
+                    layBannerAd.addView(ad.getView(activity))
+                    layBannerAd.visibility = View.VISIBLE
+                    shimmerFrameLayout.stopShimmer()
+                    shimmerFrameLayout.visibility = View.GONE
+                    visibility = View.VISIBLE
+
+                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Preloaded banner displayed", true)
+                    callback?.onAdLoaded()
+                } else {
+                    AdDebugUtils.logError("BannerAdView", "Activity not available for displaying preloaded ad", null)
+                    callback?.onFailedToLoad(
+                        LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Activity not available", null)
+                    )
+                }
+            } catch (e: Exception) {
+                AdDebugUtils.logError("BannerAdView", "Error displaying preloaded ad: ${e.message}", e)
+                callback?.onFailedToLoad(
+                    LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Error displaying ad: ${e.message}", null)
+                )
+            }
+        }
+    }
+
+    /**
+     * Check if a preloaded banner ad is available.
+     */
+    fun isPreloadedAdAvailable(): Boolean {
+        val adUnitId = currentAdUnitId ?: return false
+        return AdManageKitConfig.enableBannerPreloader && BannerAdPreloader.isAdAvailable(adUnitId)
+    }
+
+    /**
+     * Check if the preloader is currently active.
+     */
+    fun isPreloaderActive(): Boolean = preloaderActive.get()
+
+    companion object {
+        /**
+         * Start preloading banner ads globally for the specified ad unit.
+         * Call this early in your app (e.g., Application.onCreate()) to have ads ready.
+         *
+         * @param context Application or Activity context
+         * @param adUnitId The banner ad unit ID to preload
+         */
+        @JvmStatic
+        fun startGlobalPreloading(context: Context, adUnitId: String) {
+            if (!AdManageKitConfig.enableBannerPreloader) {
+                Log.d("BannerAdView", "Banner preloader disabled in config")
+                return
+            }
+
+            val purchaseProvider = BillingConfig.getPurchaseProvider()
+            if (purchaseProvider.isPurchased()) {
+                Log.d("BannerAdView", "User has purchased, skipping global preloader start")
+                return
+            }
+
+            Log.d("BannerAdView", "Starting global BannerAdPreloader for $adUnitId")
+
+            val preloadCallback = object : PreloadCallback {
+                override fun onAdPreloaded(preloadId: String, responseInfo: ResponseInfo) {
+                    Log.d("BannerAdView", "Global banner ad preloaded for $adUnitId")
+                    AdDebugUtils.logEvent(adUnitId, "onPreloaded", "Global banner ad preloaded", true)
+                }
+
+                override fun onAdFailedToPreload(preloadId: String, adError: LoadAdError) {
+                    Log.e("BannerAdView", "Global banner ad failed to preload: ${adError.message}")
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToPreload", "Global banner failed: ${adError.message}", false)
+                }
+
+                override fun onAdsExhausted(preloadId: String) {
+                    Log.d("BannerAdView", "Global banner ads exhausted for $adUnitId")
+                    AdDebugUtils.logEvent(adUnitId, "onAdsExhausted", "Global banner ads exhausted", false)
+                }
+            }
+
+            // Use standard banner size for global preloading
+            val adSize = AdSize.BANNER
+            val adRequest = BannerAdRequest.Builder(adUnitId, adSize).build()
+            val preloadConfig = PreloadConfiguration(adRequest, bufferSize = AdManageKitConfig.bannerPreloaderBufferSize)
+
+            BannerAdPreloader.start(adUnitId, preloadConfig, preloadCallback)
+            Log.d("BannerAdView", "Global BannerAdPreloader started for $adUnitId")
+        }
+
+        /**
+         * Check if a preloaded banner ad is available for the specified ad unit.
+         */
+        @JvmStatic
+        fun isPreloadedAdAvailable(adUnitId: String): Boolean {
+            return AdManageKitConfig.enableBannerPreloader && BannerAdPreloader.isAdAvailable(adUnitId)
+        }
     }
 }

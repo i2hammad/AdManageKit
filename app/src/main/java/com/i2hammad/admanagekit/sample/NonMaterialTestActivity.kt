@@ -71,7 +71,7 @@ class NonMaterialTestActivity : Activity() {
                 // Ad loaded successfully
             }
 
-            override fun onFailedToLoad(adError: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(adError: com.google.android.libraries.ads.mobile.sdk.common.LoadAdError?) {
                 Toast.makeText(this@NonMaterialTestActivity, "Ad failed: ${adError?.message}", Toast.LENGTH_SHORT).show()
             }
         })

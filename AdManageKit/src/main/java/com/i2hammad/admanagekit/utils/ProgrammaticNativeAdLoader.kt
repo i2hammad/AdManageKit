@@ -17,6 +17,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallback
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
+import com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.admob.AdLoadCallback
@@ -195,8 +196,7 @@ object ProgrammaticNativeAdLoader {
                 nativeAdView.callToActionView = nativeAdView.findViewById(R.id.cta)
                 nativeAdView.iconView = nativeAdView.findViewById(R.id.icon)
                 nativeAdView.advertiserView = nativeAdView.findViewById(R.id.tertiary)
-                // MediaView needs to be assigned directly without type casting
-                nativeAdView.mediaView = nativeAdView.findViewById(R.id.media_view)
+                // Note: mediaView is read-only in Next-Gen SDK, handled via registerNativeAd()
             }
         }
 
@@ -334,7 +334,12 @@ object ProgrammaticNativeAdLoader {
             }
         }
 
-        // Associate the NativeAd with the NativeAdView
-        // In Next-Gen SDK, we populate the views and the SDK handles the association
+        // Register the native ad with the view - Next-Gen SDK requires mediaView parameter
+        val mediaViewId = when (size) {
+            NativeAdSize.LARGE -> R.id.media_view
+            else -> null // Small and Medium don't have media views
+        }
+        val mediaView: MediaView? = mediaViewId?.let { nativeAdView.findViewById(it) }
+        nativeAdView.registerNativeAd(nativeAd, mediaView)
     }
 }

@@ -3,6 +3,8 @@ package com.i2hammad.admanagekit.admob
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.view.View
@@ -10,9 +12,9 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.android.gms.ads.AdError
-//import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
-import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
@@ -37,6 +39,7 @@ class NativeBannerMedium @JvmOverloads constructor(
     private lateinit var adUnitId: String
     private var firebaseAnalytics: FirebaseAnalytics? = null
     var callback: com.i2hammad.admanagekit.admob.AdLoadCallback? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // =================== DEPRECATED METHODS (use loadingStrategy instead) ===================
 
@@ -271,32 +274,31 @@ class NativeBannerMedium @JvmOverloads constructor(
                     }
                 }
 
-                adPlaceholder.removeAllViews()
-                AdDebugUtils.logDebug("AdDisplay", "Cleared placeholder views")
+                // Switch to main thread for all UI operations
+                mainHandler.post {
+                    adPlaceholder.removeAllViews()
+                    AdDebugUtils.logDebug("AdDisplay", "Cleared placeholder views")
 
-                adPlaceholder.addView(nativeAdView)
-                AdDebugUtils.logDebug("AdDisplay", "Added NativeAdView to placeholder")
+                    adPlaceholder.addView(nativeAdView)
+                    AdDebugUtils.logDebug("AdDisplay", "Added NativeAdView to placeholder")
 
-                binding.root.visibility = View.VISIBLE
-                adPlaceholder.visibility = View.VISIBLE
-                AdDebugUtils.logDebug("AdDisplay", "Set views visible")
+                    binding.root.visibility = View.VISIBLE
+                    adPlaceholder.visibility = View.VISIBLE
+                    AdDebugUtils.logDebug("AdDisplay", "Set views visible")
 
-                AdDebugUtils.logDebug("AdDisplay", "About to populate native ad view")
-                populateNativeAdView(nativeAd, nativeAdView)
+                    AdDebugUtils.logDebug("AdDisplay", "About to populate native ad view")
+                    populateNativeAdView(nativeAd, nativeAdView)
 
-                AdDebugUtils.logDebug(
-                    "ViewStates",
-                    "After population - Root: ${binding.root.visibility}, Placeholder: ${adPlaceholder.visibility}, Children: ${adPlaceholder.childCount}, Attached: ${nativeAdView.parent != null}"
-                )
+                    AdDebugUtils.logDebug(
+                        "ViewStates",
+                        "After population - Root: ${binding.root.visibility}, Placeholder: ${adPlaceholder.visibility}, Children: ${adPlaceholder.childCount}, Attached: ${nativeAdView.parent != null}"
+                    )
 
-                shimmerFrameLayout.visibility = View.GONE
-                AdDebugUtils.logEvent(adUnitId, "displayComplete", "Ad display pipeline completed successfully", true)
+                    shimmerFrameLayout.visibility = View.GONE
+                    AdDebugUtils.logEvent(adUnitId, "displayComplete", "Ad display pipeline completed successfully", true)
 
-//                nativeAd.setOnPaidEventListener { adValue ->
-//
-//                }
-
-                callback?.onAdLoaded()
+                    callback?.onAdLoaded()
+                }
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -311,8 +313,10 @@ class NativeBannerMedium @JvmOverloads constructor(
                             "Used fallback cached ad after network failure",
                             true
                         )
-                        displayAd(cachedAd)
-                        callback?.onAdLoaded()
+                        mainHandler.post {
+                            displayAd(cachedAd)
+                            callback?.onAdLoaded()
+                        }
                         return
                     }
                 }
@@ -323,18 +327,22 @@ class NativeBannerMedium @JvmOverloads constructor(
                     "NativeBannerMedium failed: ${loadAdError.message}",
                     false
                 )
-                adPlaceholder.visibility = View.GONE
-                shimmerFrameLayout.visibility = View.GONE
 
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putString("ad_error_code", loadAdError.code.toString())
-                    if (AdManageKitConfig.enablePerformanceMetrics) {
-                        putString("error_message", loadAdError.message)
+                // Switch to main thread for UI operations
+                mainHandler.post {
+                    adPlaceholder.visibility = View.GONE
+                    shimmerFrameLayout.visibility = View.GONE
+
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", loadAdError.code.toString())
+                        if (AdManageKitConfig.enablePerformanceMetrics) {
+                            putString("error_message", loadAdError.message)
+                        }
                     }
+                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    callback?.onFailedToLoad(loadAdError)
                 }
-                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                callback?.onFailedToLoad(loadAdError)
             }
         })
     }
@@ -393,12 +401,12 @@ class NativeBannerMedium @JvmOverloads constructor(
             }
         }
 
-        // Set native ad and ensure visibility in next frame
-        AdDebugUtils.logDebug("AdBind", "Setting native ad on NativeAdView")
-        nativeAdView.post {
+        // Register the native ad with the view - Next-Gen SDK requires mediaView parameter (null for medium banners)
+        AdDebugUtils.logDebug("AdBind", "Registering native ad on NativeAdView")
+        CoroutineScope(Dispatchers.Main).launch {
             try {
-                nativeAdView.setNativeAd(nativeAd)
-                AdDebugUtils.logEvent(adUnitId, "setNativeAd", "Successfully called setNativeAd()", true)
+                nativeAdView.registerNativeAd(nativeAd, null)
+                AdDebugUtils.logEvent(adUnitId, "registerNativeAd", "Successfully called registerNativeAd()", true)
 
                 binding.shimmerContainerNative.visibility = View.GONE
                 binding.root.visibility = View.VISIBLE
@@ -411,7 +419,7 @@ class NativeBannerMedium @JvmOverloads constructor(
                 )
 
             } catch (e: Exception) {
-                AdDebugUtils.logEvent(adUnitId, "setNativeAdError", "Error setting native ad: ${e.message}", false)
+                AdDebugUtils.logEvent(adUnitId, "registerNativeAdError", "Error registering native ad: ${e.message}", false)
                 e.printStackTrace()
             }
         }

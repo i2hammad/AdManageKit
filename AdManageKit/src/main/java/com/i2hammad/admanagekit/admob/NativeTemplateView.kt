@@ -13,8 +13,7 @@ import android.widget.ImageView
 import android.widget.RatingBar
 import android.widget.TextView
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.nativead.NativeAdOptions
+import com.google.android.libraries.ads.mobile.sdk.common.AdChoicesPlacement
 import com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
@@ -25,6 +24,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallba
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
+import com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -80,11 +80,9 @@ class NativeTemplateView @JvmOverloads constructor(
 
     /**
      * AdChoices placement position. Default is TOP_RIGHT.
-     * Note: This only applies when the template doesn't have a custom AdChoicesView in XML.
-     * If the template has an AdChoicesView defined, the SDK renders into that view instead.
-     * Options: ADCHOICES_TOP_LEFT, ADCHOICES_TOP_RIGHT, ADCHOICES_BOTTOM_RIGHT, ADCHOICES_BOTTOM_LEFT
+     * In GMA Next-Gen SDK, this uses AdChoicesPlacement enum.
      */
-    private var adChoicesPlacement: Int = NativeAdOptions.ADCHOICES_TOP_RIGHT
+    private var adChoicesPlacement: AdChoicesPlacement = AdChoicesPlacement.TOP_RIGHT
 
     /**
      * Whether to use custom AdChoicesView from template XML (true) or SDK auto-placement (false).
@@ -101,11 +99,12 @@ class NativeTemplateView @JvmOverloads constructor(
                 val templateIndex = typedArray.getInt(R.styleable.NativeTemplateView_adTemplate, 0)
                 currentTemplate = NativeAdTemplate.fromIndex(templateIndex)
 
-                // Read AdChoices placement
-                adChoicesPlacement = typedArray.getInt(
+                // Read AdChoices placement and convert to enum
+                val placementIndex = typedArray.getInt(
                     R.styleable.NativeTemplateView_adChoicesPlacement,
-                    NativeAdOptions.ADCHOICES_TOP_RIGHT
+                    1 // TOP_RIGHT default
                 )
+                adChoicesPlacement = intToAdChoicesPlacement(placementIndex)
             } finally {
                 typedArray.recycle()
             }
@@ -207,11 +206,10 @@ class NativeTemplateView @JvmOverloads constructor(
      * Note: This only takes effect when useCustomAdChoicesView is set to false,
      * otherwise the template's XML-defined AdChoicesView position is used.
      *
-     * @param placement One of NativeAdOptions.ADCHOICES_TOP_LEFT, ADCHOICES_TOP_RIGHT,
-     *                  ADCHOICES_BOTTOM_RIGHT, ADCHOICES_BOTTOM_LEFT
+     * @param placement AdChoicesPlacement enum value
      * @param useSDKPlacement If true, ignores template's AdChoicesView and uses SDK auto-placement
      */
-    fun setAdChoicesPlacement(placement: Int, useSDKPlacement: Boolean = false) {
+    fun setAdChoicesPlacement(placement: AdChoicesPlacement, useSDKPlacement: Boolean = false) {
         adChoicesPlacement = placement
         useCustomAdChoicesView = !useSDKPlacement
     }
@@ -219,7 +217,20 @@ class NativeTemplateView @JvmOverloads constructor(
     /**
      * Get current AdChoices placement
      */
-    fun getAdChoicesPlacement(): Int = adChoicesPlacement
+    fun getAdChoicesPlacement(): AdChoicesPlacement = adChoicesPlacement
+
+    /**
+     * Convert int value to AdChoicesPlacement enum (for XML attribute compatibility)
+     */
+    private fun intToAdChoicesPlacement(value: Int): AdChoicesPlacement {
+        return when (value) {
+            0 -> AdChoicesPlacement.TOP_LEFT
+            1 -> AdChoicesPlacement.TOP_RIGHT
+            2 -> AdChoicesPlacement.BOTTOM_RIGHT
+            3 -> AdChoicesPlacement.BOTTOM_LEFT
+            else -> AdChoicesPlacement.TOP_RIGHT
+        }
+    }
 
     /**
      * Configure whether to use custom AdChoicesView from template XML or SDK auto-placement.
@@ -417,14 +428,9 @@ class NativeTemplateView @JvmOverloads constructor(
 
         // Build AdLoader on background thread as recommended by Google
         CoroutineScope(Dispatchers.IO).launch {
-            // Configure NativeAdOptions with AdChoices placement
-            val nativeAdOptions = NativeAdOptions.Builder()
-                .setAdChoicesPlacement(adChoicesPlacement)
-                .build()
-
-            // Build load request
+            // Build load request with AdChoices placement - Next-Gen SDK uses setAdChoicesPlacement directly
             val request = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
-                .setNativeAdOptions(nativeAdOptions)
+                .setAdChoicesPlacement(adChoicesPlacement)
                 .build()
 
             NativeAdLoader.load(request, object : NativeAdLoaderCallback {
@@ -571,8 +577,7 @@ class NativeTemplateView @JvmOverloads constructor(
         nativeAdView.iconView = nativeAdView.findViewById(R.id.ad_app_icon)
         nativeAdView.advertiserView = nativeAdView.findViewById(R.id.ad_advertiser)
 
-        // Optional views that may not exist in all templates
-        nativeAdView.mediaView = nativeAdView.findViewById(R.id.ad_media)
+        // Optional views - Note: mediaView is read-only in Next-Gen SDK, handled via registerNativeAd()
         nativeAdView.starRatingView = nativeAdView.findViewById(R.id.ad_stars)
 
         // AdChoices handling:
@@ -647,11 +652,10 @@ class NativeTemplateView @JvmOverloads constructor(
             }
         }
 
-        // Media
-        nativeAdView.mediaView?.let { mediaView ->
-            val mediaContent = nativeAd.mediaContent
-            if (mediaContent != null) {
-                mediaView.mediaContent = mediaContent
+        // Media - In Next-Gen SDK, mediaView and mediaContent are handled by registerNativeAd()
+        // We just need to control visibility
+        nativeAdView.findViewById<MediaView>(R.id.ad_media)?.let { mediaView ->
+            if (nativeAd.mediaContent != null) {
                 mediaView.visibility = VISIBLE
             } else {
                 mediaView.visibility = GONE
@@ -678,12 +682,14 @@ class NativeTemplateView @JvmOverloads constructor(
 
         // AdChoices - show the view if found, AdMob will populate it automatically
         nativeAdView.findViewById<View>(R.id.ad_choices_view)?.let { adChoicesView ->
-            // AdChoices content is automatically handled by NativeAdView when setNativeAd is called
+            // AdChoices content is automatically handled by NativeAdView when registerNativeAd is called
             // We just need to make it visible if the view exists
             adChoicesView.visibility = VISIBLE
         }
 
-        nativeAdView.setNativeAd(nativeAd)
+        // Register the native ad with the view - Next-Gen SDK requires mediaView parameter
+        val mediaView: MediaView? = nativeAdView.findViewById(R.id.ad_media)
+        nativeAdView.registerNativeAd(nativeAd, mediaView)
     }
 
     /**

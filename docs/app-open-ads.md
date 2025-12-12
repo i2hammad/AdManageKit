@@ -1,10 +1,30 @@
-# App Open Ads - AdManageKit v2.5.0
+# App Open Ads - AdManageKit v4.0.0
 
 ## Overview
-The `AdManageKit` library (version `v2.5.0`) provides lifecycle-aware management of app open ads through the `AppOpenManager` class in the `com.i2hammad.admanagekit.admob` package. App open ads are full-screen ads displayed when users launch or return to your app, ideal for monetizing app entry points. The `AppOpenManager` handles ad loading, display, activity exclusion, automatic retry with exponential backoff, and Firebase Analytics integration for tracking ad events.
+The `AdManageKit` library (version `v4.0.0`) provides lifecycle-aware management of app open ads through the `AppOpenManager` class in the `com.i2hammad.admanagekit.admob` package. App open ads are full-screen ads displayed when users launch or return to your app, ideal for monetizing app entry points. The `AppOpenManager` handles ad loading, display, activity/screen/fragment exclusion, automatic retry with exponential backoff, preloader support, and Firebase Analytics integration for tracking ad events.
 
-**Library Version**: v2.5.0
-**Last Updated**: January 2025
+**Library Version**: v4.0.0
+**Last Updated**: December 2025
+
+## What's New in v4.0.0
+
+### GMA Next-Gen SDK Migration
+- **Modern SDK**: Full migration to Google Mobile Ads Next-Gen SDK
+- **Background Thread Safety**: All callbacks now automatically dispatch to main thread
+- **Preloader Support**: Uses `AppOpenAdPreloader` for efficient ad loading
+
+### Single-Activity App Support
+- **Screen Tag Exclusions**: Control ads by screen/destination name
+- **Fragment Tag Exclusions**: Exclude specific fragments from showing ads
+- **Fragment Tag Provider**: Automatic fragment detection
+- **Temporary Disable**: Pause/resume ads during critical flows
+
+### Preloader System
+- **Auto-Loading**: SDK automatically keeps ads ready in background
+- **Efficient**: Reduces ad load time when showing
+- **Configurable**: Enable/disable via `usePreloader` property
+
+---
 
 ## What's New in v2.5.0
 
@@ -335,7 +355,130 @@ Re-enable an excluded activity:
 appOpenManager.includeAppOpenActivityForAds(SplashActivity::class.java)
 ```
 
-### 5. Checking Ad Availability
+### 5. Single-Activity App Support (v4.0.0+)
+
+For apps using a single activity with multiple fragments (e.g., Navigation Component, Jetpack Compose Navigation):
+
+#### Screen Tag Exclusions
+
+```kotlin
+class MyApp : Application() {
+    lateinit var appOpenManager: AppOpenManager
+
+    override fun onCreate() {
+        super.onCreate()
+
+        appOpenManager = AppOpenManager(this, "ca-app-pub-xxxxx/yyyyy").apply {
+            // Exclude specific screens by name
+            excludeScreenTags("Payment", "Onboarding", "Checkout", "Settings")
+        }
+    }
+}
+
+// In MainActivity - track current screen
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        val navController = findNavController(R.id.nav_host_fragment)
+
+        // Update screen tag on navigation
+        navController.addOnDestinationChangedListener { _, destination, _ ->
+            (application as MyApp).appOpenManager.setCurrentScreenTag(
+                destination.label?.toString()
+            )
+        }
+    }
+}
+```
+
+#### Fragment Tag Exclusions
+
+```kotlin
+class MyApp : Application() {
+    lateinit var appOpenManager: AppOpenManager
+
+    override fun onCreate() {
+        super.onCreate()
+
+        appOpenManager = AppOpenManager(this, "ca-app-pub-xxxxx/yyyyy").apply {
+            // Exclude specific fragment tags
+            excludeFragmentTags("PaymentFragment", "OnboardingFragment", "CheckoutFragment")
+        }
+    }
+}
+
+// In MainActivity - set up fragment tag provider
+class MainActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        // Set provider for automatic fragment detection
+        (application as MyApp).appOpenManager.setFragmentTagProvider {
+            supportFragmentManager.fragments.lastOrNull()?.tag
+        }
+    }
+}
+```
+
+#### Temporary Disable/Enable
+
+```kotlin
+class PaymentFragment : Fragment() {
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        // Disable app open ads during payment flow
+        (requireActivity().application as MyApp).appOpenManager.disableAppOpenAdsTemporarily()
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+
+        // Re-enable when leaving payment
+        (requireActivity().application as MyApp).appOpenManager.enableAppOpenAds()
+    }
+
+    private fun onPaymentComplete() {
+        // Re-enable before navigating away
+        (requireActivity().application as MyApp).appOpenManager.enableAppOpenAds()
+        findNavController().navigate(R.id.action_payment_to_success)
+    }
+}
+```
+
+#### Check Current State
+
+```kotlin
+// Check if ads are currently enabled
+if (appOpenManager.areAppOpenAdsEnabled()) {
+    Log.d("AppOpen", "Ads are enabled")
+}
+
+// Get current screen tag
+val currentScreen = appOpenManager.getCurrentScreenTag()
+Log.d("AppOpen", "Current screen: $currentScreen")
+```
+
+#### Combining Approaches
+
+You can combine activity exclusion, screen tags, and fragment tags:
+
+```kotlin
+appOpenManager = AppOpenManager(this, "ca-app-pub-xxxxx/yyyyy").apply {
+    // Exclude activities (for multi-activity apps or specific activities)
+    disableAppOpenWithActivity(SplashActivity::class.java)
+
+    // Exclude screens by name (for Navigation Component)
+    excludeScreenTags("Payment", "Onboarding")
+
+    // Exclude fragments by tag (for FragmentManager)
+    excludeFragmentTags("PaymentFragment")
+}
+```
+
+### 6. Checking Ad Availability
 
 ```kotlin
 // Check if ad is loaded and ready
@@ -1064,6 +1207,60 @@ fun includeAppOpenActivityForAds(activityClass: Class<*>)
 ```
 Re-enable ads for excluded activity.
 
+**setCurrentScreenTag()** (v4.0.0+)
+```kotlin
+fun setCurrentScreenTag(tag: String?)
+```
+Set current screen tag for single-activity apps.
+
+**excludeScreenTag()** (v4.0.0+)
+```kotlin
+fun excludeScreenTag(tag: String)
+```
+Exclude a screen tag from showing ads.
+
+**excludeScreenTags()** (v4.0.0+)
+```kotlin
+fun excludeScreenTags(vararg tags: String)
+```
+Exclude multiple screen tags.
+
+**setFragmentTagProvider()** (v4.0.0+)
+```kotlin
+fun setFragmentTagProvider(provider: (() -> String?)?)
+```
+Set provider for automatic fragment tag detection.
+
+**excludeFragmentTag()** (v4.0.0+)
+```kotlin
+fun excludeFragmentTag(tag: String)
+```
+Exclude a fragment tag from showing ads.
+
+**excludeFragmentTags()** (v4.0.0+)
+```kotlin
+fun excludeFragmentTags(vararg tags: String)
+```
+Exclude multiple fragment tags.
+
+**disableAppOpenAdsTemporarily()** (v4.0.0+)
+```kotlin
+fun disableAppOpenAdsTemporarily()
+```
+Temporarily disable app open ads.
+
+**enableAppOpenAds()** (v4.0.0+)
+```kotlin
+fun enableAppOpenAds()
+```
+Re-enable app open ads after temporary disable.
+
+**areAppOpenAdsEnabled()** (v4.0.0+)
+```kotlin
+fun areAppOpenAdsEnabled(): Boolean
+```
+Check if app open ads are currently enabled.
+
 **getPerformanceMetrics()**
 ```kotlin
 fun getPerformanceMetrics(): Map<String, Any>
@@ -1328,6 +1525,22 @@ Report issues at: [GitHub Issues](https://github.com/i2hammad/AdManageKit/issues
 ---
 
 ## Changelog
+
+### v4.0.0 (December 2025)
+- **GMA Next-Gen SDK Migration**: Full migration to modern SDK
+- **Background Thread Safety**: All callbacks now dispatch to main thread
+- **Preloader Support**: Uses `AppOpenAdPreloader` for efficient loading
+- **Single-Activity App Support**:
+  - Added `setCurrentScreenTag()` / `getCurrentScreenTag()`
+  - Added `excludeScreenTag()` / `excludeScreenTags()` / `includeScreenTag()` / `clearScreenTagExclusions()`
+  - Added `setFragmentTagProvider()`
+  - Added `excludeFragmentTag()` / `excludeFragmentTags()` / `includeFragmentTag()`
+  - Added `disableAppOpenAdsTemporarily()` / `enableAppOpenAds()` / `areAppOpenAdsEnabled()`
+- **Preloader API**:
+  - Added `isPreloadedAdAvailable()`
+  - Added `pollPreloadedAd()`
+  - Added `showPreloadedAd()`
+  - Added `usePreloader` property
 
 ### v2.5.0 (January 2025)
 - Added custom ad unit support to `fetchAd()` method

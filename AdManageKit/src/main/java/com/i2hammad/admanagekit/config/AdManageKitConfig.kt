@@ -326,6 +326,79 @@ object AdManageKitConfig {
      */
     var loadingDialogSubtitle: String? = null
 
+    // =================== PRELOADER SETTINGS ===================
+
+    /**
+     * Enable preloader for interstitial ads.
+     * When enabled, uses InterstitialAdPreloader for background ad loading.
+     * Default: true
+     */
+    var enableInterstitialPreloader: Boolean = true
+
+    /**
+     * Enable preloader for app open ads.
+     * When enabled, uses AppOpenAdPreloader for background ad loading.
+     * Default: true
+     */
+    var enableAppOpenPreloader: Boolean = true
+
+    /**
+     * Enable preloader for native ads.
+     * When enabled, uses NativeAdPreloader for background ad loading.
+     * Default: true
+     */
+    var enableNativePreloader: Boolean = true
+
+    /**
+     * Enable preloader for rewarded ads.
+     * When enabled, uses RewardedAdPreloader for background ad loading.
+     * Default: true
+     */
+    var enableRewardedPreloader: Boolean = true
+
+    /**
+     * Enable preloader for banner ads.
+     * When enabled, uses BannerAdPreloader for background ad loading.
+     * Note: Banner preloading is optional since banners display inline and auto-refresh.
+     * Default: false
+     */
+    var enableBannerPreloader: Boolean = false
+
+    /**
+     * Default buffer size for interstitial ad preloader.
+     * Number of ads to keep preloaded in the buffer.
+     * Default: 2
+     */
+    var interstitialPreloaderBufferSize: Int = 2
+
+    /**
+     * Default buffer size for app open ad preloader.
+     * Number of ads to keep preloaded in the buffer.
+     * Default: 1
+     */
+    var appOpenPreloaderBufferSize: Int = 1
+
+    /**
+     * Default buffer size for native ad preloader.
+     * Number of ads to keep preloaded in the buffer.
+     * Default: 3
+     */
+    var nativePreloaderBufferSize: Int = 3
+
+    /**
+     * Default buffer size for rewarded ad preloader.
+     * Number of ads to keep preloaded in the buffer.
+     * Default: 1
+     */
+    var rewardedPreloaderBufferSize: Int = 1
+
+    /**
+     * Default buffer size for banner ad preloader.
+     * Number of ads to keep preloaded in the buffer.
+     * Default: 2
+     */
+    var bannerPreloaderBufferSize: Int = 2
+
     // =================== AD LOADING STRATEGIES ===================
 
     /**
@@ -469,6 +542,16 @@ object AdManageKitConfig {
         interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
         appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
         nativeLoadingStrategy = AdLoadingStrategy.HYBRID
+        enableInterstitialPreloader = true
+        enableAppOpenPreloader = true
+        enableNativePreloader = true
+        enableRewardedPreloader = true
+        enableBannerPreloader = false
+        interstitialPreloaderBufferSize = 2
+        appOpenPreloaderBufferSize = 1
+        nativePreloaderBufferSize = 3
+        rewardedPreloaderBufferSize = 1
+        bannerPreloaderBufferSize = 2
         maxCacheMemoryMB = 50
         enableLRUEviction = true
         cacheCleanupInterval = 30.seconds * 60
@@ -529,6 +612,12 @@ object AdManageKitConfig {
             appendLine("- Circuit Breaker: threshold=$circuitBreakerThreshold")
             appendLine("- Banner Refresh: ${defaultBannerRefreshInterval}")
             appendLine("- Privacy Compliant: $privacyCompliantMode")
+            appendLine("- Preloaders:")
+            appendLine("  - Interstitial: $enableInterstitialPreloader (buffer: $interstitialPreloaderBufferSize)")
+            appendLine("  - App Open: $enableAppOpenPreloader (buffer: $appOpenPreloaderBufferSize)")
+            appendLine("  - Native: $enableNativePreloader (buffer: $nativePreloaderBufferSize)")
+            appendLine("  - Rewarded: $enableRewardedPreloader (buffer: $rewardedPreloaderBufferSize)")
+            appendLine("  - Banner: $enableBannerPreloader (buffer: $bannerPreloaderBufferSize)")
         }
     }
     

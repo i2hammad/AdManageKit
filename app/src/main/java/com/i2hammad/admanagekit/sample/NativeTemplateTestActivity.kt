@@ -12,7 +12,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdTemplate
@@ -147,7 +147,7 @@ class NativeTemplateTestActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 Log.e(TAG, "Ad failed to load: ${error?.message}")
                 runOnUiThread {
                     btnLoadAd.isEnabled = true

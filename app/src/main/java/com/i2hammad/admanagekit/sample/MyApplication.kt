@@ -2,6 +2,7 @@ package com.i2hammad.admanagekit.sample
 
 import android.app.Application
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
 import kotlinx.coroutines.launch
 import com.i2hammad.admanagekit.admob.AppOpenManager
@@ -36,7 +37,7 @@ class MyApplication : Application() {
         initBilling()
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
-
+        initAds()
     }
 
     /**
@@ -190,12 +191,18 @@ class MyApplication : Application() {
 
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
             try {
+                // Initialize with InitializationConfig (required by Next-Gen SDK)
+                // Use test app ID for testing: ca-app-pub-3940256099942544~3347511713
+                val initConfig = InitializationConfig.Builder("ca-app-pub-3940256099942544~3347511713").build()
+                MobileAds.initialize(this@MyApplication, initConfig) {
+                    android.util.Log.d("MyApplication", "GMA Next-Gen SDK Initialized")
+                }
+
+
+                // Set test device IDs after initialization
                 val configuration: RequestConfiguration =
                     RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
                 MobileAds.setRequestConfiguration(configuration)
-                MobileAds.initialize(this@MyApplication) {
-                    android.util.Log.d("MyApplication", "GMA Next-Gen SDK Initialized")
-                }
             } catch (e: Exception) {
                 android.util.Log.e("MyApplication", "GMA Next-Gen SDK Initialization failed", e)
             }
