@@ -48,6 +48,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val excludedActivities: MutableSet<Class<*>> = HashSet()
     private val excludedActivityNames: MutableSet<String> = HashSet() // Cache for performance
 
+    // Fragment-based and tag-based exclusions for single-activity apps
+    private val excludedFragmentTags: MutableSet<String> = HashSet()
+    private val excludedScreenTags: MutableSet<String> = HashSet()
+    @Volatile
+    private var currentScreenTag: String? = null
+    private var fragmentTagProvider: (() -> String?)? = null
+
     private val skipNextAd = AtomicBoolean(false)
     private val isLoading = AtomicBoolean(false)  // Prevents concurrent ad requests
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
@@ -527,12 +534,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private fun getCurrentActivity(): Activity? = currentActivity
 
     /**
-     * Check if activity is excluded with performance optimization
+     * Check if activity is excluded with performance optimization.
+     * Also checks screen/fragment tags for single-activity apps.
      */
     private fun isActivityExcluded(activityClass: Class<*>): Boolean {
         val className = activityClass.name
 
-        // Fast path: check cache first
+        // Fast path: check activity cache first
         synchronized(excludedActivities) {
             if (excludedActivityNames.contains(className)) {
                 return true
@@ -542,9 +550,46 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             val isExcluded = excludedActivities.contains(activityClass)
             if (isExcluded) {
                 excludedActivityNames.add(className) // Cache for future lookups
+                return true
             }
-            return isExcluded
         }
+
+        // Check screen/fragment tag exclusions for single-activity apps
+        if (isCurrentScreenExcluded()) {
+            return true
+        }
+
+        return false
+    }
+
+    /**
+     * Check if the current screen (fragment/destination) is excluded.
+     * Used for single-activity apps with multiple fragments.
+     */
+    private fun isCurrentScreenExcluded(): Boolean {
+        // Check manually set current screen tag
+        val screenTag = currentScreenTag
+        if (screenTag != null) {
+            synchronized(excludedScreenTags) {
+                if (excludedScreenTags.contains(screenTag)) {
+                    Log.d(LOG_TAG, "Screen tag '$screenTag' is excluded from app open ads")
+                    return true
+                }
+            }
+        }
+
+        // Check fragment tag provider if set
+        val fragmentTag = fragmentTagProvider?.invoke()
+        if (fragmentTag != null) {
+            synchronized(excludedFragmentTags) {
+                if (excludedFragmentTags.contains(fragmentTag)) {
+                    Log.d(LOG_TAG, "Fragment tag '$fragmentTag' is excluded from app open ads")
+                    return true
+                }
+            }
+        }
+
+        return false
     }
 
     /**
@@ -663,6 +708,10 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         // Clear caches
         excludedActivityNames.clear()
+        excludedScreenTags.clear()
+        excludedFragmentTags.clear()
+        currentScreenTag = null
+        fragmentTagProvider = null
         loadTimes.clear()
 
         // Reset state
@@ -1081,5 +1130,156 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             }
         }
     }
+
+    // =================== SCREEN/FRAGMENT TAG EXCLUSIONS (v3.2.0+) ===================
+
+    /**
+     * Set the current screen tag for single-activity apps.
+     * Call this when navigating between screens/fragments.
+     *
+     * Example with Navigation Component:
+     * ```kotlin
+     * navController.addOnDestinationChangedListener { _, destination, _ ->
+     *     appOpenManager.setCurrentScreenTag(destination.label?.toString())
+     * }
+     * ```
+     *
+     * @param tag The current screen tag (e.g., destination label, fragment name)
+     */
+    fun setCurrentScreenTag(tag: String?) {
+        currentScreenTag = tag
+        Log.d(LOG_TAG, "Current screen tag set to: $tag")
+    }
+
+    /**
+     * Get the current screen tag.
+     */
+    fun getCurrentScreenTag(): String? = currentScreenTag
+
+    /**
+     * Exclude a screen tag from showing app open ads.
+     *
+     * @param tag The screen tag to exclude
+     */
+    fun excludeScreenTag(tag: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.add(tag)
+        }
+        Log.d(LOG_TAG, "Excluded screen tag: $tag")
+    }
+
+    /**
+     * Exclude multiple screen tags from showing app open ads.
+     *
+     * @param tags The screen tags to exclude
+     */
+    fun excludeScreenTags(vararg tags: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.addAll(tags)
+        }
+        Log.d(LOG_TAG, "Excluded screen tags: ${tags.joinToString()}")
+    }
+
+    /**
+     * Re-include a previously excluded screen tag.
+     *
+     * @param tag The screen tag to include
+     */
+    fun includeScreenTag(tag: String) {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.remove(tag)
+        }
+        Log.d(LOG_TAG, "Included screen tag: $tag")
+    }
+
+    /**
+     * Clear all screen tag exclusions.
+     */
+    fun clearScreenTagExclusions() {
+        synchronized(excludedScreenTags) {
+            excludedScreenTags.clear()
+        }
+        Log.d(LOG_TAG, "Cleared all screen tag exclusions")
+    }
+
+    /**
+     * Set a provider function that returns the current fragment tag.
+     * This is called automatically when checking if ads should be shown.
+     *
+     * Example:
+     * ```kotlin
+     * appOpenManager.setFragmentTagProvider {
+     *     supportFragmentManager.fragments.lastOrNull()?.tag
+     * }
+     * ```
+     *
+     * @param provider A function that returns the current fragment tag, or null
+     */
+    fun setFragmentTagProvider(provider: (() -> String?)?) {
+        fragmentTagProvider = provider
+        Log.d(LOG_TAG, "Fragment tag provider ${if (provider != null) "set" else "cleared"}")
+    }
+
+    /**
+     * Exclude a fragment tag from showing app open ads.
+     *
+     * @param tag The fragment tag to exclude
+     */
+    fun excludeFragmentTag(tag: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.add(tag)
+        }
+        Log.d(LOG_TAG, "Excluded fragment tag: $tag")
+    }
+
+    /**
+     * Exclude multiple fragment tags from showing app open ads.
+     *
+     * @param tags The fragment tags to exclude
+     */
+    fun excludeFragmentTags(vararg tags: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.addAll(tags)
+        }
+        Log.d(LOG_TAG, "Excluded fragment tags: ${tags.joinToString()}")
+    }
+
+    /**
+     * Re-include a previously excluded fragment tag.
+     *
+     * @param tag The fragment tag to include
+     */
+    fun includeFragmentTag(tag: String) {
+        synchronized(excludedFragmentTags) {
+            excludedFragmentTags.remove(tag)
+        }
+        Log.d(LOG_TAG, "Included fragment tag: $tag")
+    }
+
+    // =================== TEMPORARY DISABLE/ENABLE ===================
+
+    /**
+     * Temporarily disable app open ads.
+     * Useful during critical user flows (e.g., payment, onboarding).
+     *
+     * Call [enableAppOpenAds] to re-enable.
+     */
+    fun disableAppOpenAdsTemporarily() {
+        skipNextAd.set(true)
+        Log.d(LOG_TAG, "App open ads temporarily disabled")
+    }
+
+    /**
+     * Re-enable app open ads after temporary disable.
+     */
+    fun enableAppOpenAds() {
+        skipNextAd.set(false)
+        Log.d(LOG_TAG, "App open ads re-enabled")
+    }
+
+    /**
+     * Check if app open ads are currently enabled.
+     */
+    fun areAppOpenAdsEnabled(): Boolean = !skipNextAd.get()
 
 }
