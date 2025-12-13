@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.2.0`** adds **Single-Activity App Support** for app open ads.
+**Latest Version `3.2.0`** adds **Single-Activity App Support**, **Background-Aware Ad Display**, and **Dialog Stability Fixes**.
 
 ## What's New in 3.2.0
 
@@ -22,6 +22,31 @@ appOpenManager.excludeScreenTags("Payment", "Onboarding")
 navController.addOnDestinationChangedListener { _, destination, _ ->
     appOpenManager.setCurrentScreenTag(destination.label?.toString())
 }
+```
+
+### Background-Aware Ad Display
+- **Smart Background Detection**: App open ads no longer try to show when app is in background
+- **Pending Ad Queue**: Ads loaded while in background are saved and shown when user returns
+- **Welcome Dialog on Return**: Smooth transition with welcome dialog when showing pending ads
+
+### Dialog Stability Improvements
+- **Duplicate Dialog Prevention**: Fixed issue where pausing/resuming app caused duplicate dialogs
+- **Interstitial Priority**: App open ads won't show on top of interstitial loading dialogs
+- **Thread-Safe Callbacks**: All ad callbacks now properly run on main thread
+
+### New Callback: onAdShowed()
+- **Full Screen Detection**: New callback when interstitial ad covers the screen
+- **Use Case**: Pause app content, mute audio, track impressions
+
+```kotlin
+AdManager.getInstance().forceShowInterstitial(activity, object : AdManagerCallback() {
+    override fun onAdShowed() {
+        // Ad is now showing - pause game, mute audio, etc.
+    }
+    override fun onNextAction() {
+        // Ad dismissed - resume app
+    }
+})
 ```
 
 ## What's New in 3.1.0

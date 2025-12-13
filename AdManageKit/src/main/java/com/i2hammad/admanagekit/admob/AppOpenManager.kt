@@ -59,6 +59,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val isLoading = AtomicBoolean(false)  // Prevents concurrent ad requests
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
 
+    // Track foreground/background state
+    private val isAppInForeground = AtomicBoolean(false)
+
+    // Track if ad was loaded while app was in background - needs to show when coming back
+    private val pendingAdToShow = AtomicBoolean(false)
+    private var pendingAdCallback: AdManagerCallback? = null
+
     // Reusable handler for timeouts
     private val timeoutHandler = Handler(Looper.getMainLooper())
     private val pendingTimeouts = mutableSetOf<Runnable>()
@@ -458,6 +465,20 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             isFetchingWithDialog = false
                             appOpenAd = ad
 
+                            Log.d(LOG_TAG, "Ad loaded, isAppInForeground=${isAppInForeground.get()}")
+
+                            // Check if app is in foreground before showing ad
+                            if (!isAppInForeground.get()) {
+                                // App is in background - save ad for later, dismiss dialog
+                                Log.d(LOG_TAG, "App in background, saving ad for when user returns")
+                                pendingAdToShow.set(true)
+                                pendingAdCallback = callback
+                                animateDialogDismissal(dialogViews) {
+                                    currentWelcomeDialog = null
+                                }
+                                return@post
+                            }
+
                             // Keep dialog showing - ad will be displayed on top
                             // Dialog will be dismissed after ad is closed with delay
                             currentWelcomeDialog = dialogViews
@@ -468,6 +489,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             } else {
                                 Log.d(LOG_TAG, "Activity not in valid state after ad load")
                                 dismissWelcomeDialogWithDelay(dialogViews)
+                                currentWelcomeDialog = null
                                 callback?.onNextAction()
                             }
                         }
@@ -1220,13 +1242,87 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     override fun onStart(owner: LifecycleOwner) {
+        isAppInForeground.set(true)
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
-        if (!purchaseProvider.isPurchased() && !AdManager.getInstance().isDisplayingAd()) {
-            currentActivity?.let {
-                Log.d(LOG_TAG, "onStart - showing ad on: ${it.javaClass.simpleName}")
-                showAdIfAvailable()
+        // Use isAdOrDialogShowing() to also check for interstitial loading dialog
+        if (!purchaseProvider.isPurchased() && !AdManager.getInstance().isAdOrDialogShowing()) {
+            currentActivity?.let { activity ->
+                Log.d(LOG_TAG, "onStart - showing ad on: ${activity.javaClass.simpleName}")
+
+                // Check if we have a pending ad that was loaded while in background
+                if (pendingAdToShow.getAndSet(false) && appOpenAd != null) {
+                    Log.d(LOG_TAG, "Showing pending ad that was loaded while in background")
+                    val callback = pendingAdCallback
+                    pendingAdCallback = null
+
+                    // Show welcome dialog again briefly before showing the ad
+                    showPendingAdWithDialog(activity, callback)
+                } else {
+                    showAdIfAvailable()
+                }
+            }
+        } else if (AdManager.getInstance().isAdOrDialogShowing()) {
+            Log.d(LOG_TAG, "onStart - skipping app open ad: interstitial ad or dialog is showing")
+            // Clear pending ad state since interstitial takes priority
+            if (pendingAdToShow.get()) {
+                Log.d(LOG_TAG, "Clearing pending app open ad - interstitial has priority")
+                pendingAdToShow.set(false)
+                pendingAdCallback?.onNextAction()
+                pendingAdCallback = null
             }
         }
+    }
+
+    /**
+     * Show pending ad with a brief welcome dialog.
+     * Used when ad was loaded while app was in background.
+     */
+    private fun showPendingAdWithDialog(activity: Activity, callback: AdManagerCallback?) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            callback?.onNextAction()
+            return
+        }
+
+        // Double-check interstitial isn't showing (could have started between onStart check and now)
+        if (AdManager.getInstance().isAdOrDialogShowing()) {
+            Log.d(LOG_TAG, "Skipping pending ad dialog - interstitial is showing")
+            callback?.onNextAction()
+            return
+        }
+
+        // Show welcome dialog again
+        val dialogViews = showWelcomeBackDialog(activity)
+        currentWelcomeDialog = dialogViews
+
+        // Show the ad after a brief delay (let dialog appear first)
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Check again before showing - interstitial might have appeared
+            if (AdManager.getInstance().isAdOrDialogShowing()) {
+                Log.d(LOG_TAG, "Cancelling pending ad - interstitial appeared")
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                    callback?.onNextAction()
+                }
+                return@postDelayed
+            }
+
+            if (!activity.isFinishing && !activity.isDestroyed && appOpenAd != null) {
+                Log.d(LOG_TAG, "Showing pending ad after dialog")
+                showLoadedAd(activity, callback)
+            } else {
+                // Dismiss dialog if can't show ad
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                    callback?.onNextAction()
+                }
+            }
+        }, 500) // 500ms delay to let dialog appear
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        isAppInForeground.set(false)
+        Log.d(LOG_TAG, "onStop - app went to background")
     }
 
     // =================== SCREEN/FRAGMENT TAG EXCLUSIONS (v3.2.0+) ===================
