@@ -1,4 +1,4 @@
-# Release Notes - v3.2.0
+# Release Notes - v3.3.0
 
 ## Highlights
 
@@ -185,7 +185,7 @@ fun areAppOpenAdsEnabled(): Boolean
 
 ## Migration Guide
 
-### From v3.1.0 to v3.2.0
+### From v3.2.0 to v3.3.0
 
 This is a **backward-compatible** release. No code changes are required.
 

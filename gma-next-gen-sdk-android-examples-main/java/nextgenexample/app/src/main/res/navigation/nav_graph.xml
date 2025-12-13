@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/MenuFragment">
+
+    <fragment
+        android:id="@+id/MenuFragment"
+        android:name="com.example.nextgenexample.MenuFragment"
+        android:label="@string/menu"
+        tools:layout="@layout/fragment_menu" />
+
+    <fragment
+        android:id="@+id/AppOpenFragment"
+        android:name="com.example.nextgenexample.appopen.AppOpenFragment"
+        android:label="@string/app_open"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_AppOpenFragment"
+        app:destination="@id/AppOpenFragment" />
+    <fragment
+        android:id="@+id/BannerFragment"
+        android:name="com.example.nextgenexample.banner.BannerFragment"
+        android:label="@string/banner"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_BannerFragment"
+        app:destination="@id/BannerFragment" />
+    <fragment
+        android:id="@+id/CollapsibleBannerFragment"
+        android:name="com.example.nextgenexample.banner.CollapsibleBannerFragment"
+        android:label="@string/collapsible_banner"
+        tools:layout="@layout/fragment_menu">
+    </fragment>
+    <action
+        android:id="@+id/action_MenuFragment_to_CollapsibleBannerFragment"
+        app:destination="@id/CollapsibleBannerFragment" />
+
+    <fragment
+        android:id="@+id/AdManagerMultipleAdSizesFragment"
+        android:name="com.example.nextgenexample.banner.AdManagerMultipleAdSizesFragment"
+        android:label="@string/ad_manager_multiple_ad_sizes"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_AdManagerMultipleAdSizesFragment"
+        app:destination="@id/AdManagerMultipleAdSizesFragment" />
+    <fragment
+        android:id="@+id/InlineBannerFragment"
+        android:name="com.example.nextgenexample.inlinebanner.InlineBannerFragment"
+        android:label="@string/inline_banner"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_InlineBannerFragment"
+        app:destination="@id/InlineBannerFragment" />
+    <fragment
+        android:id="@+id/InterstitialFragment"
+        android:name="com.example.nextgenexample.interstitial.InterstitialFragment"
+        android:label="@string/interstitial"
+        tools:layout="@layout/fragment_interstitial" />
+    <action
+        android:id="@+id/action_MenuFragment_to_InterstitialFragment"
+        app:destination="@id/InterstitialFragment" />
+
+    <fragment
+        android:id="@+id/NativeFragment"
+        android:name="com.example.nextgenexample.nativead.NativeFragment"
+        android:label="@string/native_ad"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_NativeFragment"
+        app:destination="@id/NativeFragment" />
+
+    <fragment
+        android:id="@+id/preloadingFragment"
+        android:name="com.example.nextgenexample.preloading.PreloadMainFragment"
+        android:label="@string/preloading"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_PreloadingFragment"
+        app:destination="@id/preloadingFragment" />
+
+    <fragment
+        android:id="@+id/full_screen_native_ad_controller"
+        android:name="com.example.nextgenexample.fullscreennative.FullScreenNativeControllerFragment"
+        android:label="@string/full_screen_native"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_FullScreenNativeControllerFragment"
+        app:destination="@id/full_screen_native_ad_controller" />
+
+    <fragment
+        android:id="@+id/customNativeFragment"
+        android:name="com.example.nextgenexample.nativead.CustomNativeFragment"
+        android:label="@string/custom_native"
+        tools:layout="@layout/fragment_menu" />
+    <action
+        android:id="@+id/action_MenuFragment_to_CustomNativeFragment"
+        app:destination="@id/customNativeFragment" />
+
+    <fragment
+        android:id="@+id/RewardedFragment"
+        android:name="com.example.nextgenexample.rewarded.RewardedFragment"
+        android:label="@string/rewarded"
+        tools:layout="@layout/fragment_rewarded" />
+    <action
+        android:id="@+id/action_MenuFragment_to_RewardedFragment"
+        app:destination="@id/RewardedFragment" />
+
+    <fragment
+        android:id="@+id/RewardedInterstitialFragment"
+        android:name="com.example.nextgenexample.rewardedinterstitial.RewardedInterstitialFragment"
+        android:label="@string/rewarded_interstitial"
+        tools:layout="@layout/fragment_rewarded_interstitial" />
+    <action
+        android:id="@+id/action_MenuFragment_to_RewardedInterstitialFragment"
+        app:destination="@id/RewardedInterstitialFragment" />
+
+    <fragment
+        android:id="@+id/IconAdFragment"
+        android:name="com.example.nextgenexample.iconad.IconAdFragment"
+        android:label="@string/icon_ad"
+        tools:layout="@layout/fragment_icon" />
+    <action
+        android:id="@+id/action_MenuFragment_to_IconFragment"
+        app:destination="@id/IconAdFragment" />
+
+    <fragment
+        android:id="@+id/InAppBrowserFragment"
+        android:name="com.example.nextgenexample.webview.InAppBrowserFragment"
+        android:label="@string/webview_api_for_ads"
+        tools:layout="@layout/fragment_browser" />
+    <action
+        android:id="@+id/action_MenuFragment_to_InAppBrowserFragment"
+        app:destination="@id/InAppBrowserFragment" />
+
+  <fragment
+      android:id="@+id/AdManagerCategoryExclusionFragment"
+      android:name="com.example.nextgenexample.banner.AdManagerCategoryExclusionFragment"
+      android:label="@string/ad_manager_category_exclusion"
+      tools:layout="@layout/fragment_category_exclusion" />
+  <action
+      android:id="@+id/action_MenuFragment_to_AdManagerCategoryExclusionFragment"
+      app:destination="@id/AdManagerCategoryExclusionFragment" />
+
+    <fragment
+        android:id="@+id/AdManagerFluidSizeFragment"
+        android:name="com.example.nextgenexample.nativead.AdManagerFluidSizeFragment"
+        android:label="@string/ad_manager_fluid_size"
+        tools:layout="@layout/fragment_fluid_size">
+    </fragment>
+    <action
+        android:id="@+id/action_MenuFragment_to_AdManagerFluidSizeFragment"
+        app:destination="@id/AdManagerFluidSizeFragment" />
+
+  <fragment
+      android:id="@+id/AdManagerCustomTargetingFragment"
+      android:name="com.example.nextgenexample.banner.AdManagerCustomTargetingFragment"
+      android:label="@string/ad_manager_custom_targeting"
+      tools:layout="@layout/fragment_browser" />
+  <action
+      android:id="@+id/action_MenuFragment_to_AdManagerCustomTargetingFragment"
+      app:destination="@id/AdManagerCustomTargetingFragment" />
+
+    <fragment
+        android:id="@+id/InterstitialSingleLoadFragment"
+        android:name="com.example.nextgenexample.interstitial.InterstitialSingleLoadFragment"
+        android:label="@string/interstitial_single_load"
+        tools:layout="@layout/fragment_interstitial">
+    </fragment>
+    <action
+        android:id="@+id/action_MenuFragment_to_InterstitialSingleLoadFragment"
+        app:destination="@id/InterstitialSingleLoadFragment" />
+
+</navigation>

@@ -1,0 +1,97 @@
+<resources>
+  <string name="app_name">next_gen_example</string>
+  <string name="privacy_settings">Privacy settings</string>
+  <!-- Strings used for splash screen -->
+  <string name="splash_activity_image_text" translatable="false">Splash Activity Image</string>
+  <string name="splash_activity_text" translatable="false">Splash Screen</string>
+  <string name="splash_activity_loading_text" translatable="false">App is done loading in: %1$d</string>
+  <string name="splash_activity_done_loading_text" translatable="false">Done.</string>
+  <!-- Strings used for navigation -->
+  <string name="menu" translatable="false">Menu</string>
+  <string name="app_open" translatable="false">App open ad</string>
+  <string name="banner" translatable="false">Banner ad</string>
+  <string name="collapsible_banner" translatable="false">Collapsible banner ad</string>
+  <string name="compose_banner" translatable="false">Compose banner ad</string>
+  <string name="compose_lazy_banner" translatable="false">Compose lazy banner ad</string>
+  <string name="custom_native" translatable="false">Custom native ad</string>
+  <string name="preloading" translatable="false">Preloading</string>
+  <string name="full_screen_native" translatable="false">Full-screen native ad</string>
+  <string name="icon_ad" translatable="false">Icon ad</string>
+  <string name="inline_banner" translatable="false">Inline banner ad</string>
+  <string name="interstitial" translatable="false">Interstitial ad</string>
+  <string name="interstitial_single_load" translatable="false">Interstitial ad (single load)</string>
+  <string name="native_ad" translatable="false">Native ad</string>
+  <string name="rewarded" translatable="false">Rewarded ad</string>
+  <string name="rewarded_single_load" translatable="false">Rewarded ad (single load)</string>
+  <string name="rewarded_interstitial" translatable="false">Rewarded interstitial ad</string>
+  <string name="rewarded_interstitial_single_load" translatable="false">Rewarded interstitial ad (single load)</string>
+  <string name="ad_manager_multiple_ad_sizes" translatable="false">Ad Manager multiple ad sizes</string>
+  <string name="ad_manager_custom_targeting" translatable="false">Ad Manager custom targeting</string>
+  <string name="ad_manager_category_exclusion" translatable="false">Ad Manager category exclusion</string>
+  <string name="ad_manager_fluid_size" translatable="false">Ad Manager fluid ad size</string>
+  <!-- Strings used for app open ad fragment -->
+  <string name="leave_and_switch_back" translatable="false">Leave and switch back to the app to see the ad</string>
+  <string name="show_app_open_ad_on_all_starts_text" translatable="false">Show app open ad on all cold and warm starts</string>
+  <!-- Strings used for full-screen ad fragments -->
+  <string name="coins">Coins: %1$d</string>
+  <string name="game_over">Game over</string>
+  <string name="impossible_game" translatable="false">Impossible Game</string>
+  <string name="play_again" translatable="false">Play again</string>
+  <string name="seconds_left">{count, plural, =1{# second left} other{# seconds left}}</string>
+  <string name="watch_video_coins">{count, plural, =1{Watch video for an additional coin} other{Watch video for additional # coins}}</string>
+  <string name="you_lose">You lose!</string>
+  <string name="watch_video_for_reward">Watch video for additional reward</string>
+  <!-- Strings used for ad dialog -->
+  <string name="ad_app_icon_description" translatable="false">Test Icon Ad</string>
+  <string name="ad_app_icon_cta_button_description" translatable="false">Icon Ad call-to-action button</string>
+  <string name="load_ad">Load ad</string>
+  <string name="no_thanks">No thanks</string>
+  <string name="show_ad">Show ad</string>
+  <string name="video_starting">Video starting in %1$d…</string>
+  <!-- Strings used for in-app browsers -->
+  <string name="launch_cct">Launch in Chrome Custom Tab</string>
+  <string name="launch_webview">Launch in WebView</string>
+  <string name="webview_api_for_ads">Web view API for Ads</string>
+  <!-- Strings used for native ad fragment -->
+  <string name="nativead_attribution">Ad</string>
+  <string name="nativead_adchoices" translatable="false">Ad choices</string>
+  <string name="nativead_refresh">Refresh Ad</string>
+  <string name="nativead_requestControls">Request custom video controls?</string>
+  <string name="nativead_requestCustom">Request custom format ad?</string>
+  <string name="nativead_requestVideo">Request video ad?</string>
+  <string name="nativead_startMuted">Start with muted video?</string>
+  <string name="nativead_video_ended">Video status: Video playback has ended.</string>
+  <string name="nativead_video_pause">Video status: Video playback has paused.</string>
+  <string name="nativead_video_play">Video status: Video playback is playing.</string>
+  <string name="nativead_video_none">Video status: Ad does not contain a video asset.</string>
+  <string name="nativead_video_started">Video status: Video playback has started.</string>
+  <!-- Strings used for preloading -->
+  <string name="available">Preloaded ads available</string>
+  <string name="exhausted">Preloaded ads exhausted</string>
+  <!-- Strings used for custom targeting -->
+  <string name="customtargeting_sport" translatable="false">Favorite sport</string>
+  <!-- Strings used for Ad Manager multiple ad sizes -->
+  <string name="adsizes_size" translatable="false">Available sizes</string>
+  <string name="load_ad_button" translatable="false">Load new ad</string>
+  <!-- Strings used for category exclusion -->
+  <string name="categoryexclusion_noexclusions" translatable="false">Banner</string>
+  <string name="categoryexclusion_catsexcluded" translatable="false">Banner (excluding cats)</string>
+  <string name="categoryexclusion_dogsexcluded" translatable="false">Banner (excluding dogs)</string>
+  <!-- Strings used for Ad Manager fluid size ad -->
+  <string name="fluid_btn_text" translatable="false">Change Ad Width</string>
+  <string name="fluid_current_width">320 dp</string>
+  <string name="fluid_above" translatable="false">(this TextView is above the ad)</string>
+  <string name="fluid_below" translatable="false">(this TextView is below the ad)</string>
+  <!-- Strings used for lazy banner ad -->
+  <string-array name="lazy_banner_filler_content">
+    <item>Semper adhibitiones probationales in evolutione adhibe.</item>
+    <item>Utere vexillis adaptivis in linea pro praeconiis intra materiam pascendi.</item>
+    <item>Utere vexillis adaptivis pro magnitudinibus praeconiorum per machinas optimizatis.</item>
+    <item>Imple consensum ad recipienda praeconia personalizata in EEA permittenda.</item>
+    <item>Permitte fontes praeconiorum licitantes ad vectigal praeconiorum emendandum.</item>
+    <item>Voca MobileAds.initialize() in filo secundario ad ANRs vitandos.</item>
+    <item>Loca praeconiorum diligenter in variis machinis et magnitudinibus tegumentorum proba.</item>
+    <item>Utere Inspectore Praeconiorum ad inquisitiones et responsa praeconiorum corrigenda.</item>
+    <item>Habes responsum in hoc exemplo? Fac nos scire in Github!</item>
+  </string-array>
+</resources>
