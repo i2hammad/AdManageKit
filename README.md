@@ -5,7 +5,23 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.0.0`** brings **GMA Next-Gen SDK migration**, **Preloader system**, and **Single-Activity app support**.
+**Latest Version `4.1.0`** brings **GMA Next-Gen SDK migration**, **Preloader system**, **Single-Activity app support**, and **Background-Aware Ad Display**.
+
+## What's New in 4.1.0
+
+### Background-Aware Ad Display
+- **No Background Ads**: App open ads won't show when app is in background
+- **Pending Ad Queue**: Ads that load while backgrounded are saved for return
+- **Welcome Dialog**: Smooth transition when showing pending ads on return
+
+### Interstitial Priority
+- **Dialog Conflict Prevention**: App open ads respect interstitial loading dialogs
+- **Smart Skipping**: App open ads are skipped when interstitial has priority
+
+### Bug Fixes
+- Fixed duplicate dialog display when app is paused/resumed during ad loading
+- Fixed threading crashes ("Animators may only be run on Looper threads")
+- Fixed race condition allowing multiple concurrent ad shows
 
 ## What's New in 4.0.0
 
@@ -84,12 +100,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.0.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.0.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.0.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.0'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -126,6 +142,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.0.0'
 - Environment-specific settings (debug vs production)
 - Runtime configuration changes
 - **Preloader Control** (v4.0.0+): Enable/disable and configure preloaders per ad type
+- **Background-Aware Ads** (v4.1.0+): Smart handling of ads during background/foreground transitions
 
 ### Intelligent Native Ad Caching
 - Screen-aware caching prevents collisions
@@ -479,6 +496,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.1.0](docs/release-notes/RELEASE_NOTES_v4.1.0.md)
 - [Release Notes v4.0.0](docs/release-notes/RELEASE_NOTES_v4.0.0.md)
 - [Release Notes v3.1.0](docs/release-notes/RELEASE_NOTES_v3.1.0.md)
 - [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
@@ -506,6 +524,19 @@ Output: `build/dokka/htmlMultiModule/index.html`
 ---
 
 ## Migration Guide
+
+### Migrating to 4.1.0
+
+Version 4.1.0 is **fully backward compatible** with 4.0.0. All improvements are automatic and internal.
+
+New API additions (optional):
+```kotlin
+// Check if loading dialog is showing
+AdManager.getInstance().isLoadingDialogShowing()
+
+// Check if ad OR loading dialog is showing
+AdManager.getInstance().isAdOrDialogShowing()
+```
 
 ### Migrating to 4.0.0
 

@@ -51,7 +51,7 @@ dependencies {
     api(libs.material)
     api(libs.user.messaging.platform)
     api(libs.shimmer)    // GMA Next-Gen SDK
-    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
+    api("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
     implementation(libs.androidx.lifecycle.process)
     api(platform(libs.firebase.bom))
     api(libs.firebase.analytics)

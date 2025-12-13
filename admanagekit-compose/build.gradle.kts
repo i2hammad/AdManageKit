@@ -52,7 +52,7 @@ dependencies {
     api(project(":admanagekit-core"))
 
     // GMA Next-Gen SDK for type references in public API
-    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
+    api("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
 
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
