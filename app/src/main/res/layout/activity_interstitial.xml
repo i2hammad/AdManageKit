@@ -18,12 +18,13 @@
         android:id="@+id/statusTextView"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/btnShowInterstitialAd"
+        android:layout_above="@+id/buttonsContainer"
         android:layout_centerHorizontal="true"
         android:padding="32dp"
         android:text="App Purchase called" />
 
     <LinearLayout
+        android:id="@+id/buttonsContainer"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
