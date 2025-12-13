@@ -71,6 +71,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val isLoading = AtomicBoolean(false)  // Prevents concurrent ad requests
     private val firebaseAnalytics: FirebaseAnalytics = FirebaseAnalytics.getInstance(myApplication)
 
+    // Track foreground/background state
+    private val isAppInForeground = AtomicBoolean(false)
+
+    // Track if ad was loaded while app was in background - needs to show when coming back
+    private val pendingAdToShow = AtomicBoolean(false)
+    private var pendingAdCallback: AdManagerCallback? = null
+
     // Preloader state
     private val preloaderActive = AtomicBoolean(false)
 
@@ -493,12 +500,26 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         isFetchingWithDialog = false
                         appOpenAd = ad
 
-                        // Keep dialog showing - ad will be displayed on top
-                        // Dialog will be dismissed after ad is closed with delay
-                        Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
+                        Log.d(LOG_TAG, "Ad loaded, isAppInForeground=${isAppInForeground.get()}")
 
                         // Switch to main thread for UI operations
                         mainHandler.post {
+                            // Check if app is in foreground before showing ad
+                            if (!isAppInForeground.get()) {
+                                // App is in background - save ad for later, dismiss dialog
+                                Log.d(LOG_TAG, "App in background, saving ad for when user returns")
+                                pendingAdToShow.set(true)
+                                pendingAdCallback = callback
+                                animateDialogDismissal(dialogViews) {
+                                    currentWelcomeDialog = null
+                                }
+                                return@post
+                            }
+
+                            // Keep dialog showing - ad will be displayed on top
+                            // Dialog will be dismissed after ad is closed with delay
+                            Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
+
                             if (!activity.isFinishing && !activity.isDestroyed) {
                                 showLoadedAd(activity, callback)
                             } else {
@@ -1557,13 +1578,29 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     fun areAppOpenAdsEnabled(): Boolean = !skipNextAd.get()
 
     override fun onStart(owner: LifecycleOwner) {
+        isAppInForeground.set(true)
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (!purchaseProvider.isPurchased()) {
-            currentActivity?.let {
-                Log.d(LOG_TAG, "onStart - showing ad on: ${it.javaClass.simpleName}")
-                showAdIfAvailable()
+            currentActivity?.let { activity ->
+                Log.d(LOG_TAG, "onStart - showing ad on: ${activity.javaClass.simpleName}")
+
+                // Check if we have a pending ad that was loaded while in background
+                if (pendingAdToShow.getAndSet(false) && appOpenAd != null) {
+                    Log.d(LOG_TAG, "Showing pending ad that was loaded while in background")
+                    val callback = pendingAdCallback
+                    pendingAdCallback = null
+                    showLoadedAd(activity, callback)
+                } else {
+                    showAdIfAvailable()
+                }
             }
         }
+    }
+
+    override fun onStop(owner: LifecycleOwner) {
+        isAppInForeground.set(false)
+        Log.d(LOG_TAG, "onStop - app went to background")
     }
 
 }
