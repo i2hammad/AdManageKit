@@ -551,6 +551,50 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
+     * Show pending ad with welcome dialog (for when user returns from background)
+     */
+    private fun showPendingAdWithDialog(activity: Activity, callback: AdManagerCallback?) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            callback?.onNextAction()
+            return
+        }
+
+        // Double-check interstitial isn't showing
+        if (AdManager.getInstance().isAdOrDialogShowing()) {
+            Log.d(LOG_TAG, "Skipping pending ad dialog - interstitial is showing")
+            callback?.onNextAction()
+            return
+        }
+
+        // Show welcome dialog again
+        val dialogViews = showWelcomeBackDialog(activity)
+        currentWelcomeDialog = dialogViews
+
+        // Show the ad after a brief delay (let dialog appear first)
+        Handler(Looper.getMainLooper()).postDelayed({
+            // Check again before showing - interstitial might have appeared
+            if (AdManager.getInstance().isAdOrDialogShowing()) {
+                Log.d(LOG_TAG, "Cancelling pending ad - interstitial appeared")
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                    callback?.onNextAction()
+                }
+                return@postDelayed
+            }
+
+            if (!activity.isFinishing && !activity.isDestroyed && appOpenAd != null) {
+                Log.d(LOG_TAG, "Showing pending ad after dialog")
+                showLoadedAd(activity, callback)
+            } else {
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                    callback?.onNextAction()
+                }
+            }
+        }, 500) // 500ms delay to let dialog appear
+    }
+
+    /**
      * Fetch and show fresh ad without dialog
      */
     private fun fetchAndShowFresh(activity: Activity, callback: AdManagerCallback?) {
@@ -1581,7 +1625,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         isAppInForeground.set(true)
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
-        if (!purchaseProvider.isPurchased()) {
+        // Use isAdOrDialogShowing() to also check for interstitial loading dialog
+        if (!purchaseProvider.isPurchased() && !AdManager.getInstance().isAdOrDialogShowing()) {
             currentActivity?.let { activity ->
                 Log.d(LOG_TAG, "onStart - showing ad on: ${activity.javaClass.simpleName}")
 
@@ -1590,10 +1635,21 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     Log.d(LOG_TAG, "Showing pending ad that was loaded while in background")
                     val callback = pendingAdCallback
                     pendingAdCallback = null
-                    showLoadedAd(activity, callback)
+
+                    // Show welcome dialog again briefly before showing the ad
+                    showPendingAdWithDialog(activity, callback)
                 } else {
                     showAdIfAvailable()
                 }
+            }
+        } else if (AdManager.getInstance().isAdOrDialogShowing()) {
+            Log.d(LOG_TAG, "onStart - skipping app open ad: interstitial ad or dialog is showing")
+            // Clear pending ad state since interstitial takes priority
+            if (pendingAdToShow.get()) {
+                Log.d(LOG_TAG, "Clearing pending app open ad - interstitial has priority")
+                pendingAdToShow.set(false)
+                pendingAdCallback?.onNextAction()
+                pendingAdCallback = null
             }
         }
     }
