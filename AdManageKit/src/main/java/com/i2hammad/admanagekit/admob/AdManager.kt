@@ -88,6 +88,12 @@ class AdManager() {
     // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
 
+    // Track current loading dialog to prevent duplicates
+    private var currentLoadingDialog: LoadingDialogViews? = null
+
+    // Flag to track if we're currently fetching an ad with dialog displayed
+    private var isFetchingWithDialog = false
+
     // =================== PRELOADER STATE ===================
 
     // Track active preloaders by ad unit ID
@@ -121,6 +127,26 @@ class AdManager() {
 
     fun initializeFirebase(context: Context) {
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
+    }
+
+    /**
+     * Check if loading dialog is currently showing.
+     * Used to prevent app open ads from showing on top.
+     */
+    fun isLoadingDialogShowing(): Boolean {
+        return try {
+            currentLoadingDialog?.dialog?.isShowing == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Check if any ad or loading dialog is currently showing.
+     * Used by AppOpenManager to prevent showing on top of interstitial flow.
+     */
+    fun isAdOrDialogShowing(): Boolean {
+        return isDisplayingAd || isLoadingDialogShowing() || isFetchingWithDialog
     }
 
 
@@ -714,6 +740,19 @@ class AdManager() {
             return
         }
 
+        // Guard: Prevent duplicate dialogs if already showing or fetching
+        val dialogAlreadyShowing = try {
+            currentLoadingDialog?.dialog?.isShowing == true
+        } catch (e: Exception) {
+            false
+        }
+
+        if (dialogAlreadyShowing || isFetchingWithDialog) {
+            Log.d("AdManager", "Skipping forceShowInterstitialInternal: dialog already showing or fetching")
+            callback.onNextAction()
+            return
+        }
+
         initializeFirebase(activity)
 
         // IMPORTANT: Save existing cached ad as fallback - DON'T discard it!
@@ -725,8 +764,23 @@ class AdManager() {
             AdDebugUtils.logEvent(currentAdUnitId, "cachedFallbackAvailable", "Cached ad saved as fallback", true)
         }
 
+        // Set fetching flag before showing dialog
+        isFetchingWithDialog = true
+
+        // Dismiss any existing dialog first
+        currentLoadingDialog?.let { existing ->
+            try {
+                if (existing.dialog.isShowing) {
+                    existing.dialog.dismiss()
+                }
+            } catch (e: Exception) {
+                Log.w("AdManager", "Error dismissing existing dialog: ${e.message}")
+            }
+        }
+
         // Show beautiful loading dialog
         val dialogViews = showBeautifulLoadingDialog(activity)
+        currentLoadingDialog = dialogViews
 
         // Load fresh ad with timeout
         val adRequest = AdRequest.Builder(currentAdUnitId).build()
@@ -735,13 +789,17 @@ class AdManager() {
         var timeoutTriggered = false
         var dialogDismissed = false
 
-        // Helper to safely dismiss dialog only once
+        // Helper to safely dismiss dialog only once (runs on main thread)
         fun dismissDialogOnce(onDismissed: () -> Unit) {
-            if (!dialogDismissed) {
-                dialogDismissed = true
-                animateDialogDismissal(dialogViews, onDismissed)
-            } else {
-                onDismissed()
+            Handler(Looper.getMainLooper()).post {
+                if (!dialogDismissed) {
+                    dialogDismissed = true
+                    isFetchingWithDialog = false
+                    currentLoadingDialog = null
+                    animateDialogDismissal(dialogViews, onDismissed)
+                } else {
+                    onDismissed()
+                }
             }
         }
 
@@ -1154,6 +1212,11 @@ class AdManager() {
 
                 // Log detailed impression with per-user tracking
                 logAdImpression(shownAdUnitId, "interstitial")
+
+                // Notify callback that ad is shown (on main thread)
+                eventMainHandler.post {
+                    callback.onAdShowed()
+                }
             }
 
             override fun onAdImpression() {
@@ -1605,6 +1668,11 @@ class AdManager() {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, effectiveAdUnitId)
                     }
                     firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                }
+
+                // Notify callback that ad is shown (on main thread)
+                preloadedEventMainHandler.post {
+                    callback.onAdShowed()
                 }
             }
 

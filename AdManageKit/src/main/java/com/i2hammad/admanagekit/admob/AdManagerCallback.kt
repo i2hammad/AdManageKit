@@ -26,4 +26,12 @@ abstract class AdManagerCallback {
     open fun onAdLoaded() {
         // Default implementation
     }
+
+    /**
+     * Called when the ad is shown and covers the full screen.
+     * Use this to pause app content, mute audio, etc.
+     */
+    open fun onAdShowed() {
+        // Default implementation
+    }
 }

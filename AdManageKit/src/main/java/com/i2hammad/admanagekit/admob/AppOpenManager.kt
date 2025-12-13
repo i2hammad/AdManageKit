@@ -150,6 +150,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private var currentWelcomeDialog: WelcomeBackDialogViews? = null
 
     /**
+     * Flag to track if we're currently fetching an ad with dialog displayed
+     */
+    private var isFetchingWithDialog = false
+
+    /**
      * Get themed context for dialog inflation.
      * Uses activity's theme if it has Material attributes (preserves app colors),
      * otherwise wraps with Material3 as fallback for non-Material themes.
@@ -183,6 +188,18 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Show beautiful welcome back dialog
      */
     private fun showWelcomeBackDialog(activity: Activity): WelcomeBackDialogViews {
+        // Dismiss any existing dialog first
+        currentWelcomeDialog?.let { existing ->
+            try {
+                if (existing.dialog.isShowing) {
+                    existing.dialog.dismiss()
+                }
+            } catch (e: Exception) {
+                Log.w(LOG_TAG, "Error dismissing existing welcome dialog: ${e.message}")
+            }
+        }
+        currentWelcomeDialog = null
+
         // Get themed context - use activity's theme if it has Material attributes,
         // otherwise wrap with Material3 as fallback
         val themedContext = getThemedContextForDialog(activity)
@@ -356,7 +373,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
 
         // If ad is available, show it
-        if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isDisplayingAd()) {
+        // Use isAdOrDialogShowing() to also prevent showing on top of interstitial loading dialog
+        if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && !AdManager.getInstance().isAdOrDialogShowing()) {
             if (currentActivity == null) {
                 Log.e(LOG_TAG, "Cannot show ad: currentActivity is null (WeakReference cleared)")
                 return
@@ -370,9 +388,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 if (preloadedAd != null) {
                     val eventCallback = createAppOpenAdEventCallback("preloaded", null)
                     preloadedAd.adEventCallback = eventCallback
+                    // Set isShowingAd BEFORE calling show() to prevent race conditions
+                    isShowingAd.set(true)
                     try {
                         preloadedAd.show(currentActivity)
                     } catch (e: Exception) {
+                        isShowingAd.set(false)
                         Log.e(LOG_TAG, "Error showing preloaded ad: ${e.message}")
                     }
                 }
@@ -380,9 +401,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 val eventCallback = createAppOpenAdEventCallback("regular", null)
                 appOpenAd?.apply {
                     adEventCallback = eventCallback
+                    // Set isShowingAd BEFORE calling show() to prevent race conditions
+                    isShowingAd.set(true)
                     try {
                         show(currentActivity)
                     } catch (e: Exception) {
+                        isShowingAd.set(false)
                         Log.e(LOG_TAG, "Error showing ad: ${e.message}")
                     }
                 }
@@ -406,20 +430,55 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Show ad with welcome back dialog
      */
     private fun showAdWithWelcomeDialog(activity: Activity, callback: AdManagerCallback?) {
+        // Guard: Prevent if ad is already showing
+        if (isShowingAd.get()) {
+            Log.d(LOG_TAG, "Skipping showAdWithWelcomeDialog: ad already showing")
+            callback?.onNextAction()
+            return
+        }
+
+        // Guard: Prevent if interstitial ad or loading dialog is showing
+        if (AdManager.getInstance().isAdOrDialogShowing()) {
+            Log.d(LOG_TAG, "Skipping showAdWithWelcomeDialog: interstitial ad or loading dialog is showing")
+            callback?.onNextAction()
+            return
+        }
+
+        // Guard: Check actual dialog state to prevent duplicates
+        val dialogAlreadyShowing = try {
+            currentWelcomeDialog?.dialog?.isShowing == true
+        } catch (e: Exception) {
+            false
+        }
+
+        if (dialogAlreadyShowing || isFetchingWithDialog) {
+            Log.d(LOG_TAG, "Skipping showAdWithWelcomeDialog: dialog already showing or fetching")
+            callback?.onNextAction()
+            return
+        }
+
         if (activity.isFinishing) {
             callback?.onNextAction()
             return
         }
 
+        // Set fetching flag before showing dialog
+        isFetchingWithDialog = true
+
         val dialogViews = showWelcomeBackDialog(activity)
+        currentWelcomeDialog = dialogViews
         val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
 
         var hasTimedOut = false
         val timeoutRunnable = scheduleTimeout(timeoutMillis) {
             hasTimedOut = true
-            animateDialogDismissal(dialogViews) {
-                Log.e(LOG_TAG, "App open ad load timed out")
-                callback?.onNextAction()
+            isFetchingWithDialog = false
+            Handler(Looper.getMainLooper()).post {
+                animateDialogDismissal(dialogViews) {
+                    Log.e(LOG_TAG, "App open ad load timed out")
+                    currentWelcomeDialog = null
+                    callback?.onNextAction()
+                }
             }
         }
 
@@ -431,11 +490,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdLoaded(ad: AppOpenAd) {
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
+                        isFetchingWithDialog = false
                         appOpenAd = ad
 
                         // Keep dialog showing - ad will be displayed on top
                         // Dialog will be dismissed after ad is closed with delay
-                        currentWelcomeDialog = dialogViews
                         Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
 
                         // Switch to main thread for UI operations
@@ -445,6 +504,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             } else {
                                 Log.d(LOG_TAG, "Activity not in valid state after ad load")
                                 dismissWelcomeDialogWithDelay(dialogViews)
+                                currentWelcomeDialog = null
                                 callback?.onNextAction()
                             }
                         }
@@ -454,10 +514,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdFailedToLoad(error: LoadAdError) {
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
+                        isFetchingWithDialog = false
                         logFailedToLoadEvent(error)
                         // Switch to main thread for UI operations
                         mainHandler.post {
                             animateDialogDismissal(dialogViews) {
+                                currentWelcomeDialog = null
                                 callback?.onNextAction()
                             }
                         }
@@ -529,9 +591,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         appOpenAd?.apply {
             adEventCallback = eventCallback
+            // Set isShowingAd BEFORE calling show() to prevent race conditions
+            isShowingAd.set(true)
             try {
                 show(activity)
             } catch (e: Exception) {
+                isShowingAd.set(false)
                 Log.e(LOG_TAG, "Error showing ad: ${e.message}")
                 callback?.onNextAction()
             }
@@ -972,10 +1037,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val eventCallback = createAppOpenAdEventCallback("preloaded", callback)
         ad.adEventCallback = eventCallback
 
+        // Set isShowingAd BEFORE calling show() to prevent race conditions
+        isShowingAd.set(true)
         try {
             ad.show(activity)
             return true
         } catch (e: Exception) {
+            isShowingAd.set(false)
             Log.e(LOG_TAG, "Error showing preloaded ad: ${e.message}")
             callback?.onNextAction()
             return false
