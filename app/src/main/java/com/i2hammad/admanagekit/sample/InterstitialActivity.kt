@@ -83,10 +83,12 @@ class InterstitialActivity : AppCompatActivity() {
                     startActivity(nativeAdsIntent)
                 }
             })
-
         }
 
-
+        // Button to test fragment transition ads
+        findViewById<Button>(R.id.btnFragmentTransitionTest).setOnClickListener {
+            startActivity(Intent(this, FragmentTransitionTestActivity::class.java))
+        }
     }
 
 

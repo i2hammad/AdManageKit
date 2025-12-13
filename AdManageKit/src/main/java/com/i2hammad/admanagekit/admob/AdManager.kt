@@ -83,6 +83,12 @@ class AdManager() {
     // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
 
+    // Track current loading dialog to prevent duplicates
+    private var currentLoadingDialog: LoadingDialogViews? = null
+
+    // Flag to track if we're currently fetching an ad with dialog displayed
+    private var isFetchingWithDialog = false
+
     companion object {
         const val PURCHASED_APP_ERROR_CODE = 1001
         const val PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit"
@@ -118,6 +124,18 @@ class AdManager() {
      * Creates and shows a beautiful full-screen loading dialog with animations
      */
     private fun showBeautifulLoadingDialog(activity: Activity): LoadingDialogViews {
+        // Dismiss any existing dialog first to prevent duplicates
+        currentLoadingDialog?.let { existing ->
+            try {
+                if (existing.dialog.isShowing) {
+                    existing.dialog.dismiss()
+                }
+            } catch (e: Exception) {
+                Log.w("AdManager", "Error dismissing existing dialog: ${e.message}")
+            }
+            currentLoadingDialog = null
+        }
+
         // Create beautiful full-screen loading dialog
         val dialog = Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
         val dialogView = LayoutInflater.from(activity).inflate(R.layout.dialog_loading_ad_fullscreen, null)
@@ -193,7 +211,9 @@ class AdManager() {
         animateDot(dot2, 200)
         animateDot(dot3, 400)
 
-        return LoadingDialogViews(dialog, overlay, contentCard)
+        val dialogViews = LoadingDialogViews(dialog, overlay, contentCard)
+        currentLoadingDialog = dialogViews
+        return dialogViews
     }
 
 
@@ -658,6 +678,20 @@ class AdManager() {
      * @param callback The callback to handle actions after the ad is closed.
      */
     private fun forceShowInterstitialInternal(activity: Activity, callback: AdManagerCallback) {
+        // Prevent duplicate requests if dialog is already showing or ad is being fetched/displayed
+        if (isFetchingWithDialog || isDisplayingAd) {
+            Log.d("AdManager", "Skipping forceShowInterstitialInternal: already fetching or showing (isFetchingWithDialog=$isFetchingWithDialog, isDisplayingAd=$isDisplayingAd)")
+            callback.onNextAction()
+            return
+        }
+
+        // Check if a dialog is already displayed
+        if (currentLoadingDialog?.dialog?.isShowing == true) {
+            Log.d("AdManager", "Skipping forceShowInterstitialInternal: dialog already showing")
+            callback.onNextAction()
+            return
+        }
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onNextAction()
@@ -682,6 +716,8 @@ class AdManager() {
             AdDebugUtils.logEvent(currentAdUnitId, "cachedFallbackAvailable", "Cached ad saved as fallback", true)
         }
 
+        isFetchingWithDialog = true
+
         // Show beautiful loading dialog
         val dialogViews = showBeautifulLoadingDialog(activity)
 
@@ -692,13 +728,16 @@ class AdManager() {
         var timeoutTriggered = false
         var dialogDismissed = false
 
-        // Helper to safely dismiss dialog only once
+        // Helper to safely dismiss dialog only once (ensures main thread execution)
         fun dismissDialogOnce(onDismissed: () -> Unit) {
-            if (!dialogDismissed) {
-                dialogDismissed = true
-                animateDialogDismissal(dialogViews, onDismissed)
-            } else {
-                onDismissed()
+            Handler(Looper.getMainLooper()).post {
+                isFetchingWithDialog = false
+                if (!dialogDismissed) {
+                    dialogDismissed = true
+                    animateDialogDismissal(dialogViews, onDismissed)
+                } else {
+                    onDismissed()
+                }
             }
         }
 
@@ -843,6 +882,10 @@ class AdManager() {
             .setDuration(300)
             .withEndAction {
                 dismissDialogSafely(dialogViews.dialog)
+                // Clear the reference if this is the current dialog
+                if (currentLoadingDialog?.dialog == dialogViews.dialog) {
+                    currentLoadingDialog = null
+                }
                 onComplete()
             }
             .start()
@@ -937,6 +980,26 @@ class AdManager() {
 
     fun isDisplayingAd(): Boolean {
         return isDisplayingAd
+    }
+
+    /**
+     * Check if the loading dialog is currently showing.
+     * Used to prevent other UI (like app open ads) from appearing on top.
+     */
+    fun isLoadingDialogShowing(): Boolean {
+        return try {
+            currentLoadingDialog?.dialog?.isShowing == true
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Check if either an ad is displaying OR the loading dialog is showing.
+     * Useful for preventing app open ads from appearing during interstitial flow.
+     */
+    fun isAdOrDialogShowing(): Boolean {
+        return isDisplayingAd || isLoadingDialogShowing() || isFetchingWithDialog
     }
 
     fun setAdInterval(intervalMillis: Long) {
@@ -1062,6 +1125,9 @@ class AdManager() {
                 lastAdShowTime = System.currentTimeMillis()
                 adDisplayCount++
                 AdDebugUtils.logEvent(shownAdUnitId, "onAdImpression", "Interstitial ad shown", true)
+
+                // Notify callback that ad is now showing
+                callback.onAdShowed()
 
                 // Log Firebase event for ad impression (standard event)
                 val params = Bundle().apply {

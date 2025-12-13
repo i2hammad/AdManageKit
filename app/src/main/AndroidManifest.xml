@@ -45,6 +45,12 @@
             android:label="Non-Material Theme Test"
             android:theme="@style/Theme.NonMaterial" />
 
+        <activity
+            android:name=".FragmentTransitionTestActivity"
+            android:exported="false"
+            android:label="Fragment Transition Ad Test"
+            android:theme="@style/Theme.AdManageKit" />
+
         <meta-data android:name="com.google.android.gms.ads.flag.NATIVE_AD_DEBUGGER_ENABLED"
             android:value="false" />
         <meta-data

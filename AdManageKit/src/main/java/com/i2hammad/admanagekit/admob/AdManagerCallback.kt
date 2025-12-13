@@ -12,16 +12,30 @@ abstract class AdManagerCallback {
      * Called to perform the next action after an ad is shown or dismissed.
      * Override this method to implement custom behavior when the ad flow completes.
      */
-
     open fun onNextAction() {
         // Default implementation
     }
 
+    /**
+     * Called when the ad failed to load.
+     * @param error The error that occurred during ad loading.
+     */
     open fun onFailedToLoad(error: AdError?) {
         // Default implementation
     }
 
+    /**
+     * Called when the ad has been loaded successfully.
+     */
     open fun onAdLoaded() {
+        // Default implementation
+    }
+
+    /**
+     * Called when the ad is shown and covers the full screen.
+     * Use this to pause app content, mute audio, etc.
+     */
+    open fun onAdShowed() {
         // Default implementation
     }
 }

@@ -58,6 +58,12 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Setup button to open Fragment Transition Ad Test
+        findViewById<Button>(R.id.btnOpenFragmentTransitionTest).setOnClickListener {
+            val intent = Intent(this, FragmentTransitionTestActivity::class.java)
+            startActivity(intent)
+        }
+
         loadAds()
 
 

@@ -104,5 +104,15 @@
             android:textAllCaps="false"
             style="@style/Widget.Material3.Button.TonalButton" />
 
+        <Button
+            android:id="@+id/btnOpenFragmentTransitionTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Test Fragment Transition Ads"
+            android:textSize="14sp"
+            android:textAllCaps="false"
+            style="@style/Widget.Material3.Button.ElevatedButton" />
+
     </LinearLayout>
 </RelativeLayout>
