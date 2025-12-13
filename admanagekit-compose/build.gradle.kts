@@ -51,6 +51,9 @@ dependencies {
     api(project(":AdManageKit"))
     api(project(":admanagekit-core"))
 
+    // GMA Next-Gen SDK for type references in public API
+    implementation("com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:0.21.0-beta01")
+
     // Compose BOM
     implementation(platform(libs.androidx.compose.bom))
 
@@ -75,6 +78,11 @@ dependencies {
     // Debug tooling
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+}
+
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-ads")
+    exclude(group = "com.google.android.gms", module = "play-services-ads-lite")
 }
 
 afterEvaluate {

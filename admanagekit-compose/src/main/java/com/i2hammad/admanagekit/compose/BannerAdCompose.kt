@@ -11,8 +11,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 
 /**
  * A Jetpack Compose wrapper for BannerAdView from AdManageKit.
@@ -37,7 +37,7 @@ fun BannerAdCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -59,7 +59,7 @@ fun BannerAdCompose(
                     onAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     onAdFailedToLoad?.invoke(error)
                 }
 
@@ -127,7 +127,7 @@ fun BannerAdCompose(
     height: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -147,7 +147,7 @@ fun BannerAdCompose(
                     onAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     onAdFailedToLoad?.invoke(error)
                 }
 

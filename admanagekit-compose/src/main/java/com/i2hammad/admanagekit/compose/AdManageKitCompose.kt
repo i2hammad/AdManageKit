@@ -111,29 +111,29 @@ object AdManageKitCompose {
     }
 
     /**
-     * Helper function to check if caching is enabled.
+     * Helper function to check if preloading/caching is enabled.
      */
     val isCachingEnabled: Boolean
-        get() = NativeAdManager.enableCachingNativeAds
+        get() = NativeAdManager.enablePreloading
 
     /**
      * Helper function to get current cache configuration.
+     * Note: In GMA Next-Gen SDK, the SDK manages caching automatically via NativeAdPreloader.
      */
     val cacheConfig: CacheConfig
         get() = CacheConfig(
-            expiryMs = NativeAdManager.cacheExpiryMs,
-            maxAdsPerUnit = NativeAdManager.maxCachedAdsPerUnit,
-            cleanupEnabled = NativeAdManager.enableBackgroundCleanup
+            preloadingEnabled = NativeAdManager.enablePreloading,
+            activePreloaders = NativeAdManager.getActivePreloaders().size
         )
 }
 
 /**
  * Data class representing cache configuration for display purposes.
+ * Note: In GMA Next-Gen SDK, the SDK manages caching automatically.
  */
 data class CacheConfig(
-    val expiryMs: Long,
-    val maxAdsPerUnit: Int,
-    val cleanupEnabled: Boolean
+    val preloadingEnabled: Boolean,
+    val activePreloaders: Int
 )
 
 /**

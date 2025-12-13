@@ -10,10 +10,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdValue
-import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdView
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader
 
 /**
@@ -46,7 +46,7 @@ fun ProgrammaticNativeAdCompose(
     useCachedAd: Boolean = true,
     showLoadingIndicator: Boolean = true,
     onAdLoaded: ((NativeAdView, NativeAd) -> Unit)? = null,
-    onAdFailedToLoad: ((AdError) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -77,7 +77,7 @@ fun ProgrammaticNativeAdCompose(
                         onAdLoaded?.invoke(loadedNativeAdView, nativeAd)
                     }
 
-                    override fun onAdFailedToLoad(error: AdError) {
+                    override fun onAdFailedToLoad(error: LoadAdError) {
                         isLoading = false
                         hasError = true
                         onAdFailedToLoad?.invoke(error)
@@ -158,7 +158,7 @@ fun ProgrammaticNativeBannerSmallCompose(
     useCachedAd: Boolean = true,
     showLoadingIndicator: Boolean = true,
     onAdLoaded: ((NativeAdView, NativeAd) -> Unit)? = null,
-    onAdFailedToLoad: ((AdError) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -192,7 +192,7 @@ fun ProgrammaticNativeBannerMediumCompose(
     useCachedAd: Boolean = true,
     showLoadingIndicator: Boolean = true,
     onAdLoaded: ((NativeAdView, NativeAd) -> Unit)? = null,
-    onAdFailedToLoad: ((AdError) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -226,7 +226,7 @@ fun ProgrammaticNativeLargeCompose(
     useCachedAd: Boolean = true,
     showLoadingIndicator: Boolean = true,
     onAdLoaded: ((NativeAdView, NativeAd) -> Unit)? = null,
-    onAdFailedToLoad: ((AdError) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
