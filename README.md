@@ -29,10 +29,12 @@ AdManager.getInstance().resetAllCallCounts()
 ```
 
 ### New Native Templates
+- **flexible**: Adaptive layout that adjusts to available space
 - **icon_left**: Icon on left side with MediaView at top for GridView display
 - **top_icon_media**: Icon at top, MediaView in middle, CTA at bottom
 
 ```kotlin
+nativeTemplateView.setTemplate(NativeAdTemplate.FLEXIBLE)
 nativeTemplateView.setTemplate(NativeAdTemplate.ICON_LEFT)
 nativeTemplateView.setTemplate(NativeAdTemplate.TOP_ICON_MEDIA)
 ```
@@ -46,7 +48,7 @@ nativeTemplateView.setTemplate(NativeAdTemplate.TOP_ICON_MEDIA)
 
 ### New Native Template
 - **MEDIUM_HORIZONTAL**: 55% media (left) / 45% content (right) horizontal split layout
-- **26 Total Templates**: 20 standard + 6 video templates
+- **27 Total Templates**: 21 standard + 6 video templates
 
 ## What's New in 3.0.0
 
@@ -116,7 +118,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.2'
 ## Features
 
 ### NativeTemplateView (v2.6.0+)
-- **26 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, icon_left, top_icon_media, spotlight, and more
+- **27 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, flexible, icon_left, top_icon_media, spotlight, and more
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
 - **AdChoices Control**: Configure placement position (v2.9.0+)
@@ -232,6 +234,7 @@ class MyApp : Application() {
 | `medium_horizontal` | 55/45 media-content split (v3.0.0+) |
 | `spotlight` | High visibility (v2.9.0+) |
 | `media_content_split` | Balanced display (v2.9.0+) |
+| `flexible` | Adaptive layout (v3.3.2+) |
 | `icon_left` | Icon on left, GridView optimized (v3.3.2+) |
 | `top_icon_media` | Icon at top, MediaView center (v3.3.2+) |
 | `video_small/medium/large` | Video content |

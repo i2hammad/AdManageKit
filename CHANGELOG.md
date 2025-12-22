@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **everyNthTime Feature**: Fixed call counter resetting on each builder instance; counter now persists in AdManager
 
 ### Added
-- **New Native Templates**: Added `icon_left` and `top_icon_media` templates for GridView display with MediaView support
+- **New Native Templates**: Added `flexible`, `icon_left`, and `top_icon_media` templates for GridView display with MediaView support
 - **AdManager Counter API**: New methods for managing call counters:
   - `incrementCallCount(adUnitId)` - Increment and return counter for ad unit
   - `getCallCount(adUnitId)` - Get current counter value
@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **MEDIUM_HORIZONTAL Template**: 55% media / 45% content horizontal split layout
-- Total of 24 native ad templates (18 standard + 6 video)
+- Total of 27 native ad templates (21 standard + 6 video)
 
 ## [3.0.0] - 2024-12-17
 

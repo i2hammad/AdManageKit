@@ -4,7 +4,7 @@
 
 - **InterstitialAdBuilder Fix**: Ad unit now properly assigned to AdManager on first HYBRID fetch
 - **everyNthTime Fix**: Call counter persists across builder instances
-- **New Native Templates**: `icon_left` and `top_icon_media` for GridView display
+- **New Native Templates**: `flexible`, `icon_left`, and `top_icon_media` for GridView display
 - **Call Counter API**: Manage everyNthTime counters via AdManager
 
 ---
@@ -61,7 +61,12 @@ InterstitialAdBuilder.with(activity)
 
 ### New Native Templates for GridView
 
-Two new templates designed for displaying native ads in GridView or similar layouts:
+Three new templates designed for displaying native ads in GridView or similar layouts:
+
+#### flexible Template
+- Adaptive layout that adjusts to available space
+- MediaView support for video content
+- Responsive design for various screen sizes
 
 #### icon_left Template
 - Icon positioned on the left side
@@ -75,6 +80,9 @@ Two new templates designed for displaying native ads in GridView or similar layo
 - CTA button at bottom
 
 ```kotlin
+nativeTemplateView.setTemplate(NativeAdTemplate.FLEXIBLE)
+nativeTemplateView.loadNativeAd(activity, adUnitId)
+
 nativeTemplateView.setTemplate(NativeAdTemplate.ICON_LEFT)
 nativeTemplateView.loadNativeAd(activity, adUnitId)
 
@@ -135,6 +143,7 @@ fun resetAllCallCounts()
 ### NativeAdTemplate (Enum)
 
 ```kotlin
+FLEXIBLE        // Adaptive layout for various screen sizes
 ICON_LEFT       // Icon on left, MediaView at top
 TOP_ICON_MEDIA  // Icon at top, MediaView in middle
 ```
@@ -175,6 +184,9 @@ fun onPremiumPurchased() {
 #### 2. Use New Native Templates
 
 ```kotlin
+// Adaptive layout for various screen sizes
+nativeTemplateView.setTemplate(NativeAdTemplate.FLEXIBLE)
+
 // For GridView/RecyclerView grid layouts
 nativeTemplateView.setTemplate(NativeAdTemplate.ICON_LEFT)
 
@@ -191,6 +203,7 @@ nativeTemplateView.setTemplate(NativeAdTemplate.TOP_ICON_MEDIA)
 - Fixed everyNthTime counter resetting on each builder instance
 
 ### New Features
+- Added `flexible` native template with adaptive layout
 - Added `icon_left` native template with MediaView for GridView
 - Added `top_icon_media` native template with MediaView
 - Added `setAdUnitId()` to AdManager
