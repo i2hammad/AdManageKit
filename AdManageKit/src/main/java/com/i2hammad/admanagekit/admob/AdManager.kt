@@ -83,6 +83,9 @@ class AdManager() {
     // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
 
+    // Call counters per ad unit (for everyNthTime feature)
+    private val callCounters = mutableMapOf<String, Int>()
+
     // Track current loading dialog to prevent duplicates
     private var currentLoadingDialog: LoadingDialogViews? = null
 
@@ -609,7 +612,20 @@ class AdManager() {
      * @param callback The callback to handle actions after the ad is closed.
      */
     internal fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback) {
-        forceShowInterstitialInternal(activity, callback)
+        forceShowInterstitialInternal(activity, callback, null)
+    }
+
+    /**
+     * Always forces fetch and display of a fresh interstitial ad with specified ad unit.
+     * Ignores loading strategy - always loads new ad with dialog.
+     * Used internally by InterstitialAdBuilder for explicit force behavior.
+     *
+     * @param activity The activity used to display the ad.
+     * @param callback The callback to handle actions after the ad is closed.
+     * @param adUnitId The ad unit ID to use for loading (overrides the default).
+     */
+    internal fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback, adUnitId: String) {
+        forceShowInterstitialInternal(activity, callback, adUnitId)
     }
 
     /**
@@ -676,8 +692,9 @@ class AdManager() {
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
+     * @param overrideAdUnitId Optional ad unit ID to use instead of the default (used by InterstitialAdBuilder).
      */
-    private fun forceShowInterstitialInternal(activity: Activity, callback: AdManagerCallback) {
+    private fun forceShowInterstitialInternal(activity: Activity, callback: AdManagerCallback, overrideAdUnitId: String? = null) {
         // Prevent duplicate requests if dialog is already showing or ad is being fetched/displayed
         if (isFetchingWithDialog || isDisplayingAd) {
             Log.d("AdManager", "Skipping forceShowInterstitialInternal: already fetching or showing (isFetchingWithDialog=$isFetchingWithDialog, isDisplayingAd=$isDisplayingAd)")
@@ -698,12 +715,17 @@ class AdManager() {
             return
         }
 
-        val currentAdUnitId = adUnitId ?: ""
+        // Use override ad unit ID if provided, otherwise fall back to default
+        val currentAdUnitId = overrideAdUnitId ?: adUnitId ?: ""
         if (currentAdUnitId.isEmpty()) {
             Log.e("AdManager", "Ad unit ID is not set. Cannot force show interstitial.")
             callback.onNextAction()
             return
         }
+
+        // Always update AdManager's adUnitId to the one being used
+        // This ensures auto-reload and other operations use the correct ad unit
+        adUnitId = currentAdUnitId
 
         initializeFirebase(activity)
 
@@ -1009,12 +1031,62 @@ class AdManager() {
         }
     }
 
+    /**
+     * Set the primary ad unit ID directly.
+     * Used by InterstitialAdBuilder to ensure AdManager has the correct ad unit
+     * before force loading operations.
+     *
+     * @param adUnitId The ad unit ID to set
+     */
+    fun setAdUnitId(adUnitId: String?) {
+        this.adUnitId = adUnitId
+    }
+
     fun getAdDisplayCount(): Int {
         return adDisplayCount
     }
 
     fun setAdDisplayCount(count: Int) {
         this.adDisplayCount = count
+    }
+
+    /**
+     * Increment and return the call counter for a specific ad unit.
+     * Used by InterstitialAdBuilder for everyNthTime feature.
+     *
+     * @param adUnitId The ad unit ID
+     * @return The new call count after incrementing
+     */
+    fun incrementCallCount(adUnitId: String): Int {
+        val newCount = (callCounters[adUnitId] ?: 0) + 1
+        callCounters[adUnitId] = newCount
+        return newCount
+    }
+
+    /**
+     * Get the current call count for a specific ad unit.
+     *
+     * @param adUnitId The ad unit ID
+     * @return The current call count (0 if never called)
+     */
+    fun getCallCount(adUnitId: String): Int {
+        return callCounters[adUnitId] ?: 0
+    }
+
+    /**
+     * Reset the call counter for a specific ad unit.
+     *
+     * @param adUnitId The ad unit ID
+     */
+    fun resetCallCount(adUnitId: String) {
+        callCounters.remove(adUnitId)
+    }
+
+    /**
+     * Reset all call counters.
+     */
+    fun resetAllCallCounts() {
+        callCounters.clear()
     }
 
     private fun canShowAd(): Boolean {

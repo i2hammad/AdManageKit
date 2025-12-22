@@ -5,48 +5,36 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.2.0`** adds **Single-Activity App Support**, **Background-Aware Ad Display**, and **Dialog Stability Fixes**.
+**Latest Version `3.3.2`** adds **InterstitialAdBuilder Fixes**, **everyNthTime Counter Persistence**, and **New Native Templates**.
 
-## What's New in 3.2.0
+## What's New in 3.3.2
 
-### Single-Activity App Support
-- **Screen Tag Exclusions**: Control app open ads by screen/destination name
-- **Fragment Tag Exclusions**: Exclude specific fragments from showing ads
-- **Temporary Disable**: Pause ads during critical flows (payment, onboarding)
+### InterstitialAdBuilder Fixes
+- **Ad Unit Assignment**: Fixed ad unit not being assigned to AdManager on first HYBRID fetch
+- **Immediate Availability**: `adUnit()` now sets AdManager.adUnitId immediately for first-call reliability
+
+### everyNthTime Feature Fix
+- **Counter Persistence**: Call counter now persists across builder instances in AdManager
+- **Counter API**: New methods to manage counters: `getCallCount()`, `resetCallCount()`, `resetAllCallCounts()`
 
 ```kotlin
-// Exclude screens by name
-appOpenManager.excludeScreenTags("Payment", "Onboarding")
+// everyNthTime now works correctly
+InterstitialAdBuilder.with(activity)
+    .adUnit(adUnitId)
+    .everyNthTime(3)  // Shows on 3rd, 6th, 9th calls, etc.
+    .show { navigateNext() }
 
-// Track current screen on navigation
-navController.addOnDestinationChangedListener { _, destination, _ ->
-    appOpenManager.setCurrentScreenTag(destination.label?.toString())
-}
+// Reset counters when user upgrades
+AdManager.getInstance().resetAllCallCounts()
 ```
 
-### Background-Aware Ad Display
-- **Smart Background Detection**: App open ads no longer try to show when app is in background
-- **Pending Ad Queue**: Ads loaded while in background are saved and shown when user returns
-- **Welcome Dialog on Return**: Smooth transition with welcome dialog when showing pending ads
-
-### Dialog Stability Improvements
-- **Duplicate Dialog Prevention**: Fixed issue where pausing/resuming app caused duplicate dialogs
-- **Interstitial Priority**: App open ads won't show on top of interstitial loading dialogs
-- **Thread-Safe Callbacks**: All ad callbacks now properly run on main thread
-
-### New Callback: onAdShowed()
-- **Full Screen Detection**: New callback when interstitial ad covers the screen
-- **Use Case**: Pause app content, mute audio, track impressions
+### New Native Templates
+- **icon_left**: Icon on left side with MediaView at top for GridView display
+- **top_icon_media**: Icon at top, MediaView in middle, CTA at bottom
 
 ```kotlin
-AdManager.getInstance().forceShowInterstitial(activity, object : AdManagerCallback() {
-    override fun onAdShowed() {
-        // Ad is now showing - pause game, mute audio, etc.
-    }
-    override fun onNextAction() {
-        // Ad dismissed - resume app
-    }
-})
+nativeTemplateView.setTemplate(NativeAdTemplate.ICON_LEFT)
+nativeTemplateView.setTemplate(NativeAdTemplate.TOP_ICON_MEDIA)
 ```
 
 ## What's New in 3.1.0
@@ -58,7 +46,7 @@ AdManager.getInstance().forceShowInterstitial(activity, object : AdManagerCallba
 
 ### New Native Template
 - **MEDIUM_HORIZONTAL**: 55% media (left) / 45% content (right) horizontal split layout
-- **24 Total Templates**: 18 standard + 6 video templates
+- **26 Total Templates**: 20 standard + 6 video templates
 
 ## What's New in 3.0.0
 
@@ -115,12 +103,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.2.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.2.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.2'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.2'
 ```
 
 **Step 3:** Sync your project with Gradle.
@@ -128,7 +116,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.2.0'
 ## Features
 
 ### NativeTemplateView (v2.6.0+)
-- **24 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, spotlight, and more
+- **26 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, icon_left, top_icon_media, spotlight, and more
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
 - **AdChoices Control**: Configure placement position (v2.9.0+)
@@ -244,6 +232,8 @@ class MyApp : Application() {
 | `medium_horizontal` | 55/45 media-content split (v3.0.0+) |
 | `spotlight` | High visibility (v2.9.0+) |
 | `media_content_split` | Balanced display (v2.9.0+) |
+| `icon_left` | Icon on left, GridView optimized (v3.3.2+) |
+| `top_icon_media` | Icon at top, MediaView center (v3.3.2+) |
 | `video_small/medium/large` | Video content |
 | `video_square/vertical/fullscreen` | Social feeds |
 
@@ -509,7 +499,8 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
-- [Release Notes v3.2.0](docs/release-notes/RELEASE_NOTES_v3.2.0.md)
+- [Release Notes v3.3.2](docs/release-notes/RELEASE_NOTES_v3.3.2.md)
+- [Release Notes v3.3.0](docs/release-notes/RELEASE_NOTES_v3.3.0.md)
 - [Release Notes v3.1.0](docs/release-notes/RELEASE_NOTES_v3.1.0.md)
 - [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
 - [API Reference](docs/API_REFERENCE.md)

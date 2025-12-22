@@ -82,7 +82,6 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private var everyNthCall: Int? = null       // Show ad every Nth time show() is called
     private var maxShows: Int? = null           // Maximum total times to show ad
     private var minIntervalMs: Long? = null     // Minimum milliseconds between shows
-    private var callCount = 0                   // Track calls to show() method
     private var waitForLoading = false          // Wait for loading ad before force fetching
     private var autoReload: Boolean? = null     // Auto reload after showing (null = use global config)
 
@@ -94,6 +93,30 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         fun with(activity: Activity): InterstitialAdBuilder {
             return InterstitialAdBuilder(activity)
         }
+
+        /**
+         * Reset the call counter for a specific ad unit
+         */
+        @JvmStatic
+        fun resetCallCounter(adUnitId: String) {
+            AdManager.getInstance().resetCallCount(adUnitId)
+        }
+
+        /**
+         * Reset all call counters
+         */
+        @JvmStatic
+        fun resetAllCallCounters() {
+            AdManager.getInstance().resetAllCallCounts()
+        }
+
+        /**
+         * Get current call count for an ad unit
+         */
+        @JvmStatic
+        fun getCallCount(adUnitId: String): Int {
+            return AdManager.getInstance().getCallCount(adUnitId)
+        }
     }
 
     /**
@@ -101,6 +124,8 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
      */
     fun adUnit(adUnitId: String): InterstitialAdBuilder {
         this.primaryAdUnit = adUnitId
+        // Assign to AdManager immediately so force show operations have the correct ad unit
+        AdManager.getInstance().setAdUnitId(adUnitId)
         return this
     }
 
@@ -372,14 +397,17 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         require(primaryAdUnit != null) { "Ad unit ID must be set using adUnit()" }
 
         val adManager = AdManager.getInstance()
-        callCount++  // Increment call counter
+        val adUnitId = primaryAdUnit!!
+
+        // Increment call counter in AdManager for this ad unit
+        val currentCount = adManager.incrementCallCount(adUnitId)
 
         // Check everyNthTime - skip if not Nth call
         everyNthCall?.let { nth ->
-            if (callCount % nth != 0) {
+            if (currentCount % nth != 0) {
                 if (debugMode) {
                     android.util.Log.d("InterstitialBuilder",
-                        "Not Nth time (call #$callCount, showing every ${nth}th), skipping ad")
+                        "Not Nth time (call #$currentCount, showing every ${nth}th), skipping ad")
                 }
                 onComplete()
                 return
@@ -501,7 +529,7 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
     private fun showWithDialog(callback: AdManagerCallback, onComplete: () -> Unit) {
         if (debugMode) android.util.Log.d("InterstitialBuilder", "Showing ad with loading dialog (force fetch)")
 
-        // Use forceShowInterstitialAlways to bypass global strategy - Builder has its own strategy logic
+        // Ad unit already set in adUnit() - just call forceShowInterstitialAlways
         AdManager.getInstance().forceShowInterstitialAlways(
             activity,
             callback

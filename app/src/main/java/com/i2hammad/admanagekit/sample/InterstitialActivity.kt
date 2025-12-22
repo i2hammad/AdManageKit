@@ -89,6 +89,11 @@ class InterstitialActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnFragmentTransitionTest).setOnClickListener {
             startActivity(Intent(this, FragmentTransitionTestActivity::class.java))
         }
+
+        // Button to open interstitial test suite
+        findViewById<Button>(R.id.btnInterstitialTestSuite).setOnClickListener {
+            startActivity(Intent(this, InterstitialTestActivity::class.java))
+        }
     }
 
 

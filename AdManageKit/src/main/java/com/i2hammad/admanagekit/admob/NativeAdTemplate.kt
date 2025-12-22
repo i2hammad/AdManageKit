@@ -124,6 +124,18 @@ enum class NativeAdTemplate(
         displayName = "Spotlight"
     ),
 
+    FLEXIBLE(
+        layoutResId = R.layout.layout_native_flexible,
+        shimmerResId = R.layout.layout_shimmer_flexible,
+        displayName = "Flexible"
+    ),
+
+    GRID_ITEM(
+        layoutResId = R.layout.layout_native_grid_item,
+        shimmerResId = R.layout.layout_shimmer_grid_item,
+        displayName = "Grid Item"
+    ),
+
     // Video Templates
     VIDEO_SMALL(
         layoutResId = R.layout.layout_native_video_small,
@@ -159,6 +171,18 @@ enum class NativeAdTemplate(
         layoutResId = R.layout.layout_native_video_fullscreen,
         shimmerResId = R.layout.layout_shimmer_video_fullscreen,
         displayName = "Video Fullscreen"
+    ),
+
+    TOP_ICON_MEDIA(
+        layoutResId = R.layout.layout_native_top_icon_media,
+        shimmerResId = R.layout.layout_shimmer_top_icon_media,
+        displayName = "Top Icon Media"
+    ),
+
+    ICON_LEFT(
+        layoutResId = R.layout.layout_native_icon_left,
+        shimmerResId = R.layout.layout_shimmer_icon_left,
+        displayName = "Icon Left"
     );
 
     companion object {

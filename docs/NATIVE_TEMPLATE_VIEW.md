@@ -1,14 +1,14 @@
 # NativeTemplateView Guide
 
-**New in v2.6.0** - A unified native ad component supporting 17 different template styles with Material 3 theming and video support.
+**New in v2.6.0** - A unified native ad component supporting 28 different template styles with Material 3 theming and video support.
 
 ## Overview
 
-`NativeTemplateView` is a single, flexible component that replaces the need for multiple native ad views. It supports 17 different visual templates that can be set via XML attributes or programmatically.
+`NativeTemplateView` is a single, flexible component that replaces the need for multiple native ad views. It supports 28 different visual templates that can be set via XML attributes or programmatically.
 
 ## Features
 
-- **17 Template Styles**: From minimal to magazine, compact to fullscreen video
+- **28 Template Styles**: From minimal to icon-left, compact to fullscreen video
 - **Material 3 Theming**: Automatic dark/light mode support
 - **Video Support**: All templates support video ads (120dp+ MediaView)
 - **Shimmer Loading**: Beautiful loading animation
@@ -28,13 +28,24 @@
 | Material 3 | `MATERIAL3` | Material Design 3 style with M3 components |
 | Minimal | `MINIMAL` | Clean, minimal design for content-focused apps |
 | Compact Horizontal | `COMPACT_HORIZONTAL` | Horizontal layout, 120dp height |
+| Story Style | `STORY_STYLE` | Story/feed style for social apps |
 | Full Width Banner | `FULL_WIDTH_BANNER` | Full-width banner style |
-| List Item | `LIST_ITEM` | List item style with divider |
 | Grid Card | `GRID_CARD` | Square card for grid layouts |
+| List Item | `LIST_ITEM` | List item style with divider |
 | Featured | `FEATURED` | Large featured card for hero sections |
 | Overlay Dark | `OVERLAY_DARK` | Dark overlay on media |
-| Story Style | `STORY_STYLE` | Story/feed style for social apps |
 | Magazine | `MAGAZINE` | Magazine article style for news/blog apps |
+| Media Content Split | `MEDIA_CONTENT_SPLIT` | Media/content split layout |
+| App Store | `APP_STORE` | Store listing style with install CTA |
+| Social Feed | `SOCIAL_FEED` | Sponsored post layout for feeds |
+| Gradient Card | `GRADIENT_CARD` | Hero card with gradient overlay |
+| Pill Banner | `PILL_BANNER` | Pill-shaped compact banner |
+| Medium Horizontal | `MEDIUM_HORIZONTAL` | 55/45 media-content horizontal split |
+| Spotlight | `SPOTLIGHT` | Centered hero with large icon |
+| Flexible | `FLEXIBLE` | Adaptive card with media focus |
+| Grid Item | `GRID_ITEM` | Compact grid item with centered content |
+| Top Icon Media | `TOP_ICON_MEDIA` | Top icon + headline, media center, CTA footer |
+| Icon Left | `ICON_LEFT` | Left icon column with stacked content |
 
 ### Video Templates
 
@@ -67,13 +78,24 @@ app:adTemplate="card_modern"
 app:adTemplate="material3"
 app:adTemplate="minimal"
 app:adTemplate="compact_horizontal"
+app:adTemplate="story_style"
 app:adTemplate="full_width_banner"
-app:adTemplate="list_item"
 app:adTemplate="grid_card"
+app:adTemplate="list_item"
 app:adTemplate="featured"
 app:adTemplate="overlay_dark"
-app:adTemplate="story_style"
 app:adTemplate="magazine"
+app:adTemplate="media_content_split"
+app:adTemplate="app_store"
+app:adTemplate="social_feed"
+app:adTemplate="gradient_card"
+app:adTemplate="pill_banner"
+app:adTemplate="medium_horizontal"
+app:adTemplate="spotlight"
+app:adTemplate="flexible"
+app:adTemplate="grid_item"
+app:adTemplate="top_icon_media"
+app:adTemplate="icon_left"
 
 <!-- Video templates -->
 app:adTemplate="video_small"
@@ -311,9 +333,9 @@ Templates are automatically mapped to screen types for caching:
 
 | Templates | Screen Type |
 |-----------|-------------|
-| COMPACT_HORIZONTAL, FULL_WIDTH_BANNER, LIST_ITEM, GRID_CARD, VIDEO_SMALL | SMALL |
-| CARD_MODERN, MATERIAL3, MINIMAL, VIDEO_MEDIUM, VIDEO_SQUARE | MEDIUM |
-| STORY_STYLE, FEATURED, OVERLAY_DARK, MAGAZINE, VIDEO_LARGE, VIDEO_VERTICAL, VIDEO_FULLSCREEN | LARGE |
+| COMPACT_HORIZONTAL, FULL_WIDTH_BANNER, LIST_ITEM, GRID_CARD, GRID_ITEM, MEDIA_CONTENT_SPLIT, PILL_BANNER, VIDEO_SMALL | SMALL |
+| CARD_MODERN, MATERIAL3, MINIMAL, APP_STORE, MEDIUM_HORIZONTAL, TOP_ICON_MEDIA, ICON_LEFT, FLEXIBLE, VIDEO_MEDIUM, VIDEO_SQUARE | MEDIUM |
+| STORY_STYLE, FEATURED, OVERLAY_DARK, MAGAZINE, SOCIAL_FEED, GRADIENT_CARD, SPOTLIGHT, VIDEO_LARGE, VIDEO_VERTICAL, VIDEO_FULLSCREEN | LARGE |
 
 ## XML Preview
 

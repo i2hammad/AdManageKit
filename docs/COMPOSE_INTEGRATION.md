@@ -14,7 +14,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
 
 | Component | Description |
 |-----------|-------------|
-| `NativeTemplateCompose` | Unified native ad with 17 templates (NEW in 2.6.0) |
+| `NativeTemplateCompose` | Unified native ad with 28 templates (NEW in 2.6.0) |
 | `BannerAdCompose` | Banner ad with lifecycle management |
 | `NativeBannerSmallCompose` | Small native banner (80dp) |
 | `NativeBannerMediumCompose` | Medium native banner (120dp) |
@@ -29,7 +29,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
 
 ## NativeTemplateCompose (NEW in 2.6.0)
 
-A Compose wrapper for `NativeTemplateView` supporting all 17 template styles.
+A Compose wrapper for `NativeTemplateView` supporting all 28 template styles.
 
 ### Basic Usage
 
@@ -67,13 +67,24 @@ NativeAdTemplate.CARD_MODERN      // General purpose
 NativeAdTemplate.MATERIAL3        // Material Design 3
 NativeAdTemplate.MINIMAL          // Clean, minimal
 NativeAdTemplate.COMPACT_HORIZONTAL // Horizontal layout
+NativeAdTemplate.STORY_STYLE      // Social/story style
 NativeAdTemplate.FULL_WIDTH_BANNER // Full width
-NativeAdTemplate.LIST_ITEM        // List/RecyclerView items
 NativeAdTemplate.GRID_CARD        // Grid layouts
+NativeAdTemplate.LIST_ITEM        // List/RecyclerView items
 NativeAdTemplate.FEATURED         // Hero sections
 NativeAdTemplate.OVERLAY_DARK     // Dark overlay on media
-NativeAdTemplate.STORY_STYLE      // Social/story style
 NativeAdTemplate.MAGAZINE         // News/blog style
+NativeAdTemplate.MEDIA_CONTENT_SPLIT // Media/content split
+NativeAdTemplate.APP_STORE        // Store listing style
+NativeAdTemplate.SOCIAL_FEED      // Sponsored feed layout
+NativeAdTemplate.GRADIENT_CARD    // Gradient overlay hero
+NativeAdTemplate.PILL_BANNER      // Pill-shaped banner
+NativeAdTemplate.MEDIUM_HORIZONTAL // 55/45 media-content split
+NativeAdTemplate.SPOTLIGHT        // Centered hero with large icon
+NativeAdTemplate.FLEXIBLE         // Adaptive media-focused layout
+NativeAdTemplate.GRID_ITEM        // Compact grid item
+NativeAdTemplate.TOP_ICON_MEDIA   // Top icon, media center
+NativeAdTemplate.ICON_LEFT        // Left icon column layout
 
 // Video Templates
 NativeAdTemplate.VIDEO_SMALL      // 120x120dp

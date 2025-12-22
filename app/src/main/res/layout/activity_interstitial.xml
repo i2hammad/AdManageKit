@@ -46,6 +46,15 @@
             android:textAllCaps="false"
             style="@style/Widget.Material3.Button.TonalButton" />
 
+        <Button
+            android:id="@+id/btnInterstitialTestSuite"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Interstitial Test Suite"
+            android:textAllCaps="false"
+            style="@style/Widget.Material3.Button" />
+
     </LinearLayout>
 
 

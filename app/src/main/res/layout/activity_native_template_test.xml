@@ -180,19 +180,105 @@
 
                 <FrameLayout
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+                    android:layout_height="match_parent"
 
                    >
 
                     <com.i2hammad.admanagekit.admob.NativeTemplateView
                         android:id="@+id/nativeTemplateView"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        app:adTemplate="medium_horizontal" />
+                        android:layout_height="300dp"
+                        app:adTemplate="flexible" />
 
                 </FrameLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- New Templates Demo Section -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:text="New Templates Demo"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#757575" />
+
+            <!-- Grid Item Demo - 2 column layout -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="280dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="4dp"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="2dp">
+
+                    <com.i2hammad.admanagekit.admob.NativeTemplateView
+                        android:id="@+id/gridItemLeft"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        app:adTemplate="top_icon_media" />
+
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="0dp"
+                    android:layout_height="280dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="4dp"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="2dp">
+
+                    <com.i2hammad.admanagekit.admob.NativeTemplateView
+                        android:id="@+id/gridItemRight"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        app:adTemplate="grid_item" />
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="grid_item template - 2 column grid"
+                android:textSize="11sp"
+                android:textColor="#9E9E9E" />
+
+            <!-- Flexible Template Demo -->
+            <com.google.android.material.card.MaterialCardView
+                android:layout_width="match_parent"
+                android:layout_height="200dp"
+                android:layout_marginTop="12dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="2dp">
+
+                <com.i2hammad.admanagekit.admob.NativeTemplateView
+                    android:id="@+id/flexibleDemo"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    app:adTemplate="flexible" />
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:gravity="center"
+                android:text="flexible template - adapts to any size"
+                android:textSize="11sp"
+                android:textColor="#9E9E9E" />
 
             <!-- Template List Info -->
             <com.google.android.material.card.MaterialCardView
@@ -211,7 +297,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Available Templates (24)"
+                        android:text="Available Templates (26)"
                         android:textSize="14sp"
                         android:textStyle="bold"
                         android:textColor="#212121" />
@@ -220,7 +306,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="Standard Templates (18):\ncard_modern, material3, minimal, compact_horizontal, story_style, full_width_banner, grid_card, list_item, featured, overlay_dark, magazine, media_content_split, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, spotlight"
+                        android:text="Standard Templates (20):\ncard_modern, material3, minimal, compact_horizontal, story_style, full_width_banner, grid_card, list_item, featured, overlay_dark, magazine, media_content_split, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, spotlight, flexible, grid_item"
                         android:textSize="12sp"
                         android:textColor="#616161"
                         android:lineSpacingExtra="4dp" />

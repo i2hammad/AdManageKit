@@ -24,13 +24,17 @@
             <enum name="pill_banner" value="15" />
             <enum name="medium_horizontal" value="16" />
             <enum name="spotlight" value="17" />
+            <enum name="flexible" value="18" />
+            <enum name="grid_item" value="19" />
             <!-- Video Templates -->
-            <enum name="video_small" value="18" />
-            <enum name="video_medium" value="19" />
-            <enum name="video_large" value="20" />
-            <enum name="video_square" value="21" />
-            <enum name="video_vertical" value="22" />
-            <enum name="video_fullscreen" value="23" />
+            <enum name="video_small" value="20" />
+            <enum name="video_medium" value="21" />
+            <enum name="video_large" value="22" />
+            <enum name="video_square" value="23" />
+            <enum name="video_vertical" value="24" />
+            <enum name="video_fullscreen" value="25" />
+            <enum name="top_icon_media" value="26" />
+            <enum name="icon_left" value="27" />
         </attr>
 
         <!-- AdChoices icon placement position -->

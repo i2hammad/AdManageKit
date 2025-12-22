@@ -32,6 +32,11 @@ class NativeTemplateTestActivity : AppCompatActivity() {
     private lateinit var switchVideoAd: SwitchMaterial
     private lateinit var tvAdUnitInfo: TextView
 
+    // Demo templates
+    private lateinit var gridItemLeft: NativeTemplateView
+    private lateinit var gridItemRight: NativeTemplateView
+    private lateinit var flexibleDemo: NativeTemplateView
+
     // Test ad units
     private val standardAdUnitId = "ca-app-pub-3940256099942544/2247696110" // Test native ad unit
     private val videoAdUnitId = "ca-app-pub-3940256099942544/1044960115" // Test video native unit
@@ -63,12 +68,29 @@ class NativeTemplateTestActivity : AppCompatActivity() {
         switchVideoAd = findViewById(R.id.switchVideoAd)
         tvAdUnitInfo = findViewById(R.id.tvAdUnitInfo)
 
+        // Demo templates
+        gridItemLeft = findViewById(R.id.gridItemLeft)
+        gridItemRight = findViewById(R.id.gridItemRight)
+        flexibleDemo = findViewById(R.id.flexibleDemo)
+
         // Setup video ad switch listener
         switchVideoAd.setOnCheckedChangeListener { _, isChecked ->
             updateAdUnitInfo(isChecked)
             loadAd()
         }
         updateAdUnitInfo(switchVideoAd.isChecked)
+
+        // Load demo ads
+        loadDemoAds()
+    }
+
+    private fun loadDemoAds() {
+        // Load grid item demos
+        gridItemLeft.loadNativeAd(this, standardAdUnitId)
+        gridItemRight.loadNativeAd(this, standardAdUnitId)
+
+        // Load flexible demo
+        flexibleDemo.loadNativeAd(this, standardAdUnitId)
     }
 
     private fun updateAdUnitInfo(isVideoAd: Boolean) {
@@ -189,6 +211,10 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.PILL_BANNER -> "Compact pill-shaped banner with rounded corners"
             NativeAdTemplate.MEDIUM_HORIZONTAL -> "Horizontal split: 55% media left, 45% content right"
             NativeAdTemplate.SPOTLIGHT -> "Centered hero with large icon & full-width CTA"
+            NativeAdTemplate.FLEXIBLE -> "Adapts to any size - full media background with overlay"
+            NativeAdTemplate.GRID_ITEM -> "Square media + centered content - perfect for 2-column grids"
+            NativeAdTemplate.TOP_ICON_MEDIA -> "Top icon + headline, media in center, CTA footer"
+            NativeAdTemplate.ICON_LEFT -> "Left icon column with stacked media and CTA"
 
             // Video Templates
             NativeAdTemplate.VIDEO_SMALL -> "Compact video player (160dp)"

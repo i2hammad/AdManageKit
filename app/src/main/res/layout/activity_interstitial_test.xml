@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".InterstitialTestActivity">
+
+    <!-- Header -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimaryContainer"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Interstitial Ad Test Suite"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="?attr/colorOnPrimaryContainer" />
+
+        <TextView
+            android:id="@+id/statusTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Ready"
+            android:textColor="?attr/colorOnPrimaryContainer" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <!-- Buttons Panel (Scrollable) -->
+        <ScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <!-- Loading Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="📦 Loading"
+                    android:textStyle="bold"
+                    android:layout_marginTop="8dp" />
+
+                <Button
+                    android:id="@+id/btnPreload"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Preload"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnLoadWithCallback"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Load (AdManager)"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnCheckIsReady"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Check isReady()"
+                    android:textAllCaps="false" />
+
+                <!-- Strategies Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🎯 Loading Strategies"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+                <Button
+                    android:id="@+id/btnStrategyOnDemand"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="ON_DEMAND"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnStrategyOnlyCache"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="ONLY_CACHE"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnStrategyHybrid"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="HYBRID"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnStrategyFreshWithFallback"
+                    style="@style/Widget.Material3.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="FRESH_WITH_FALLBACK"
+                    android:textAllCaps="false" />
+
+                <!-- Builder Options Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🔧 Builder Options"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+                <Button
+                    android:id="@+id/btnBasicShow"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Basic Show"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnForceShow"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Force Show"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnWithTimeout"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="With Timeout (3s)"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnWithCallbacks"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="With All Callbacks"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnEveryNthTime"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Every 3rd Time"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnMaxShows"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Max Shows (2)"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnMinInterval"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Min Interval (10s)"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnAutoReloadOff"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Auto Reload OFF"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnWaitForLoading"
+                    style="@style/Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Wait For Loading"
+                    android:textAllCaps="false" />
+
+                <!-- AdManager Direct Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚡ AdManager Direct"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+                <Button
+                    android:id="@+id/btnForceShowWithDialog"
+                    style="@style/Widget.Material3.Button.ElevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="forceShowWithDialog"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnShowIfReady"
+                    style="@style/Widget.Material3.Button.ElevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="showIfReady"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnShowByTime"
+                    style="@style/Widget.Material3.Button.ElevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="showByTime"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnShowByCount"
+                    style="@style/Widget.Material3.Button.ElevatedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="showByCount"
+                    android:textAllCaps="false" />
+
+                <!-- Edge Cases Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⚠️ Edge Cases"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+                <Button
+                    android:id="@+id/btnShowBeforeLoad"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Show Before Load"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnRapidClicks"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Rapid Clicks (5x)"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnBuilderWithoutPreload"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Builder Without Preload"
+                    android:textAllCaps="false" />
+
+                <!-- Utilities Section -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🛠️ Utilities"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+                <Button
+                    android:id="@+id/btnClearLog"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Clear Log"
+                    android:textAllCaps="false" />
+
+                <Button
+                    android:id="@+id/btnResetAdManager"
+                    style="@style/Widget.Material3.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Reset AdManager"
+                    android:textAllCaps="false" />
+
+            </LinearLayout>
+        </ScrollView>
+
+        <!-- Log Panel -->
+        <ScrollView
+            android:id="@+id/scrollView"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/colorSurfaceVariant">
+
+            <TextView
+                android:id="@+id/logTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:padding="8dp"
+                android:textSize="11sp"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+
+        </ScrollView>
+
+    </LinearLayout>
+
+</LinearLayout>

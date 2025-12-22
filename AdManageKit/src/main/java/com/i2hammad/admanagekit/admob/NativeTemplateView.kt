@@ -372,6 +372,7 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.FULL_WIDTH_BANNER,
             NativeAdTemplate.LIST_ITEM,
             NativeAdTemplate.GRID_CARD,
+            NativeAdTemplate.GRID_ITEM,
             NativeAdTemplate.MEDIA_CONTENT_SPLIT,
             NativeAdTemplate.PILL_BANNER,
             NativeAdTemplate.VIDEO_SMALL -> NativeAdIntegrationManager.ScreenType.SMALL
@@ -382,6 +383,9 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.MINIMAL,
             NativeAdTemplate.APP_STORE,
             NativeAdTemplate.MEDIUM_HORIZONTAL,
+            NativeAdTemplate.TOP_ICON_MEDIA,
+            NativeAdTemplate.ICON_LEFT,
+            NativeAdTemplate.FLEXIBLE,
             NativeAdTemplate.VIDEO_MEDIUM,
             NativeAdTemplate.VIDEO_SQUARE -> NativeAdIntegrationManager.ScreenType.MEDIUM
 

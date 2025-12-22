@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Top Icon Media shimmer - Icon+text at top, media in middle, CTA at bottom (for grid display) -->
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_card_ads">
+
+    <!-- Header Section - Icon on left with text, fixed at TOP -->
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/shimmer_header"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:padding="8dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <!-- Ad Badge placeholder -->
+        <View
+            android:id="@+id/shimmer_badge"
+            android:layout_width="22dp"
+            android:layout_height="12dp"
+            android:background="@color/lightTransparent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- App Icon placeholder -->
+        <View
+            android:id="@+id/shimmer_icon"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginTop="4dp"
+            android:background="@color/lightTransparent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/shimmer_badge" />
+
+        <!-- Text Content placeholder -->
+        <LinearLayout
+            android:id="@+id/shimmer_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="4dp"
+            android:orientation="vertical"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/shimmer_icon"
+            app:layout_constraintTop_toBottomOf="@id/shimmer_badge">
+
+            <!-- Headline placeholder -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="12dp"
+                android:background="@color/lightTransparent" />
+
+            <!-- Headline line 2 placeholder -->
+            <View
+                android:layout_width="80dp"
+                android:layout_height="12dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/lightTransparent" />
+
+            <!-- Advertiser placeholder -->
+            <View
+                android:layout_width="50dp"
+                android:layout_height="10dp"
+                android:layout_marginTop="4dp"
+                android:background="@color/lightTransparent" />
+
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+    <!-- CTA Button placeholder - fixed at BOTTOM -->
+    <View
+        android:id="@+id/shimmer_cta"
+        android:layout_width="0dp"
+        android:layout_height="32dp"
+        android:layout_margin="8dp"
+        android:background="@color/lightTransparent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent" />
+
+    <!-- Media placeholder - fills remaining space -->
+    <View
+        android:id="@+id/shimmer_media"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_margin="8dp"
+        android:background="@color/lightTransparent"
+        app:layout_constraintBottom_toTopOf="@id/shimmer_cta"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/shimmer_header" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
