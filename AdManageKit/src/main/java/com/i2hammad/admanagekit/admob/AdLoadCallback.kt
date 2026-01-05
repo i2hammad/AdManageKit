@@ -1,8 +1,5 @@
 package com.i2hammad.admanagekit.admob
 
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdValue
-
 /**
  * Abstract callback class for handling ad lifecycle events.
  * 
@@ -62,7 +59,7 @@ abstract class AdLoadCallback {
      * 
      * @since 1.0.0
      */
-    open fun onFailedToLoad(error: AdError?) {
+    open fun onFailedToLoad(error: AdKitError?) {
         // Default implementation - override to handle failures
     }
 
@@ -175,7 +172,7 @@ abstract class AdLoadCallback {
      * 
      * @since 2.1.0
      */
-    open fun onPaidEvent(adValue: AdValue) {
+    open fun onPaidEvent(adValue: AdKitValue) {
         // Default implementation - override to handle revenue tracking
     }
 

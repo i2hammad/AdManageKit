@@ -1,7 +1,5 @@
 package com.i2hammad.admanagekit.admob
 
-import com.google.android.gms.ads.LoadAdError
-
 /**
  * Java-friendly callbacks for InterstitialAdBuilder.
  *
@@ -33,7 +31,7 @@ interface OnAdShownListener {
  * Callback interface for when ad fails to load or show
  */
 interface OnAdFailedListener {
-    fun onAdFailed(error: LoadAdError)
+    fun onAdFailed(error: AdKitLoadError)
 }
 
 /**
@@ -42,6 +40,6 @@ interface OnAdFailedListener {
 interface InterstitialAdCallback {
     fun onAdLoaded() {}
     fun onAdShown() {}
-    fun onAdFailed(error: LoadAdError) {}
+    fun onAdFailed(error: AdKitLoadError) {}
     fun onComplete() {}
 }
