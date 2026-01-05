@@ -7,7 +7,59 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 **Latest Version `3.3.3`** adds **SDK-Agnostic Type Aliases** for migration compatibility between GMS SDK and Next-Gen SDK versions.
 
-> **Looking for Next-Gen GMA SDK?** See the [Next-Gen SDK Version](#next-gen-gma-sdk-version) section below for preloader-based ad loading and modern architecture.
+---
+
+## Next-Gen GMA SDK Version
+
+> **Beta Notice:** The Next-Gen GMA SDK (`com.google.android.libraries.ads.mobile.sdk`) is currently in **beta by Google**. While AdManageKit's nextgen branch is stable for production use, the underlying Google SDK may receive breaking changes until it reaches stable release.
+
+AdManageKit offers a **Next-Gen GMA SDK** version on the `nextgen` branch, featuring Google's modern preloader-based ad loading system.
+
+### Why Next-Gen?
+
+| Feature | Main Branch (GMS SDK) | Next-Gen Branch |
+|---------|----------------------|-----------------|
+| SDK | `play-services-ads` (stable) | `ads-mobile-sdk` (beta) |
+| Ad Loading | Traditional load/show | Preloader-based with auto-refill |
+| Threading | Manual main thread dispatch | Automatic background thread safety |
+| Buffer System | N/A | Configurable ad buffers per type |
+| Background Handling | Basic | Smart pending ad queue |
+
+### Next-Gen Features
+
+- **Preloader System**: SDK automatically loads next ad after one is consumed
+- **Background-Aware Ads**: App open ads won't show when app is in background
+- **Pending Ad Queue**: Ads that load while backgrounded are saved for return
+- **Configurable Buffers**: Set how many ads to keep ready per type
+
+```kotlin
+// Next-Gen preloader configuration
+AdManageKitConfig.apply {
+    enableInterstitialPreloader = true
+    enableAppOpenPreloader = true
+    interstitialPreloaderBufferSize = 2
+}
+```
+
+### Migration Compatibility
+
+Both branches use the same callback signatures via type aliases:
+- `AdKitError` → resolves to appropriate SDK error type
+- `AdKitLoadError` → resolves to appropriate SDK load error type
+- `AdKitValue` → resolves to appropriate SDK value type
+
+Your callback implementations work on both branches without changes.
+
+### Which Version Should I Use?
+
+| Use Case | Recommended |
+|----------|-------------|
+| Production apps (stable) | **Main branch** (v3.3.3) |
+| New projects wanting latest features | **Nextgen branch** (v4.1.1) |
+| Testing preloader system | **Nextgen branch** |
+| Risk-averse production | **Main branch** |
+
+---
 
 ## What's New in 3.3.3
 
@@ -125,6 +177,14 @@ dependencyResolutionManagement {
 
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
+<table>
+<tr>
+<th>Main Branch (Stable GMS SDK)</th>
+<th>Next-Gen Branch (Beta GMA SDK)</th>
+</tr>
+<tr>
+<td>
+
 ```groovy
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.3'
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.3'
@@ -133,6 +193,22 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.3'
 // For Jetpack Compose support
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.3'
 ```
+
+</td>
+<td>
+
+```groovy
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.1'
+
+// For Jetpack Compose support
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.1'
+```
+
+</td>
+</tr>
+</table>
 
 **Step 3:** Sync your project with Gradle.
 
@@ -655,59 +731,6 @@ val nativeTemplateView = NativeTemplateView(context)
 nativeTemplateView.setTemplate(NativeAdTemplate.CARD_MODERN)
 nativeTemplateView.loadNativeAd(activity, adUnitId)
 ```
-
----
-
-## Next-Gen GMA SDK Version
-
-> **Warning:** The Next-Gen SDK version is in active development. While stable for production, some APIs may change.
-
-AdManageKit also offers a **Next-Gen GMA SDK** version on the `nextgen` branch, featuring Google's modern preloader-based ad loading system.
-
-### Why Next-Gen?
-
-| Feature | Main Branch (GMS SDK) | Next-Gen Branch |
-|---------|----------------------|-----------------|
-| SDK | `com.google.android.gms:play-services-ads` | `com.google.android.libraries.ads.mobile.sdk` |
-| Ad Loading | Traditional load/show | Preloader-based with auto-refill |
-| Threading | Manual main thread dispatch | Automatic background thread safety |
-| Buffer System | N/A | Configurable ad buffers per type |
-| Background Handling | Basic | Smart pending ad queue |
-
-### Next-Gen Installation
-
-```groovy
-// Use nextgen artifacts instead of main
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.1'
-```
-
-### Next-Gen Features
-
-- **Preloader System**: SDK automatically loads next ad after one is consumed
-- **Background-Aware Ads**: App open ads won't show when app is in background
-- **Pending Ad Queue**: Ads that load while backgrounded are saved for return
-- **Configurable Buffers**: Set how many ads to keep ready per type
-
-```kotlin
-// Next-Gen preloader configuration
-AdManageKitConfig.apply {
-    enableInterstitialPreloader = true
-    enableAppOpenPreloader = true
-    interstitialPreloaderBufferSize = 2
-}
-```
-
-### Migration Compatibility
-
-Both branches use the same callback signatures via type aliases:
-- `AdKitError` → resolves to appropriate SDK error type
-- `AdKitLoadError` → resolves to appropriate SDK load error type
-- `AdKitValue` → resolves to appropriate SDK value type
-
-Your callback implementations work on both branches without changes.
 
 ---
 
