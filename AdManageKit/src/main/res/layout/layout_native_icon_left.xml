@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Icon Left layout - Media at top, icon on left in content section (for grid display) -->
+<com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/native_ad_view"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_card_ads">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <!-- Content Section - Fixed height at bottom, icon on LEFT -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/content_container"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:padding="8dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent">
+
+            <!-- App Icon - LEFT aligned -->
+            <ImageView
+                android:id="@+id/ad_app_icon"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:contentDescription="@null"
+                android:scaleType="centerCrop"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Text Content - Right of icon -->
+            <LinearLayout
+                android:id="@+id/text_container"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:orientation="vertical"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toEndOf="@id/ad_app_icon"
+                app:layout_constraintTop_toTopOf="parent">
+
+                <!-- Headline -->
+                <TextView
+                    android:id="@+id/ad_headline"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:fontFamily="@font/roboto_medium"
+                    android:maxLines="2"
+                    android:textSize="12sp"
+                    android:textStyle="bold" />
+
+                <!-- Advertiser + Rating -->
+                <LinearLayout
+                    android:id="@+id/advertiser_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/ad_advertiser"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:alpha="0.7"
+                        android:ellipsize="end"
+                        android:fontFamily="@font/roboto"
+                        android:maxLines="1"
+                        android:textSize="10sp" />
+
+                    <RatingBar
+                        android:id="@+id/ad_stars"
+                        style="?android:attr/ratingBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="4dp"
+                        android:isIndicator="true"
+                        android:numStars="5"
+                        android:scaleX="0.5"
+                        android:scaleY="0.5"
+                        android:stepSize="0.5"
+                        android:transformPivotX="0dp" />
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- CTA Button - Full width -->
+            <Button
+                android:id="@+id/ad_call_to_action"
+                android:layout_width="0dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="6dp"
+                android:background="@drawable/ads_bg_lib"
+                android:gravity="center"
+                android:text="@string/install"
+                android:textAllCaps="true"
+                android:textColor="@color/colorWhite"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toBottomOf="@id/text_container" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <!-- Media View - Fills remaining space above content -->
+        <com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
+            android:id="@+id/ad_media"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:minHeight="120dp"
+            android:minWidth="120dp"
+            android:scaleType="centerCrop"
+            app:layout_constraintBottom_toTopOf="@id/content_container"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Ad Label - top left of media -->
+        <TextView
+            android:id="@+id/ad_badge"
+            style="@style/AdsTheme"
+            android:layout_margin="6dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <!-- Ad Choices Overlay - top right of media -->
+        <com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView
+            android:id="@+id/ad_choices_view"
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_margin="6dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView>

@@ -72,7 +72,7 @@ class NativeTemplateView @JvmOverloads constructor(
 
     private val TAG = "NativeTemplateView"
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = "unknown"
     var callback: AdLoadCallback? = null
 
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
@@ -390,7 +390,9 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.GRID_CARD,
             NativeAdTemplate.MEDIA_CONTENT_SPLIT,
             NativeAdTemplate.PILL_BANNER,
-            NativeAdTemplate.VIDEO_SMALL -> NativeAdIntegrationManager.ScreenType.SMALL
+            NativeAdTemplate.VIDEO_SMALL,
+            NativeAdTemplate.GRID_ITEM,
+            NativeAdTemplate.ICON_LEFT -> NativeAdIntegrationManager.ScreenType.SMALL
 
             // Medium templates
             NativeAdTemplate.CARD_MODERN,
@@ -399,7 +401,8 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.APP_STORE,
             NativeAdTemplate.MEDIUM_HORIZONTAL,
             NativeAdTemplate.VIDEO_MEDIUM,
-            NativeAdTemplate.VIDEO_SQUARE -> NativeAdIntegrationManager.ScreenType.MEDIUM
+            NativeAdTemplate.VIDEO_SQUARE,
+            NativeAdTemplate.TOP_ICON_MEDIA -> NativeAdIntegrationManager.ScreenType.MEDIUM
 
             // Large/Hero templates
             NativeAdTemplate.STORY_STYLE,
@@ -411,7 +414,8 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.SPOTLIGHT,
             NativeAdTemplate.VIDEO_LARGE,
             NativeAdTemplate.VIDEO_VERTICAL,
-            NativeAdTemplate.VIDEO_FULLSCREEN -> NativeAdIntegrationManager.ScreenType.LARGE
+            NativeAdTemplate.VIDEO_FULLSCREEN,
+            NativeAdTemplate.FLEXIBLE -> NativeAdIntegrationManager.ScreenType.LARGE
         }
     }
 

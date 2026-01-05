@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flexible shimmer - Full background with content overlay, adapts to any size -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_card_ads">
+
+    <!-- Media placeholder - Full background -->
+    <View
+        android:id="@+id/shimmer_media"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/lightTransparent" />
+
+    <!-- Ad badge placeholder -->
+    <View
+        android:id="@+id/shimmer_badge"
+        android:layout_width="22dp"
+        android:layout_height="12dp"
+        android:layout_margin="6dp"
+        android:layout_gravity="top|start"
+        android:background="@color/lightTransparent" />
+
+    <!-- Content Container placeholder - bottom overlay -->
+    <LinearLayout
+        android:id="@+id/shimmer_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <!-- Row 1: Icon + Headline -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <!-- App Icon placeholder -->
+            <View
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@color/lightTransparent" />
+
+            <!-- Headline placeholder -->
+            <View
+                android:layout_width="0dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:background="@color/lightTransparent" />
+
+        </LinearLayout>
+
+        <!-- Row 2: Advertiser placeholder -->
+        <View
+            android:layout_width="80dp"
+            android:layout_height="10dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginStart="40dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- Row 3: Body placeholder -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="10dp"
+            android:layout_marginTop="6dp"
+            android:background="@color/lightTransparent" />
+
+        <!-- Row 4: CTA Button placeholder -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:layout_marginTop="8dp"
+            android:background="@color/lightTransparent" />
+
+    </LinearLayout>
+
+</FrameLayout>

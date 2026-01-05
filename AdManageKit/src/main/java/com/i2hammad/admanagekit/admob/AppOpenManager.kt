@@ -875,7 +875,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     /**
      * Create reusable paid event listener
      */
-    private fun createPaidEventListener(adValue: AdValue) {
+    private fun createPaidEventListener(adValue: AdKitValue) {
             val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
             val revenueParams = Bundle().apply {
                 putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
@@ -888,7 +888,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     /**
      * Log Firebase analytics for failed ad loads
      */
-    private fun logFailedToLoadEvent(adError: LoadAdError) {
+    private fun logFailedToLoadEvent(adError: AdKitError) {
         val params = Bundle().apply {
             putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
             putString("ad_error_code", adError.code.toString())

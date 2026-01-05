@@ -88,6 +88,9 @@ class AdManager() {
     // Retry state
     private val retryAttempts = mutableMapOf<String, Int>()
 
+    // Call counters per ad unit (for everyNthTime feature)
+    private val callCounters = mutableMapOf<String, Int>()
+
     // Track current loading dialog to prevent duplicates
     private var currentLoadingDialog: LoadingDialogViews? = null
 
@@ -1078,6 +1081,56 @@ class AdManager() {
 
     fun setAdDisplayCount(count: Int) {
         this.adDisplayCount = count
+    }
+
+    /**
+     * Set the primary ad unit ID directly.
+     * Used by InterstitialAdBuilder to ensure AdManager has the correct ad unit
+     * before force loading operations.
+     *
+     * @param adUnitId The ad unit ID to set
+     */
+    fun setAdUnitId(adUnitId: String?) {
+        this.adUnitId = adUnitId
+    }
+
+    /**
+     * Increment and return the call counter for a specific ad unit.
+     * Used by InterstitialAdBuilder for everyNthTime feature.
+     *
+     * @param adUnitId The ad unit ID
+     * @return The new call count after incrementing
+     */
+    fun incrementCallCount(adUnitId: String): Int {
+        val newCount = (callCounters[adUnitId] ?: 0) + 1
+        callCounters[adUnitId] = newCount
+        return newCount
+    }
+
+    /**
+     * Get the current call count for a specific ad unit.
+     *
+     * @param adUnitId The ad unit ID
+     * @return The current call count (0 if never called)
+     */
+    fun getCallCount(adUnitId: String): Int {
+        return callCounters[adUnitId] ?: 0
+    }
+
+    /**
+     * Reset the call counter for a specific ad unit.
+     *
+     * @param adUnitId The ad unit ID
+     */
+    fun resetCallCount(adUnitId: String) {
+        callCounters.remove(adUnitId)
+    }
+
+    /**
+     * Reset all call counters.
+     */
+    fun resetAllCallCounts() {
+        callCounters.clear()
     }
 
     private fun canShowAd(): Boolean {

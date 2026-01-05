@@ -38,7 +38,7 @@ class NativeLarge @JvmOverloads constructor(
     private val binding: LayoutNativeLargeBinding =
         LayoutNativeLargeBinding.inflate(LayoutInflater.from(context), this)
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = "unknown"
     private val mainHandler = Handler(Looper.getMainLooper())
 
     // =================== DEPRECATED METHODS (use loadingStrategy instead) ===================

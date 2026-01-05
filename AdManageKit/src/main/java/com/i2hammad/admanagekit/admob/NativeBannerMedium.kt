@@ -36,7 +36,7 @@ class NativeBannerMedium @JvmOverloads constructor(
 
     private val binding: LayoutNativeBannerMediumPreviewBinding =
         LayoutNativeBannerMediumPreviewBinding.inflate(LayoutInflater.from(context), this)
-    private lateinit var adUnitId: String
+    private var adUnitId: String = "unknown"
     private var firebaseAnalytics: FirebaseAnalytics? = null
     var callback: com.i2hammad.admanagekit.admob.AdLoadCallback? = null
     private val mainHandler = Handler(Looper.getMainLooper())

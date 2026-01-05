@@ -12,8 +12,8 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.i2hammad.admanagekit.admob.AdKitError
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdTemplate
 import com.i2hammad.admanagekit.admob.NativeTemplateView
@@ -147,7 +147,7 @@ class NativeTemplateTestActivity : AppCompatActivity() {
                 }
             }
 
-            override fun onFailedToLoad(error: LoadAdError?) {
+            override fun onFailedToLoad(error: AdKitError?) {
                 Log.e(TAG, "Ad failed to load: ${error?.message}")
                 runOnUiThread {
                     btnLoadAd.isEnabled = true
@@ -189,6 +189,8 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.PILL_BANNER -> "Compact pill-shaped banner with rounded corners"
             NativeAdTemplate.MEDIUM_HORIZONTAL -> "Horizontal split: 55% media left, 45% content right"
             NativeAdTemplate.SPOTLIGHT -> "Centered hero with large icon & full-width CTA"
+            NativeAdTemplate.FLEXIBLE -> "Full-background media with content overlay, adapts to any size"
+            NativeAdTemplate.GRID_ITEM -> "Compact grid item for RecyclerView grids"
 
             // Video Templates
             NativeAdTemplate.VIDEO_SMALL -> "Compact video player (160dp)"
@@ -197,6 +199,10 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.VIDEO_SQUARE -> "Square video format (1:1)"
             NativeAdTemplate.VIDEO_VERTICAL -> "Portrait video (9:16, Stories style)"
             NativeAdTemplate.VIDEO_FULLSCREEN -> "Edge-to-edge video experience"
+
+            // Additional Templates
+            NativeAdTemplate.TOP_ICON_MEDIA -> "App icon at top with media below, clean layout"
+            NativeAdTemplate.ICON_LEFT -> "Icon-left banner style, compact horizontal format"
         }
     }
 

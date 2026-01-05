@@ -36,7 +36,7 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     private val TAG = "NativeAds"
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = "unknown"
     var callback: com.i2hammad.admanagekit.admob.AdLoadCallback? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
