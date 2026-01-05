@@ -20,6 +20,8 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
+import com.i2hammad.admanagekit.admob.AdKitError
+import com.i2hammad.admanagekit.admob.AdKitValue
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.NativeAdManager
@@ -49,16 +51,17 @@ object ProgrammaticNativeAdLoader {
     }
 
     /**
-     * Callback interface for programmatic native ad loading
+     * Callback interface for programmatic native ad loading.
+     * Uses SDK-agnostic type aliases for cross-version compatibility.
      */
     interface ProgrammaticAdCallback {
         fun onAdLoaded(nativeAdView: NativeAdView, nativeAd: NativeAd)
-        fun onAdFailedToLoad(error: LoadAdError)
+        fun onAdFailedToLoad(error: AdKitError)
         fun onAdClicked()
         fun onAdImpression()
         fun onAdOpened()
         fun onAdClosed()
-        fun onPaidEvent(adValue: com.google.android.libraries.ads.mobile.sdk.common.AdValue)
+        fun onPaidEvent(adValue: AdKitValue)
     }
 
     /**
@@ -127,7 +130,7 @@ object ProgrammaticNativeAdLoader {
                 callback?.onAdLoaded(nativeAdView, nativeAd)
             }
 
-            override fun onAdFailedToLoad(error: LoadAdError) {
+            override fun onAdFailedToLoad(error: AdKitError) {
                 callback?.onAdFailedToLoad(error)
             }
 
@@ -147,7 +150,7 @@ object ProgrammaticNativeAdLoader {
                 callback?.onAdClosed()
             }
 
-            override fun onPaidEvent(adValue: com.google.android.libraries.ads.mobile.sdk.common.AdValue) {
+            override fun onPaidEvent(adValue: AdKitValue) {
                 callback?.onPaidEvent(adValue)
             }
         })
@@ -253,7 +256,7 @@ object ProgrammaticNativeAdLoader {
                 callback.onAdLoaded(nativeAdView, nativeAd)
             }
 
-            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+            override fun onAdFailedToLoad(loadAdError: AdKitError) {
                 AdDebugUtils.logEvent(
                     adUnitId,
                     "onFailedToLoad",

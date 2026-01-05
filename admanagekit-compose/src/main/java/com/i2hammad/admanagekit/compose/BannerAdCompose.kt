@@ -9,11 +9,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.i2hammad.admanagekit.admob.AdKitError
+import com.i2hammad.admanagekit.admob.AdKitValue
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
-import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
-import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 
 /**
  * A Jetpack Compose wrapper for BannerAdView from AdManageKit.
@@ -38,12 +38,12 @@ fun BannerAdCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((AdKitError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
     onAdClosed: (() -> Unit)? = null,
-    onPaidEvent: ((AdValue) -> Unit)? = null
+    onPaidEvent: ((AdKitValue) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -60,7 +60,7 @@ fun BannerAdCompose(
                     onAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: LoadAdError?) {
+                override fun onFailedToLoad(error: AdKitError?) {
                     onAdFailedToLoad?.invoke(error)
                 }
 
@@ -80,7 +80,7 @@ fun BannerAdCompose(
                     onAdClosed?.invoke()
                 }
 
-                override fun onPaidEvent(adValue: AdValue) {
+                override fun onPaidEvent(adValue: AdKitValue) {
                     onPaidEvent?.invoke(adValue)
                 }
             }
@@ -128,12 +128,12 @@ fun BannerAdCompose(
     height: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((AdKitError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
     onAdClosed: (() -> Unit)? = null,
-    onPaidEvent: ((AdValue) -> Unit)? = null
+    onPaidEvent: ((AdKitValue) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -148,7 +148,7 @@ fun BannerAdCompose(
                     onAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: LoadAdError?) {
+                override fun onFailedToLoad(error: AdKitError?) {
                     onAdFailedToLoad?.invoke(error)
                 }
 
@@ -168,7 +168,7 @@ fun BannerAdCompose(
                     onAdClosed?.invoke()
                 }
 
-                override fun onPaidEvent(adValue: AdValue) {
+                override fun onPaidEvent(adValue: AdKitValue) {
                     onPaidEvent?.invoke(adValue)
                 }
             }
@@ -234,12 +234,12 @@ fun CollapsibleBannerAdCompose(
     placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((AdKitError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
     onAdClosed: (() -> Unit)? = null,
-    onPaidEvent: ((AdValue) -> Unit)? = null
+    onPaidEvent: ((AdKitValue) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -254,7 +254,7 @@ fun CollapsibleBannerAdCompose(
                     onAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: LoadAdError?) {
+                override fun onFailedToLoad(error: AdKitError?) {
                     onAdFailedToLoad?.invoke(error)
                 }
 
@@ -274,7 +274,7 @@ fun CollapsibleBannerAdCompose(
                     onAdClosed?.invoke()
                 }
 
-                override fun onPaidEvent(adValue: AdValue) {
+                override fun onPaidEvent(adValue: AdKitValue) {
                     onPaidEvent?.invoke(adValue)
                 }
             }
