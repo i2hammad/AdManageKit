@@ -17,6 +17,8 @@ import com.google.android.gms.ads.nativead.NativeAd
 import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
+import com.i2hammad.admanagekit.admob.AdKitError
+import com.i2hammad.admanagekit.admob.AdKitValue
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.NativeAdManager
@@ -46,16 +48,17 @@ object ProgrammaticNativeAdLoader {
     }
 
     /**
-     * Callback interface for programmatic native ad loading
+     * Callback interface for programmatic native ad loading.
+     * Uses SDK-agnostic type aliases for migration compatibility.
      */
     interface ProgrammaticAdCallback {
         fun onAdLoaded(nativeAdView: NativeAdView, nativeAd: NativeAd)
-        fun onAdFailedToLoad(error: AdError)
+        fun onAdFailedToLoad(error: AdKitError)
         fun onAdClicked()
         fun onAdImpression()
         fun onAdOpened()
         fun onAdClosed()
-        fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue)
+        fun onPaidEvent(adValue: AdKitValue)
     }
 
     /**
@@ -148,7 +151,7 @@ object ProgrammaticNativeAdLoader {
                 callback?.onAdClosed()
             }
 
-            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+            override fun onPaidEvent(adValue: AdKitValue) {
                 callback?.onPaidEvent(adValue)
             }
         })
