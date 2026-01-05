@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.1.0`** brings **GMA Next-Gen SDK migration**, **Preloader system**, **Single-Activity app support**, and **Background-Aware Ad Display**.
+**Latest Version `4.1.1`** brings **GMA Next-Gen SDK migration**, **Preloader system**, **Single-Activity app support**, and **Background-Aware Ad Display**.
 
 ## What's New in 4.1.0
 
@@ -100,12 +100,12 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.1'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.1'
 ```
 
 **Step 3:** Sync your project with Gradle.
