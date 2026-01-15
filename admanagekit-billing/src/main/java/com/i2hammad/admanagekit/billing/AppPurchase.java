@@ -74,6 +74,7 @@ public class AppPurchase {
     private String oldPrice = "3.50$";
 
     private PurchaseHistoryListener purchaseHistoryListener;
+    private SubscriptionVerificationCallback subscriptionVerificationCallback;
     private boolean isPurchased = false;
     private double discount = 1.0d;
     private String idPurchased = "";
@@ -197,6 +198,36 @@ public class AppPurchase {
      */
     public void setPurchaseHistoryListener(PurchaseHistoryListener listener) {
         this.purchaseHistoryListener = listener;
+    }
+
+    /**
+     * Sets a callback for server-side subscription verification.
+     * This callback is used to verify subscriptions and retrieve expiry dates
+     * from your backend server using Google Play Developer API.
+     *
+     * <p>Example:</p>
+     * <pre>
+     * AppPurchase.getInstance().setSubscriptionVerificationCallback((packageName, subscriptionId, purchaseToken, listener) -> {
+     *     // Call your backend API
+     *     yourApi.verifySubscription(packageName, subscriptionId, purchaseToken, new Callback() {
+     *         public void onSuccess(long expiryTime) {
+     *             SubscriptionVerificationCallback.SubscriptionDetails details =
+     *                 new SubscriptionVerificationCallback.SubscriptionDetails.Builder()
+     *                     .setExpiryTimeMillis(expiryTime)
+     *                     .build();
+     *             listener.onVerified(details);
+     *         }
+     *         public void onError(String error) {
+     *             listener.onVerificationFailed(error);
+     *         }
+     *     });
+     * });
+     * </pre>
+     *
+     * @param callback The verification callback implementation.
+     */
+    public void setSubscriptionVerificationCallback(SubscriptionVerificationCallback callback) {
+        this.subscriptionVerificationCallback = callback;
     }
 
     /**
@@ -1014,11 +1045,185 @@ public class AppPurchase {
     @Nullable
     public PurchaseResult getSubscription(String subscriptionId) {
         for (PurchaseResult result : purchaseResultList) {
-            if (result.getProductId().contains(subscriptionId)) {
+            if (result.getProductIds().contains(subscriptionId)) {
                 return result;
             }
         }
         return null;
+    }
+
+    // ==================== Subscription Verification Methods ====================
+
+    /**
+     * Verifies a subscription with your backend server to get the expiry date.
+     * Requires setting a {@link SubscriptionVerificationCallback} via
+     * {@link #setSubscriptionVerificationCallback(SubscriptionVerificationCallback)}.
+     *
+     * <p>After verification, the expiry time will be stored in the PurchaseResult
+     * and can be retrieved via {@link #getSubscriptionExpiryTime(String)}.</p>
+     *
+     * @param subscriptionId The subscription product ID to verify.
+     * @param listener       Callback for verification result.
+     */
+    public void verifySubscription(String subscriptionId, SubscriptionVerificationListener listener) {
+        if (subscriptionVerificationCallback == null) {
+            Log.e(Tag, "SubscriptionVerificationCallback not set. Call setSubscriptionVerificationCallback first.");
+            if (listener != null) {
+                listener.onVerificationFailed("Verification callback not configured");
+            }
+            return;
+        }
+
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription == null) {
+            Log.e(Tag, "Subscription not found: " + subscriptionId);
+            if (listener != null) {
+                listener.onVerificationFailed("Subscription not found");
+            }
+            return;
+        }
+
+        String packageName = application.getPackageName();
+        String purchaseToken = subscription.getPurchaseToken();
+
+        subscriptionVerificationCallback.verifySubscription(
+                packageName,
+                subscriptionId,
+                purchaseToken,
+                new SubscriptionVerificationCallback.VerificationResultListener() {
+                    @Override
+                    public void onVerified(@NonNull SubscriptionVerificationCallback.SubscriptionDetails details) {
+                        // Update the PurchaseResult with expiry time
+                        subscription.setExpiryTime(details.getExpiryTimeMillis());
+                        subscription.setAutoRenewing(details.isAutoRenewing());
+
+                        Log.d(Tag, "Subscription verified: " + subscriptionId +
+                                ", expiry: " + subscription.getExpiryTimeFormatted());
+
+                        if (listener != null) {
+                            listener.onVerified(subscription);
+                        }
+                    }
+
+                    @Override
+                    public void onVerificationFailed(@Nullable String errorMessage) {
+                        Log.e(Tag, "Subscription verification failed: " + errorMessage);
+                        if (listener != null) {
+                            listener.onVerificationFailed(errorMessage);
+                        }
+                    }
+                }
+        );
+    }
+
+    /**
+     * Verifies all active subscriptions with your backend server.
+     *
+     * @param listener Callback for each verification result.
+     */
+    public void verifyAllSubscriptions(SubscriptionVerificationListener listener) {
+        if (purchaseResultList.isEmpty()) {
+            Log.d(Tag, "No subscriptions to verify");
+            return;
+        }
+
+        for (PurchaseResult result : purchaseResultList) {
+            String subscriptionId = result.getFirstProductId();
+            if (subscriptionId != null) {
+                verifySubscription(subscriptionId, listener);
+            }
+        }
+    }
+
+    /**
+     * Gets the subscription expiry time in milliseconds.
+     * Returns 0 if not verified or subscription not found.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return Expiry time in milliseconds, or 0 if not available.
+     */
+    public long getSubscriptionExpiryTime(String subscriptionId) {
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription != null && subscription.isExpiryVerified()) {
+            return subscription.getExpiryTime();
+        }
+        return 0;
+    }
+
+    /**
+     * Gets the subscription expiry time as a formatted string.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return Formatted expiry date, or "Not verified" if not available.
+     */
+    public String getSubscriptionExpiryTimeFormatted(String subscriptionId) {
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription != null) {
+            return subscription.getExpiryTimeFormatted();
+        }
+        return "Not found";
+    }
+
+    /**
+     * Gets the subscription expiry time as a formatted string with custom pattern.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @param pattern        The date format pattern (e.g., "yyyy-MM-dd").
+     * @return Formatted expiry date, or "Not verified" if not available.
+     */
+    public String getSubscriptionExpiryTimeFormatted(String subscriptionId, String pattern) {
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription != null) {
+            return subscription.getExpiryTimeFormatted(pattern);
+        }
+        return "Not found";
+    }
+
+    /**
+     * Gets the remaining days until subscription expiry.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return Remaining days, 0 if expired, or -1 if not verified/not found.
+     */
+    public int getSubscriptionRemainingDays(String subscriptionId) {
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription != null) {
+            return subscription.getRemainingDays();
+        }
+        return -1;
+    }
+
+    /**
+     * Checks if a subscription has expired based on verified expiry time.
+     *
+     * @param subscriptionId The subscription product ID.
+     * @return true if expired, false if not expired or not verified.
+     */
+    public boolean isSubscriptionExpired(String subscriptionId) {
+        PurchaseResult subscription = getSubscription(subscriptionId);
+        if (subscription != null && subscription.isExpiryVerified()) {
+            return subscription.isExpired();
+        }
+        return false;
+    }
+
+    /**
+     * Listener for subscription verification results.
+     */
+    public interface SubscriptionVerificationListener {
+        /**
+         * Called when verification succeeds.
+         *
+         * @param subscription The verified subscription with expiry time set.
+         */
+        void onVerified(PurchaseResult subscription);
+
+        /**
+         * Called when verification fails.
+         *
+         * @param errorMessage Description of the error.
+         */
+        void onVerificationFailed(@Nullable String errorMessage);
     }
 
     /**

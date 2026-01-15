@@ -42,6 +42,10 @@ public class PurchaseResult {
     private long consumedTime;
     private String productType; // "inapp" or "subs"
 
+    // Subscription expiry (from server-side verification)
+    private long expiryTime;
+    private boolean expiryVerified;
+
     /**
      * Purchase states from Google Play Billing.
      */
@@ -525,6 +529,109 @@ public class PurchaseResult {
      */
     public boolean isSubscriptionCancelled() {
         return getSubscriptionState() == SubscriptionState.CANCELLED;
+    }
+
+    // ==================== Expiry Time Methods ====================
+
+    /**
+     * Gets the subscription expiry time in milliseconds.
+     * This value is only available after server-side verification.
+     *
+     * @return Expiry time in milliseconds, or 0 if not verified.
+     */
+    public long getExpiryTime() {
+        return expiryTime;
+    }
+
+    /**
+     * Sets the subscription expiry time.
+     * Call this after verifying the subscription with your backend server.
+     *
+     * @param expiryTime Expiry time in milliseconds since epoch.
+     */
+    public void setExpiryTime(long expiryTime) {
+        this.expiryTime = expiryTime;
+        this.expiryVerified = true;
+    }
+
+    /**
+     * Checks if the expiry time has been verified via server-side verification.
+     */
+    public boolean isExpiryVerified() {
+        return expiryVerified;
+    }
+
+    /**
+     * Gets the expiry time as a Date object.
+     *
+     * @return Expiry date, or null if not verified.
+     */
+    @Nullable
+    public Date getExpiryDate() {
+        if (!expiryVerified || expiryTime <= 0) {
+            return null;
+        }
+        return new Date(expiryTime);
+    }
+
+    /**
+     * Gets the expiry time as a formatted string.
+     *
+     * @param pattern The date format pattern (e.g., "yyyy-MM-dd HH:mm:ss").
+     * @return Formatted expiry date, or "Not verified" if not available.
+     */
+    @NonNull
+    public String getExpiryTimeFormatted(String pattern) {
+        if (!expiryVerified || expiryTime <= 0) {
+            return "Not verified";
+        }
+        SimpleDateFormat sdf = new SimpleDateFormat(pattern, Locale.getDefault());
+        return sdf.format(new Date(expiryTime));
+    }
+
+    /**
+     * Gets the expiry time as a formatted string in default format.
+     */
+    @NonNull
+    public String getExpiryTimeFormatted() {
+        return getExpiryTimeFormatted("yyyy-MM-dd HH:mm:ss");
+    }
+
+    /**
+     * Checks if the subscription has expired based on verified expiry time.
+     * Returns false if expiry time has not been verified.
+     */
+    public boolean isExpired() {
+        if (!expiryVerified || expiryTime <= 0) {
+            return false;
+        }
+        return System.currentTimeMillis() > expiryTime;
+    }
+
+    /**
+     * Gets the remaining time until expiry in milliseconds.
+     *
+     * @return Remaining time in milliseconds, 0 if expired, or -1 if not verified.
+     */
+    public long getRemainingTime() {
+        if (!expiryVerified || expiryTime <= 0) {
+            return -1;
+        }
+        long remaining = expiryTime - System.currentTimeMillis();
+        return Math.max(0, remaining);
+    }
+
+    /**
+     * Gets the remaining days until expiry.
+     *
+     * @return Remaining days, 0 if expired, or -1 if not verified.
+     */
+    public int getRemainingDays() {
+        long remaining = getRemainingTime();
+        if (remaining < 0) {
+            return -1;
+        }
+        return (int) (remaining / (24 * 60 * 60 * 1000));
     }
 
     /**

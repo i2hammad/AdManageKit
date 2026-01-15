@@ -219,3 +219,150 @@ override fun onCreate(savedInstanceState: Bundle?) {
 ### 4. Handle Grace Period (Server-Side)
 
 For grace period detection, implement server-side verification using Google Play Developer API and Real-time Developer Notifications (RTDN).
+
+## Subscription Expiry Verification
+
+The Google Play Billing Library does NOT provide subscription expiry dates client-side. To get accurate expiry dates, you need server-side verification.
+
+### Setting Up Verification Callback
+
+```kotlin
+// In Application.onCreate() or early initialization
+AppPurchase.getInstance().setSubscriptionVerificationCallback { packageName, subscriptionId, purchaseToken, listener ->
+    // Call your backend API
+    yourBackendApi.verifySubscription(packageName, subscriptionId, purchaseToken,
+        onSuccess = { expiryTimeMillis, isAutoRenewing ->
+            val details = SubscriptionVerificationCallback.SubscriptionDetails.Builder()
+                .setExpiryTimeMillis(expiryTimeMillis)
+                .setAutoRenewing(isAutoRenewing)
+                .build()
+            listener.onVerified(details)
+        },
+        onError = { error ->
+            listener.onVerificationFailed(error)
+        }
+    )
+}
+```
+
+### Verifying a Subscription
+
+```kotlin
+AppPurchase.getInstance().verifySubscription("premium_monthly",
+    object : AppPurchase.SubscriptionVerificationListener {
+        override fun onVerified(subscription: PurchaseResult) {
+            // Expiry info now available
+            val expiryDate = subscription.getExpiryTimeFormatted("dd MMM yyyy")
+            val remainingDays = subscription.getRemainingDays()
+            val isExpired = subscription.isExpired()
+
+            updateUI(expiryDate, remainingDays)
+        }
+
+        override fun onVerificationFailed(errorMessage: String?) {
+            Log.e("Subscription", "Verification failed: $errorMessage")
+        }
+    }
+)
+
+// Verify all active subscriptions at once
+AppPurchase.getInstance().verifyAllSubscriptions(listener)
+```
+
+### Getting Expiry Information
+
+After verification, expiry data is stored and accessible:
+
+```kotlin
+// Get expiry time in milliseconds
+val expiryMillis = AppPurchase.getInstance().getSubscriptionExpiryTime("premium_monthly")
+
+// Get formatted expiry date
+val expiryDate = AppPurchase.getInstance().getSubscriptionExpiryTimeFormatted("premium_monthly")
+// "2024-03-15 14:30:00"
+
+// Custom format
+val customFormat = AppPurchase.getInstance().getSubscriptionExpiryTimeFormatted("premium_monthly", "dd MMM yyyy")
+// "15 Mar 2024"
+
+// Get remaining days
+val daysLeft = AppPurchase.getInstance().getSubscriptionRemainingDays("premium_monthly")
+// 30
+
+// Check if expired
+val isExpired = AppPurchase.getInstance().isSubscriptionExpired("premium_monthly")
+// false
+```
+
+### Using PurchaseResult Directly
+
+```kotlin
+val subscription = AppPurchase.getInstance().getSubscription("premium_monthly")
+if (subscription != null && subscription.isExpiryVerified()) {
+    // Expiry data available
+    val expiryDate = subscription.getExpiryDate()           // Date object
+    val expiryFormatted = subscription.getExpiryTimeFormatted()  // String
+    val remainingDays = subscription.getRemainingDays()     // Int (-1 if not verified)
+    val remainingMillis = subscription.getRemainingTime()   // Long (-1 if not verified)
+    val isExpired = subscription.isExpired()               // Boolean
+}
+```
+
+### Backend API Implementation
+
+Your backend should call Google Play Developer API:
+
+```
+GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{packageName}/purchases/subscriptionsv2/tokens/{purchaseToken}
+```
+
+Response includes:
+- `expiryTime` - RFC 3339 timestamp
+- `subscriptionState` - ACTIVE, CANCELED, IN_GRACE_PERIOD, ON_HOLD, PAUSED, EXPIRED
+- `linkedPurchaseToken` - For upgrade/downgrade tracking
+
+### Example: Show Subscription Status UI
+
+```kotlin
+fun updateSubscriptionUI() {
+    val subscription = AppPurchase.getInstance().getSubscription("premium_monthly")
+
+    if (subscription == null) {
+        showNotSubscribedUI()
+        return
+    }
+
+    if (!subscription.isExpiryVerified()) {
+        // Verify first
+        AppPurchase.getInstance().verifySubscription("premium_monthly",
+            object : AppPurchase.SubscriptionVerificationListener {
+                override fun onVerified(sub: PurchaseResult) {
+                    showSubscriptionDetails(sub)
+                }
+                override fun onVerificationFailed(error: String?) {
+                    showBasicSubscriptionUI(subscription)
+                }
+            }
+        )
+    } else {
+        showSubscriptionDetails(subscription)
+    }
+}
+
+fun showSubscriptionDetails(subscription: PurchaseResult) {
+    val daysLeft = subscription.getRemainingDays()
+
+    when {
+        subscription.isExpired() -> {
+            statusText.text = "Subscription Expired"
+            renewButton.visibility = View.VISIBLE
+        }
+        daysLeft <= 7 && !subscription.isAutoRenewing -> {
+            statusText.text = "Expires in $daysLeft days"
+            renewPrompt.visibility = View.VISIBLE
+        }
+        else -> {
+            statusText.text = "Premium until ${subscription.getExpiryTimeFormatted("dd MMM yyyy")}"
+        }
+    }
+}

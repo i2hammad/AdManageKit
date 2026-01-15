@@ -519,6 +519,82 @@ suspend fun verifyOnServer(
 
 ---
 
+## Subscription Expiry Verification
+
+Google Play Billing Library does NOT provide subscription expiry dates client-side. Use server-side verification to get accurate expiry information.
+
+### 1. Set Up Verification Callback
+
+```kotlin
+// In Application.onCreate()
+AppPurchase.getInstance().setSubscriptionVerificationCallback { packageName, subscriptionId, purchaseToken, listener ->
+    // Call your backend API
+    yourApi.verifySubscription(packageName, subscriptionId, purchaseToken,
+        onSuccess = { expiryTimeMillis ->
+            val details = SubscriptionVerificationCallback.SubscriptionDetails.Builder()
+                .setExpiryTimeMillis(expiryTimeMillis)
+                .setAutoRenewing(true)
+                .build()
+            listener.onVerified(details)
+        },
+        onError = { error ->
+            listener.onVerificationFailed(error)
+        }
+    )
+}
+```
+
+### 2. Verify Subscription
+
+```kotlin
+AppPurchase.getInstance().verifySubscription("premium_monthly",
+    object : AppPurchase.SubscriptionVerificationListener {
+        override fun onVerified(subscription: PurchaseResult) {
+            // Expiry data now available
+            val expiryDate = subscription.getExpiryTimeFormatted("dd MMM yyyy")
+            val daysLeft = subscription.getRemainingDays()
+            val isExpired = subscription.isExpired()
+
+            Log.d("Subscription", "Expires: $expiryDate, Days left: $daysLeft")
+        }
+
+        override fun onVerificationFailed(errorMessage: String?) {
+            Log.e("Subscription", "Failed: $errorMessage")
+        }
+    }
+)
+```
+
+### 3. Access Expiry Data
+
+```kotlin
+// After verification, data is cached
+val expiryMillis = AppPurchase.getInstance().getSubscriptionExpiryTime("premium_monthly")
+val expiryFormatted = AppPurchase.getInstance().getSubscriptionExpiryTimeFormatted("premium_monthly")
+val daysLeft = AppPurchase.getInstance().getSubscriptionRemainingDays("premium_monthly")
+val isExpired = AppPurchase.getInstance().isSubscriptionExpired("premium_monthly")
+
+// Or use PurchaseResult directly
+val subscription = AppPurchase.getInstance().getSubscription("premium_monthly")
+if (subscription?.isExpiryVerified() == true) {
+    val expiryDate = subscription.getExpiryDate()
+    val remaining = subscription.getRemainingTime()
+}
+```
+
+### Backend API
+
+Your server should call Google Play Developer API:
+
+```
+GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{packageName}/purchases/subscriptionsv2/tokens/{purchaseToken}
+```
+
+Response includes `expiryTime`, `subscriptionState`, and more
+```
+
+---
+
 ## Best Practices
 
 ### 1. Always Handle Edge Cases
