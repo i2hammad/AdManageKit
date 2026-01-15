@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.3`** adds **SDK-Agnostic Type Aliases** for migration compatibility between GMS SDK and Next-Gen SDK versions.
+**Latest Version `3.3.4`** adds **Subscription Expiry Verification** via server-side API for accurate expiry dates and remaining days.
 
 ---
 
@@ -54,12 +54,42 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.3) |
+| Production apps (stable) | **Main branch** (v3.3.4) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
+
+## What's New in 3.3.4
+
+### Subscription Expiry Verification
+- **Server-Side Verification**: New API to verify subscriptions and get accurate expiry dates from your backend
+- **Expiry Methods**: `getExpiryTimeFormatted()`, `getRemainingDays()`, `isExpired()` on PurchaseResult
+- **AppPurchase Helpers**: `getSubscriptionExpiryTime()`, `getSubscriptionRemainingDays()`, `isSubscriptionExpired()`
+
+```kotlin
+// Set up verification callback
+AppPurchase.getInstance().setSubscriptionVerificationCallback { packageName, subscriptionId, purchaseToken, listener ->
+    yourApi.verifySubscription(purchaseToken) { expiryMillis ->
+        val details = SubscriptionVerificationCallback.SubscriptionDetails.Builder()
+            .setExpiryTimeMillis(expiryMillis)
+            .build()
+        listener.onVerified(details)
+    }
+}
+
+// Verify and get expiry
+AppPurchase.getInstance().verifySubscription("premium_monthly",
+    object : AppPurchase.SubscriptionVerificationListener {
+        override fun onVerified(subscription: PurchaseResult) {
+            val expiryDate = subscription.getExpiryTimeFormatted("dd MMM yyyy")
+            val daysLeft = subscription.getRemainingDays()
+        }
+        override fun onVerificationFailed(error: String?) { }
+    }
+)
+```
 
 ## What's New in 3.3.3
 
@@ -186,12 +216,12 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.4'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.4'
 ```
 
 </td>
@@ -599,6 +629,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.3.4](docs/release-notes/RELEASE_NOTES_v3.3.4.md)
 - [Release Notes v3.3.3](docs/release-notes/RELEASE_NOTES_v3.3.3.md)
 - [Release Notes v3.3.2](docs/release-notes/RELEASE_NOTES_v3.3.2.md)
 - [Release Notes v3.3.0](docs/release-notes/RELEASE_NOTES_v3.3.0.md)
