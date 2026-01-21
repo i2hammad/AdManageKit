@@ -208,30 +208,192 @@ fun loadNativeAds(
 
 ### RewardedAdManager
 
-Object for managing rewarded ads.
+Singleton class for managing rewarded ads with comprehensive lifecycle callbacks, automatic retry, and Firebase Analytics integration.
+
+#### Features (v3.4.0+)
+- Automatic retry with exponential backoff on load failures
+- Purchase status integration (ads disabled for premium users)
+- Timeout support for splash screen scenarios
+- Detailed Firebase Analytics tracking (requests, fills, impressions)
+- Configurable auto-reload after ad dismissal
+
+#### Callback Interfaces
 
 ```kotlin
 object RewardedAdManager {
-    // Initialization
+    /**
+     * Full lifecycle callback for rewarded ad events.
+     */
+    interface RewardedAdCallback {
+        fun onRewardEarned(rewardType: String, rewardAmount: Int)
+        fun onAdDismissed()
+        fun onAdShowed() {}        // Optional
+        fun onAdFailedToShow(error: AdError) {}  // Optional
+        fun onAdClicked() {}       // Optional
+    }
+
+    /**
+     * Callback for ad loading events.
+     */
+    interface OnRewardedAdLoadCallback {
+        fun onAdLoaded()
+        fun onAdFailedToLoad(error: LoadAdError)
+    }
+
+    /**
+     * Legacy callback (deprecated).
+     */
+    @Deprecated("Use RewardedAdCallback instead")
+    interface OnAdDismissedListener {
+        fun onAdDismissed()
+    }
+}
+```
+
+#### Methods
+
+```kotlin
+object RewardedAdManager {
+    // =================== INITIALIZATION ===================
+
+    /**
+     * Initialize with ad unit ID. Automatically starts loading.
+     */
     fun initialize(context: Context, adUnitId: String)
-    
-    // Loading
+
+    // =================== LOADING ===================
+
+    /**
+     * Load a rewarded ad.
+     * Skips if: already loading, already loaded, or user is premium.
+     */
     fun loadRewardedAd(context: Context)
-    
-    // Display
+
+    /**
+     * Load with callback notification.
+     */
+    fun loadRewardedAd(context: Context, callback: OnRewardedAdLoadCallback)
+
+    /**
+     * Load with timeout support (for splash screens).
+     * Callback fires once: on load, fail, or timeout.
+     */
+    fun loadRewardedAdWithTimeout(
+        context: Context,
+        timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
+        callback: OnRewardedAdLoadCallback
+    )
+
+    // =================== DISPLAY ===================
+
+    /**
+     * Show with full callback support.
+     * @param autoReload Whether to reload after dismissal (default: AdManageKitConfig.interstitialAutoReload)
+     */
+    fun showAd(
+        activity: Activity,
+        callback: RewardedAdCallback,
+        autoReload: Boolean = AdManageKitConfig.interstitialAutoReload
+    )
+
+    /**
+     * Legacy show method (deprecated).
+     */
+    @Deprecated("Use showAd with RewardedAdCallback")
     fun showAd(
         activity: Activity,
         onUserEarnedRewardListener: OnUserEarnedRewardListener,
         onAdDismissedListener: OnAdDismissedListener
     )
-    
-    // State
+
+    // =================== STATE ===================
+
+    /**
+     * Check if ad is loaded and ready (returns false for premium users).
+     */
     fun isAdLoaded(): Boolean
-    
-    interface OnAdDismissedListener {
-        fun onAdDismissed()
-    }
+
+    /**
+     * Check if a load request is in progress.
+     */
+    fun isLoading(): Boolean
+
+    /**
+     * Check if ad is currently being displayed.
+     */
+    fun isShowingAd(): Boolean
+
+    // =================== UTILITIES ===================
+
+    /**
+     * Preload ad during natural pauses to improve show rate.
+     */
+    fun preload(context: Context)
+
+    /**
+     * Get session statistics for debugging.
+     */
+    fun getAdStats(): Map<String, Any>
+
+    /**
+     * Reset session statistics.
+     */
+    fun resetAdStats()
 }
+```
+
+#### Usage Examples
+
+**Basic Usage:**
+```kotlin
+// Initialize once (e.g., in Application.onCreate())
+RewardedAdManager.initialize(context, "ca-app-pub-xxx/yyy")
+
+// Show when ready
+if (RewardedAdManager.isAdLoaded()) {
+    RewardedAdManager.showAd(activity, object : RewardedAdManager.RewardedAdCallback {
+        override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
+            grantReward(rewardType, rewardAmount)
+        }
+        override fun onAdDismissed() {
+            continueGameFlow()
+        }
+    })
+}
+```
+
+**With Timeout (Splash Screen):**
+```kotlin
+RewardedAdManager.loadRewardedAdWithTimeout(
+    context = this,
+    timeoutMillis = 5000,
+    callback = object : RewardedAdManager.OnRewardedAdLoadCallback {
+        override fun onAdLoaded() {
+            // Ad ready, show it
+            showRewardedAd()
+        }
+        override fun onAdFailedToLoad(error: LoadAdError) {
+            // Proceed without ad
+            navigateToMain()
+        }
+    }
+)
+```
+
+**Preloading:**
+```kotlin
+// Preload during natural pauses
+override fun onResume() {
+    super.onResume()
+    RewardedAdManager.preload(this)
+}
+```
+
+**Analytics:**
+```kotlin
+val stats = RewardedAdManager.getAdStats()
+Log.d("Ads", "Fill rate: ${stats["fill_rate_percent"]}%")
+Log.d("Ads", "Show rate: ${stats["show_rate_percent"]}%")
 ```
 
 ## Billing Management

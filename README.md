@@ -458,6 +458,31 @@ AdManager.getInstance().showInterstitialIfReady(activity, callback, reloadAd = f
 
 **Priority:** `InterstitialAdBuilder.autoReload()` > `AdManageKitConfig.interstitialAutoReload`
 
+### Rewarded Ads
+
+```kotlin
+// Initialize once (e.g., in Application.onCreate())
+RewardedAdManager.initialize(context, "ca-app-pub-xxx/yyy")
+
+// Show when ready
+if (RewardedAdManager.isAdLoaded()) {
+    RewardedAdManager.showAd(activity, object : RewardedAdManager.RewardedAdCallback {
+        override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
+            grantReward(rewardType, rewardAmount)
+        }
+        override fun onAdDismissed() {
+            continueGameFlow()
+        }
+    })
+}
+
+// Load with timeout (splash screens)
+RewardedAdManager.loadRewardedAdWithTimeout(context, 5000, callback)
+
+// Preload during natural pauses
+RewardedAdManager.preload(context)
+```
+
 ### App Open Ads
 
 ```kotlin
@@ -627,6 +652,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Jetpack Compose Integration](docs/COMPOSE_INTEGRATION.md)
 - [Native Ads Caching](docs/native-ads-caching.md)
 - [Interstitial Ads](docs/interstitial-ads.md)
+- [Rewarded Ads](docs/rewarded-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
 - [Release Notes v3.3.4](docs/release-notes/RELEASE_NOTES_v3.3.4.md)
@@ -637,7 +663,8 @@ AppPurchase.getInstance().changeSubscription(
 - [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
 - [API Reference](docs/API_REFERENCE.md)
 
-### Wiki (Billing)
+### Wiki
+- [Rewarded Ads](wiki/Rewarded-Ads.md)
 - [Billing Integration](wiki/Billing-Integration.md)
 - [Purchase Categories](wiki/Purchase-Categories.md)
 - [Consumable Products](wiki/Consumable-Products.md)
