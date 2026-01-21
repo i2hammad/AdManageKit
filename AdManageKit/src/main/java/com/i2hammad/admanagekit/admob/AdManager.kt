@@ -243,6 +243,10 @@ class AdManager() {
         initializeFirebase(context)
         val adRequest = AdRequest.Builder().build()
 
+        // Cancel any pending retry since we're manually loading
+        AdRetryManager.getInstance().cancelRetry(adUnitId)
+        retryAttempts.remove(adUnitId)
+
         isAdLoading = true
         var callbackCalled = false  // Prevent double callbacks
 
@@ -358,6 +362,10 @@ class AdManager() {
 
         initializeFirebase(context)
         val adRequest = AdRequest.Builder().build()
+
+        // Cancel any pending retry since we're manually loading
+        AdRetryManager.getInstance().cancelRetry(adUnitId)
+        retryAttempts.remove(adUnitId)
 
         // Mark this unit as loading
         loadingAdUnits.add(adUnitId)
@@ -496,6 +504,10 @@ class AdManager() {
         this.adUnitId = adUnitId
         initializeFirebase(context)
         val adRequest = AdRequest.Builder().build()
+
+        // Cancel any pending retry since we're manually loading
+        AdRetryManager.getInstance().cancelRetry(adUnitId)
+        retryAttempts.remove(adUnitId)
 
         isAdLoading = true
         InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
