@@ -415,7 +415,7 @@ object RewardedAdManager {
     fun showAd(
         activity: Activity,
         callback: RewardedAdCallback,
-        autoReload: Boolean = AdManageKitConfig.interstitialAutoReload
+        autoReload: Boolean = AdManageKitConfig.rewardedAutoReload
     ) {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {

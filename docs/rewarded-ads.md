@@ -56,7 +56,7 @@ class MyApplication : Application() {
         // Configure AdManageKit (optional)
         AdManageKitConfig.apply {
             autoRetryFailedAds = true
-            interstitialAutoReload = true
+            rewardedAutoReload = true
         }
 
         // Initialize rewarded ads
@@ -247,7 +247,7 @@ RewardedAdManager.showAd(
 RewardedAdManager.showAd(activity, callback, autoReload = false)
 
 // Or configure globally
-AdManageKitConfig.interstitialAutoReload = false
+AdManageKitConfig.rewardedAutoReload = false
 ```
 
 ### Show Only If Ready
@@ -419,7 +419,7 @@ AdManageKitConfig.apply {
     maxRetryAttempts = 3
 
     // Auto-reload after showing
-    interstitialAutoReload = true
+    rewardedAutoReload = true
 
     // Timeout for load operations
     defaultAdTimeout = 10.seconds

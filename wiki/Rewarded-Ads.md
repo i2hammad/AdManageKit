@@ -163,7 +163,7 @@ RewardedAdManager.showAd(
 RewardedAdManager.showAd(activity, callback, autoReload = false)
 
 // Or configure globally
-AdManageKitConfig.interstitialAutoReload = false
+AdManageKitConfig.rewardedAutoReload = false
 ```
 
 ## State Checking

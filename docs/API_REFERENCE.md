@@ -288,12 +288,12 @@ object RewardedAdManager {
 
     /**
      * Show with full callback support.
-     * @param autoReload Whether to reload after dismissal (default: AdManageKitConfig.interstitialAutoReload)
+     * @param autoReload Whether to reload after dismissal (default: AdManageKitConfig.rewardedAutoReload)
      */
     fun showAd(
         activity: Activity,
         callback: RewardedAdCallback,
-        autoReload: Boolean = AdManageKitConfig.interstitialAutoReload
+        autoReload: Boolean = AdManageKitConfig.rewardedAutoReload
     )
 
     /**

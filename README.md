@@ -341,8 +341,10 @@ class MyApp : Application() {
             appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
 
-            // Auto-reload interstitial after showing (v2.7.0+)
+            // Auto-reload ads after showing (v2.7.0+)
             interstitialAutoReload = true  // default: true
+            appOpenAutoReload = true       // default: true
+            rewardedAutoReload = true      // default: true
         }
 
         // Set up billing
@@ -503,6 +505,10 @@ RewardedAdManager.loadRewardedAdWithTimeout(context, 5000, callback)
 
 // Preload during natural pauses
 RewardedAdManager.preload(context)
+
+// Control auto-reload
+AdManageKitConfig.rewardedAutoReload = false  // Disable globally
+RewardedAdManager.showAd(activity, callback, autoReload = false)  // Per-call override
 ```
 
 ### App Open Ads

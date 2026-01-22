@@ -171,6 +171,15 @@ object AdManageKitConfig {
     var appOpenAutoReload: Boolean = true
 
     /**
+     * Enable auto-reload of rewarded ads after showing.
+     * When true, a new ad is automatically loaded after the current one is dismissed.
+     * When false, you must manually call loadRewardedAd() to load the next ad.
+     *
+     * Default: true
+     */
+    var rewardedAutoReload: Boolean = true
+
+    /**
      * Default auto-refresh interval for banner ads.
      * Minimum value is 30 seconds per AdMob policies.
      * Default: 60 seconds
@@ -470,6 +479,8 @@ object AdManageKitConfig {
         enableDebugOverlay = false
         defaultInterstitialInterval = 15.seconds
         interstitialAutoReload = true
+        appOpenAutoReload = true
+        rewardedAutoReload = true
         defaultBannerRefreshInterval = 60.seconds
         enableCollapsibleBannersByDefault = false
         defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM
