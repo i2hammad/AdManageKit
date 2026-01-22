@@ -160,7 +160,16 @@ object AdManageKitConfig {
      * Default: true
      */
     var interstitialAutoReload: Boolean = true
-    
+
+    /**
+     * Enable auto-reload of app open ads after showing.
+     * When true, a new ad is automatically loaded after the current one is dismissed.
+     * When false, you must manually call fetchAd() to load the next ad.
+     *
+     * Default: true
+     */
+    var appOpenAutoReload: Boolean = true
+
     /**
      * Default auto-refresh interval for banner ads.
      * Minimum value is 30 seconds per AdMob policies.
@@ -217,16 +226,27 @@ object AdManageKitConfig {
     var enableWelcomeBackDialog: Boolean = false
 
     /**
-     * Control automatic background fetching of app open ads.
-     * When false: Automatically fetches and caches ads in background for instant display
-     * When true: Only fetches ads on-demand when needed (no background prefetching)
-     *
-     * Note: Existing cached ads are always used if available regardless of this setting.
-     * This setting only controls whether to automatically prefetch/cache ads.
-     *
-     * Default: false (enable background prefetching for better performance)
+     * @deprecated Use [appOpenLoadingStrategy] instead.
+     * - `appOpenFetchFreshAd = false` → `appOpenLoadingStrategy = AdLoadingStrategy.HYBRID`
+     * - `appOpenFetchFreshAd = true` → `appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND`
      */
+    @Deprecated(
+        message = "Use appOpenLoadingStrategy instead",
+        replaceWith = ReplaceWith("appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND")
+    )
     var appOpenFetchFreshAd: Boolean = false
+
+    /**
+     * Maximum age of a cached app open ad to be considered "fresh".
+     * If the cached ad is younger than this threshold, it will be used instead of fetching fresh.
+     * This prevents wasting already-loaded ads while still ensuring relatively fresh content.
+     *
+     * Applies to ON_DEMAND strategy - if cached ad is still fresh, it will be used.
+     * Set to Duration.ZERO to always fetch fresh (never use cached ads in ON_DEMAND).
+     *
+     * Default: 4 hours (Google recommends not caching app open ads for more than 4 hours)
+     */
+    var appOpenAdFreshnessThreshold: Duration = 4.hours
 
     /**
      * App icon resource ID to display in the welcome back dialog.

@@ -25,6 +25,7 @@ import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
 import java.lang.ref.WeakReference
@@ -44,6 +45,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private var currentActivity: Activity? = null
     @Volatile
     private var appOpenAd: AppOpenAd? = null
+    @Volatile
+    private var adLoadTime: Long = 0L  // Track when ad was loaded for freshness check
 
     private val excludedActivities: MutableSet<Class<*>> = HashSet()
     private val excludedActivityNames: MutableSet<String> = HashSet() // Cache for performance
@@ -355,49 +358,93 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val currentActivity = getCurrentActivity()
         if (currentActivity != null && isActivityExcluded(currentActivity::class.java)) {
             Log.d(LOG_TAG, "Ad display is skipped for this activity.")
-            // Only fetch in background if appOpenFetchFreshAd is false
-            if (!AdManageKitConfig.appOpenFetchFreshAd) {
+            // Prefetch in background for HYBRID/ONLY_CACHE strategies
+            if (AdManageKitConfig.appOpenLoadingStrategy != AdLoadingStrategy.ON_DEMAND) {
                 fetchAd()
             }
             return
         }
 
-        // If ad is available, show it
-        if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get()) {
-            if (currentActivity == null) {
-                Log.e(LOG_TAG, "Cannot show ad: currentActivity is null (WeakReference cleared)")
-                return
+        // Handle based on loading strategy
+        val strategy = AdManageKitConfig.appOpenLoadingStrategy
+        Log.d(LOG_TAG, "showAdIfAvailable with strategy: $strategy")
+
+        when (strategy) {
+            AdLoadingStrategy.ON_DEMAND -> {
+                // Always fetch fresh ad, but use cached if still fresh (avoid waste)
+                if (currentActivity != null && !isShowingAd.get() && !skipNextAd.get()) {
+                    if (isCachedAdFresh()) {
+                        // Use fresh cached ad
+                        val adAgeSeconds = getCachedAdAgeMs() / 1000
+                        Log.d(LOG_TAG, "ON_DEMAND: Using fresh cached ad (age: ${adAgeSeconds}s)")
+                        showCachedAd(currentActivity)
+                    } else {
+                        // Fetch fresh ad with dialog
+                        val adAgeSeconds = if (adLoadTime > 0) getCachedAdAgeMs() / 1000 else -1
+                        Log.d(LOG_TAG, "ON_DEMAND: Cached ad stale (age: ${adAgeSeconds}s), fetching fresh.")
+                        appOpenAd = null
+                        adLoadTime = 0L
+                        showAdWithWelcomeDialog(currentActivity, null)
+                    }
+                } else {
+                    Log.d(LOG_TAG, "ON_DEMAND: Cannot show ad.")
+                }
             }
 
-            Log.d(LOG_TAG, "Showing ad on activity: ${currentActivity.javaClass.simpleName}")
-
-            // Set isShowingAd BEFORE calling show() to prevent race conditions
-            isShowingAd.set(true)
-
-            val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
-
-            appOpenAd?.apply {
-                setOnPaidEventListener(createPaidEventListener())
-                setFullScreenContentCallback(fullScreenContentCallback)
-                show(currentActivity)
-            } ?: run {
-                // Ad became null unexpectedly, reset flag
-                isShowingAd.set(false)
+            AdLoadingStrategy.ONLY_CACHE -> {
+                // Only show if cached ad available, never fetch with dialog
+                if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && currentActivity != null) {
+                    Log.d(LOG_TAG, "ONLY_CACHE: Showing cached ad.")
+                    showCachedAd(currentActivity)
+                } else {
+                    Log.d(LOG_TAG, "ONLY_CACHE: No cached ad, skipping.")
+                    // Prefetch for next time
+                    fetchAd()
+                }
             }
-        } else if (!isAdAvailable() && currentActivity != null) {
-            // No cached ad available - show welcome dialog while fetching
-            // showAdWithWelcomeDialog has its own guards to prevent duplicates
-            Log.d(LOG_TAG, "No ad available, showing welcome dialog.")
-            showAdWithWelcomeDialog(currentActivity, null)
-        } else {
-            Log.d(LOG_TAG, "Cannot show ad.")
-            // Only fetch in background if appOpenFetchFreshAd is false
-            if (!AdManageKitConfig.appOpenFetchFreshAd) {
-                fetchAd()
+
+            AdLoadingStrategy.HYBRID, AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
+                // Use cached if available, fetch with dialog if not
+                if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get()) {
+                    if (currentActivity == null) {
+                        Log.e(LOG_TAG, "HYBRID: Cannot show ad - activity is null")
+                        return
+                    }
+                    Log.d(LOG_TAG, "HYBRID: Showing cached ad.")
+                    showCachedAd(currentActivity)
+                } else if (!isAdAvailable() && currentActivity != null && !skipNextAd.get()) {
+                    Log.d(LOG_TAG, "HYBRID: No cached ad, showing welcome dialog.")
+                    showAdWithWelcomeDialog(currentActivity, null)
+                } else {
+                    Log.d(LOG_TAG, "HYBRID: Cannot show ad.")
+                    fetchAd()
+                }
             }
         }
 
         skipNextAd.set(false)
+    }
+
+    /**
+     * Show the cached ad immediately (no dialog).
+     */
+    private fun showCachedAd(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            Log.d(LOG_TAG, "Cannot show cached ad: activity not valid")
+            return
+        }
+
+        isShowingAd.set(true)
+        val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
+
+        appOpenAd?.apply {
+            setOnPaidEventListener(createPaidEventListener())
+            setFullScreenContentCallback(fullScreenContentCallback)
+            show(activity)
+        } ?: run {
+            isShowingAd.set(false)
+            Log.e(LOG_TAG, "showCachedAd: appOpenAd became null")
+        }
     }
 
     /**
@@ -464,6 +511,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             cancelTimeout(timeoutRunnable)
                             isFetchingWithDialog = false
                             appOpenAd = ad
+                            adLoadTime = System.currentTimeMillis()
 
                             Log.d(LOG_TAG, "Ad loaded, isAppInForeground=${isAppInForeground.get()}")
 
@@ -530,6 +578,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdLoaded(ad: AppOpenAd) {
                     Handler(Looper.getMainLooper()).post {
                         appOpenAd = ad
+                            adLoadTime = System.currentTimeMillis()
                         if (!activity.isFinishing) {
                             showLoadedAd(activity, callback)
                         } else {
@@ -624,7 +673,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             adManagerCallback.onNextAction()
             Log.d(LOG_TAG, "Cannot show ad.")
             // Only fetch in background if appOpenFetchFreshAd is false
-            if (!AdManageKitConfig.appOpenFetchFreshAd) {
+            if (AdManageKitConfig.appOpenAutoReload) {
                 fetchAd()
             }
         }
@@ -720,7 +769,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     // Clear dialog reference if still set
                     currentWelcomeDialog = null
 
-//                    fetchAd()
+                    // Auto-reload next ad if enabled
+                    // Even with fetchFreshAd=true, auto-reload is useful because:
+                    // - If user returns quickly, the "fresh" cached ad will be used
+                    // - If user returns after threshold, a new fresh ad will be fetched
+                    if (AdManageKitConfig.appOpenAutoReload) {
+                        fetchAd()
+                    }
                     callback?.onNextAction()
                 }
             }
@@ -982,6 +1037,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 override fun onAdLoaded(ad: AppOpenAd) {
                     isLoading.set(false)  // Reset loading state
                     appOpenAd = ad
+                            adLoadTime = System.currentTimeMillis()
 
                     // Track loading performance
                     val loadTime = System.currentTimeMillis() - lastLoadStartTime
@@ -1090,6 +1146,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         appOpenAd = ad
+                            adLoadTime = System.currentTimeMillis()
 
                         // Track loading performance
                         val loadTime = System.currentTimeMillis() - lastLoadStartTime
@@ -1133,6 +1190,29 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      */
     fun isAdAvailable(): Boolean {
         return appOpenAd != null
+    }
+
+    /**
+     * Check if the cached ad is still "fresh" (not too old).
+     * Uses appOpenAdFreshnessThreshold from config.
+     *
+     * @return true if ad exists and is younger than the freshness threshold
+     */
+    private fun isCachedAdFresh(): Boolean {
+        if (appOpenAd == null || adLoadTime == 0L) return false
+        val threshold = AdManageKitConfig.appOpenAdFreshnessThreshold.inWholeMilliseconds
+        if (threshold == 0L) return false  // Duration.ZERO means always fetch fresh
+        val adAge = System.currentTimeMillis() - adLoadTime
+        return adAge < threshold
+    }
+
+    /**
+     * Get the age of the cached ad in milliseconds.
+     * @return age in ms, or -1 if no ad cached
+     */
+    fun getCachedAdAgeMs(): Long {
+        if (adLoadTime == 0L) return -1
+        return System.currentTimeMillis() - adLoadTime
     }
 
     /**
