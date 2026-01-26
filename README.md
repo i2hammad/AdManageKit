@@ -11,7 +11,7 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ## Next-Gen GMA SDK Version
 
-> **Beta Notice:** The Next-Gen GMA SDK (`com.google.android.libraries.ads.mobile.sdk`) is currently in **beta by Google**. While AdManageKit's nextgen branch is stable for production use, the underlying Google SDK may receive breaking changes until it reaches stable release.
+> **Beta Notice:** The Next-Gen GMA SDK (`com.google.android.libraries.ads.mobile.sdk`) is currently in **beta by Google**, and AdManageKit's nextgen branch is also in **beta**. The underlying Google SDK may receive breaking changes until it reaches stable release. For production use, the **main branch** is the stable option.
 
 AdManageKit offers a **Next-Gen GMA SDK** version on the `nextgen` branch, featuring Google's modern preloader-based ad loading system.
 
