@@ -1,0 +1,60 @@
+name: Publish MCP Server
+
+on:
+  push:
+    tags:
+      - "mcp-v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm ci
+      - run: npm run build
+
+      - name: Verify build
+        run: |
+          test -f dist/index.js
+          test -d content/docs
+          echo "Build verified successfully"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mcp-server-build
+          path: |
+            mcp-server/dist/
+            mcp-server/content/
+            mcp-server/package.json
+
+  publish-npm:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp-server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mcp-server-build
+          path: mcp-server
+
+      - run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

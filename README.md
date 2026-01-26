@@ -712,6 +712,58 @@ Generate locally:
 
 Output: `build/dokka/htmlMultiModule/index.html`
 
+### MCP Server (AI Integration)
+
+[![npm](https://img.shields.io/npm/v/admanagekit-mcp-server)](https://www.npmjs.com/package/admanagekit-mcp-server)
+
+AdManageKit provides an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that integrates with AI tools like Claude Code, Claude Desktop, Cursor, and other MCP-compatible clients. It provides **10 tools** for documentation lookup and code generation.
+
+#### Tools
+
+| Category | Tools |
+|----------|-------|
+| **Documentation** | `search_docs`, `get_doc_by_topic`, `get_api_reference`, `get_release_notes`, `get_migration_guide`, `list_documentation` |
+| **Code Generation** | `generate_config`, `generate_ad_integration`, `generate_billing_code`, `generate_compose_code` |
+
+#### Setup
+
+**Claude Desktop / Cursor** (`claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "admanagekit": {
+      "command": "npx",
+      "args": ["-y", "admanagekit-mcp-server"]
+    }
+  }
+}
+```
+
+**Claude Code** (auto-configured via `.mcp.json` when working in this repo):
+
+```json
+{
+  "mcpServers": {
+    "admanagekit": {
+      "command": "node",
+      "args": ["mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+#### What It Does
+
+- **Search documentation** across all docs, wiki pages, and API references
+- **Look up API references** for any class (AdManager, AppOpenManager, NativeAdManager, etc.)
+- **Generate integration code** for any ad type with display modes, loading strategies, and callbacks
+- **Generate billing code** for purchases, subscriptions, consumables, and expiry verification
+- **Generate Compose code** for all Compose ad components
+- Supports both **Kotlin** and **Java** output
+
+See [mcp-server/](mcp-server/) for more details.
+
 ---
 
 ## Migration Guide

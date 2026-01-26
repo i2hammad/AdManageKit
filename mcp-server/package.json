@@ -1,0 +1,51 @@
+{
+  "name": "admanagekit-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for AdManageKit Android library - documentation lookup and code generation",
+  "main": "dist/index.js",
+  "bin": {
+    "admanagekit-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && npm run bundle-docs",
+    "bundle-docs": "node scripts/bundle-docs.js",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/i2hammad/AdManageKit.git",
+    "directory": "mcp-server"
+  },
+  "homepage": "https://github.com/i2hammad/AdManageKit/tree/main/mcp-server",
+  "bugs": {
+    "url": "https://github.com/i2hammad/AdManageKit/issues"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "admanagekit",
+    "admob",
+    "android",
+    "ads",
+    "code-generation",
+    "documentation"
+  ],
+  "author": "i2hammad",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist/",
+    "content/"
+  ]
+}
