@@ -8,4 +8,12 @@
 
     <color name="card_color">#3F51B5</color>
 
+    <!-- Ad Loading Dialog Colors (Light Mode) -->
+    <color name="ad_dialog_overlay">#CC000000</color>
+    <color name="ad_dialog_card_background">#FFFFFF</color>
+    <color name="ad_dialog_title_color">#212121</color>
+    <color name="ad_dialog_message_color">#757575</color>
+    <color name="ad_dialog_progress_color">#2196F3</color>
+    <color name="ad_dialog_progress_track">#E3F2FD</color>
+
 </resources>

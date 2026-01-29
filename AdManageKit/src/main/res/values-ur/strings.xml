@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">اشتہار لوڈ ہو رہا ہے</string>
+    <string name="ad_loading_message">براہ کرم انتظار کریں…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">واپسی پر خوش آمدید!</string>
+    <string name="welcome_back_subtitle">آپ کا مواد لوڈ ہو رہا ہے…</string>
+    <string name="welcome_back_footer">ایک لمحہ…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">ایپ آئیکن</string>
+</resources>

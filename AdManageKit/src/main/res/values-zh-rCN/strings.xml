@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">正在加载广告</string>
+    <string name="ad_loading_message">请稍候…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">欢迎回来！</string>
+    <string name="welcome_back_subtitle">正在加载内容…</string>
+    <string name="welcome_back_footer">请稍等…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">应用图标</string>
+</resources>

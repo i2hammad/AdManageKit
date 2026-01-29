@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">Načítání reklamy</string>
+    <string name="ad_loading_message">Prosím čekejte…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">Vítejte zpět!</string>
+    <string name="welcome_back_subtitle">Načítání obsahu…</string>
+    <string name="welcome_back_footer">Moment…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">Ikona aplikace</string>
+</resources>

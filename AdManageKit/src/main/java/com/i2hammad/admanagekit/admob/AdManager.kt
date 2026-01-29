@@ -231,11 +231,36 @@ class AdManager() {
     fun loadInterstitialAdForSplash(
         context: Context, adUnitId: String, timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds, callback: AdManagerCallback
     ) {
-        var purchaseProvider = BillingConfig.getPurchaseProvider()
-        if (purchaseProvider.isPurchased())
-        {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
             // User has purchased, no ads should be shown
             callback.onNextAction()
+            return
+        }
+
+        // Skip if ad is already loaded and ready
+        if (mInterstitialAd != null || adPool.containsKey(adUnitId)) {
+            Log.d("AdManager", "Ad already loaded for splash, skipping load request")
+            AdDebugUtils.logEvent(adUnitId, "skipAlreadyLoaded", "Ad already loaded for splash", true)
+            this.adUnitId = adUnitId
+            callback.onNextAction()
+            callback.onAdLoaded()
+            return
+        }
+
+        // Skip if already loading this ad unit
+        if (loadingAdUnits.contains(adUnitId) || isAdLoading) {
+            Log.d("AdManager", "Ad unit $adUnitId already loading for splash, skipping duplicate request")
+            AdDebugUtils.logEvent(adUnitId, "skipDuplicateLoad", "Ad already loading for splash", true)
+            // Still set timeout to call callback if current load takes too long
+            this.adUnitId = adUnitId
+            var callbackCalled = false
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!callbackCalled && !isReady()) {
+                    callbackCalled = true
+                    callback.onNextAction()
+                }
+            }, timeoutMillis)
             return
         }
 
@@ -247,6 +272,8 @@ class AdManager() {
         AdRetryManager.getInstance().cancelRetry(adUnitId)
         retryAttempts.remove(adUnitId)
 
+        // Mark this unit as loading
+        loadingAdUnits.add(adUnitId)
         isAdLoading = true
         var callbackCalled = false  // Prevent double callbacks
 
@@ -255,7 +282,8 @@ class AdManager() {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad (improves show rate even if timeout already fired)
                 mInterstitialAd = interstitialAd
-                isAdLoading = false
+                loadingAdUnits.remove(adUnitId)
+                isAdLoading = loadingAdUnits.isNotEmpty()
                 Log.d("AdManager", "Interstitial ad loaded for splash")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded for splash", true)
 
@@ -271,6 +299,9 @@ class AdManager() {
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                loadingAdUnits.remove(adUnitId)
+                isAdLoading = loadingAdUnits.isNotEmpty()
+
                 Log.e(
                     "AdManager", "Failed to load interstitial ad for splash: ${loadAdError.message}"
                 )
@@ -290,7 +321,6 @@ class AdManager() {
                         loadInterstitialAdForSplash(context, adUnitId, timeoutMillis, callback)
                     }
                 } else {
-                    isAdLoading = false
                     mInterstitialAd = null
                 }
 
@@ -314,14 +344,14 @@ class AdManager() {
         })
 
         Handler(Looper.getMainLooper()).postDelayed({
-            if (isAdLoading && !callbackCalled) {
+            if (loadingAdUnits.contains(adUnitId) && !callbackCalled) {
                 Log.d("AdManager", "Ad loading timed out for splash")
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Interstitial ad loading timed out for splash", false)
                 callbackCalled = true
 
-                // Reset isAdLoading to allow new load requests
-                // Note: The in-flight load callback will still save the ad if it arrives later
-                isAdLoading = false
+                // Note: Don't remove from loadingAdUnits here - the ad callback will still fire
+                // and save the ad if it arrives later. Just allow new UI flows to proceed.
+                // The in-flight load callback will clean up loadingAdUnits when it completes.
 
                 // Ensure the callback is called if the ad loading is taking too long
                 callback.onNextAction()

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">Загрузка рекламы</string>
+    <string name="ad_loading_message">Пожалуйста, подождите…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">С возвращением!</string>
+    <string name="welcome_back_subtitle">Загружаем контент…</string>
+    <string name="welcome_back_footer">Одну секунду…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">Иконка приложения</string>
+</resources>

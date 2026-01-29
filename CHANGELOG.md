@@ -5,6 +5,19 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.6] - 2025-01-29
+
+### Added
+- **Multi-Language Support**: Added translations for ad loading dialogs in 42 languages including Chinese, Spanish, Hindi, Arabic, Portuguese, Russian, Japanese, German, French, Korean, Turkish, and many more
+- **Dark Mode Support**: Ad loading dialog now properly adapts to night mode with theme-aware colors for text, background, and progress indicators
+
+### Fixed
+- **Splash Ad Loading Optimization**: `loadInterstitialAdForSplash()` now skips redundant network requests if an ad is already loaded or currently loading
+
+### Changed
+- Dialog text strings (`ad_loading_title`, `ad_loading_message`, `welcome_back_title`, etc.) are now translatable string resources
+- Loading dialog uses `@color/ad_dialog_*` resources that adapt to light/dark theme
+
 ## [3.3.2] - 2024-12-22
 
 ### Fixed

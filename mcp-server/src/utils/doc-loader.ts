@@ -207,7 +207,7 @@ export function loadTopicFiles(files: string[]): string {
 
 export function loadReleaseNotes(version: string): string {
   if (version === "latest") {
-    version = "3.3.5";
+    version = "3.3.6";
   }
   return loadFile(`docs/release-notes/RELEASE_NOTES_v${version}.md`);
 }

@@ -12,7 +12,7 @@
         android:id="@+id/overlay"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#CC000000"
+        android:background="@color/ad_dialog_overlay"
         android:alpha="0" />
 
     <!-- Content Container -->
@@ -24,6 +24,7 @@
         android:elevation="16dp"
         app:cardCornerRadius="24dp"
         app:cardElevation="16dp"
+        app:cardBackgroundColor="@color/ad_dialog_card_background"
         android:translationY="50dp"
         android:alpha="0">
 
@@ -31,6 +32,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
+            android:background="@color/ad_dialog_card_background"
             android:padding="32dp"
             android:gravity="center">
 
@@ -63,8 +65,8 @@
                     android:layout_height="80dp"
                     android:layout_gravity="center"
                     android:indeterminate="true"
-                    app:indicatorColor="#2196F3"
-                    app:trackColor="#E3F2FD"
+                    app:indicatorColor="@color/ad_dialog_progress_color"
+                    app:trackColor="@color/ad_dialog_progress_track"
                     app:trackThickness="4dp" />
 
             </FrameLayout>
@@ -74,19 +76,19 @@
                 android:id="@+id/loadingTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Loading Ad"
+                android:text="@string/ad_loading_title"
                 android:textSize="20sp"
                 android:textStyle="bold"
-                android:textColor="#212121"
+                android:textColor="@color/ad_dialog_title_color"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.textview.MaterialTextView
                 android:id="@+id/loadingMessage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Please wait a moment..."
+                android:text="@string/ad_loading_message"
                 android:textSize="14sp"
-                android:textColor="#757575"
+                android:textColor="@color/ad_dialog_message_color"
                 android:gravity="center" />
 
             <!-- Animated dots -->

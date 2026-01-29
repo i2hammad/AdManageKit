@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">விளம்பரம் ஏற்றப்படுகிறது</string>
+    <string name="ad_loading_message">தயவுசெய்து காத்திருங்கள்…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">மீண்டும் வரவேற்கிறோம்!</string>
+    <string name="welcome_back_subtitle">உங்கள் உள்ளடக்கம் ஏற்றப்படுகிறது…</string>
+    <string name="welcome_back_footer">ஒரு கணம்…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">பயன்பாட்டு ஐகான்</string>
+</resources>

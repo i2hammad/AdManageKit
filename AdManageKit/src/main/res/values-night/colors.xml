@@ -6,6 +6,12 @@
     <color name="dn_card_stroke">#5E58595A</color>
     <color name="dn_shimmer_base_color">#ccc</color>
 
-
+    <!-- Ad Loading Dialog Colors (Night Mode) -->
+    <color name="ad_dialog_overlay">#CC000000</color>
+    <color name="ad_dialog_card_background">#1E1E1E</color>
+    <color name="ad_dialog_title_color">#ECECEC</color>
+    <color name="ad_dialog_message_color">#B0B0B0</color>
+    <color name="ad_dialog_progress_color">#64B5F6</color>
+    <color name="ad_dialog_progress_track">#1A3A5C</color>
 
 </resources>

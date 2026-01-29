@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">جاري تحميل الإعلان</string>
+    <string name="ad_loading_message">يرجى الانتظار…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">مرحبًا بعودتك!</string>
+    <string name="welcome_back_subtitle">جاري تحميل المحتوى…</string>
+    <string name="welcome_back_footer">لحظة من فضلك…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">أيقونة التطبيق</string>
+</resources>

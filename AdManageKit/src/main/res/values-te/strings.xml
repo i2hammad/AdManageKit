@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">ప్రకటన లోడ్ అవుతోంది</string>
+    <string name="ad_loading_message">దయచేసి వేచి ఉండండి…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">తిరిగి స్వాగతం!</string>
+    <string name="welcome_back_subtitle">మీ కంటెంట్ లోడ్ అవుతోంది…</string>
+    <string name="welcome_back_footer">ఒక్క క్షణం…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">యాప్ ఐకాన్</string>
+</resources>

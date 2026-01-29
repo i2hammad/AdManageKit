@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">Đang tải quảng cáo</string>
+    <string name="ad_loading_message">Vui lòng chờ…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">Chào mừng trở lại!</string>
+    <string name="welcome_back_subtitle">Đang tải nội dung…</string>
+    <string name="welcome_back_footer">Chỉ một chút…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">Biểu tượng ứng dụng</string>
+</resources>

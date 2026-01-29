@@ -57,8 +57,7 @@
                         android:layout_height="48dp"
                         android:layout_gravity="center"
                         android:src="@android:drawable/ic_dialog_info"
-                        android:contentDescription="App icon"
-                      />
+                        android:contentDescription="@string/app_icon_description" />
 
                 </FrameLayout>
 
@@ -69,7 +68,7 @@
                 android:id="@+id/welcomeTitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Welcome Back!"
+                android:text="@string/welcome_back_title"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 android:textColor="?android:attr/textColorPrimary"
@@ -82,7 +81,7 @@
                 android:id="@+id/welcomeSubtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Loading your content..."
+                android:text="@string/welcome_back_subtitle"
                 android:textSize="14sp"
                 android:textColor="?android:attr/textColorSecondary"
                 android:layout_marginBottom="28dp"
@@ -103,7 +102,7 @@
                 android:id="@+id/welcomeFooter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Just a moment..."
+                android:text="@string/welcome_back_footer"
                 android:textSize="12sp"
                 android:textColor="?android:attr/textColorTertiary"
                 android:alpha="0.7"

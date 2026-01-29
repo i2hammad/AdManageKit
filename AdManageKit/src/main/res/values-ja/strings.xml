@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">広告を読み込み中</string>
+    <string name="ad_loading_message">しばらくお待ちください…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">おかえりなさい！</string>
+    <string name="welcome_back_subtitle">コンテンツを読み込み中…</string>
+    <string name="welcome_back_footer">少々お待ちください…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">アプリアイコン</string>
+</resources>

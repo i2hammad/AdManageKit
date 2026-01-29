@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Ad Loading Dialog -->
+    <string name="ad_loading_title">जाहिरात लोड होत आहे</string>
+    <string name="ad_loading_message">कृपया प्रतीक्षा करा…</string>
+
+    <!-- Welcome Back Dialog -->
+    <string name="welcome_back_title">पुन्हा स्वागत!</string>
+    <string name="welcome_back_subtitle">तुमची सामग्री लोड होत आहे…</string>
+    <string name="welcome_back_footer">एक क्षण…</string>
+
+    <!-- Content Description -->
+    <string name="app_icon_description">अॅप आयकॉन</string>
+</resources>

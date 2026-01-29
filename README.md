@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.5`** adds **App Open Loading Strategies** - proper loading strategy support (ON_DEMAND, ONLY_CACHE, HYBRID) with ad freshness tracking and auto-reload configuration.
+**Latest Version `3.3.6`** adds **Multi-Language Support** (42 languages) and **Dark Mode** for ad loading dialogs, plus optimized splash ad loading.
 
 ---
 
@@ -54,12 +54,27 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.5) |
+| Production apps (stable) | **Main branch** (v3.3.6) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
+
+## What's New in 3.3.6
+
+### Multi-Language Support
+Ad loading dialogs now display in the user's language with support for **42 languages**:
+- **Asia**: Chinese (Simplified/Traditional), Japanese, Korean, Hindi, Bengali, Tamil, Telugu, Thai, Vietnamese, Indonesian, Malay, Urdu
+- **Europe**: German, French, Spanish, Italian, Portuguese, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Czech, Hungarian, Greek, and more
+- **Middle East**: Arabic, Persian, Hebrew, Turkish
+- **Others**: Swahili, Filipino/Tagalog, Catalan
+
+### Dark Mode Support
+The ad loading dialog now properly adapts to night mode with theme-aware colors for text, backgrounds, and progress indicators.
+
+### Splash Ad Loading Optimization
+`loadInterstitialAdForSplash()` now skips redundant network requests if an ad is already loaded or currently loading, reducing unnecessary API calls during configuration changes.
 
 ## What's New in 3.3.5
 
@@ -238,12 +253,12 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.6'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.6'
 ```
 
 </td>
@@ -683,6 +698,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Rewarded Ads](docs/rewarded-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)
 - [Release Notes v3.3.5](docs/release-notes/RELEASE_NOTES_v3.3.5.md)
 - [Release Notes v3.3.4](docs/release-notes/RELEASE_NOTES_v3.3.4.md)
 - [Release Notes v3.3.3](docs/release-notes/RELEASE_NOTES_v3.3.3.md)
