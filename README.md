@@ -726,10 +726,10 @@ AppPurchase.getInstance().changeSubscription(
 Generate locally:
 
 ```bash
-./gradlew dokkaHtmlMultiModule
+./gradlew dokkaGenerateHtml
 ```
 
-Output: `build/dokka/htmlMultiModule/index.html`
+Output: `build/dokka/html/index.html`
 
 ### MCP Server (AI Integration)
 

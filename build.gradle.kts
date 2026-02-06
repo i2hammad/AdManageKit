@@ -6,8 +6,8 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
-// Generate documentation: ./gradlew dokkaHtmlMultiModule
-// Output: build/dokka/htmlMultiModule
+// Generate documentation: ./gradlew dokkaGenerateHtml
+// Output: build/dokka/html
 
 // Build release with documentation: ./gradlew buildRelease
 tasks.register("buildRelease") {
@@ -19,7 +19,7 @@ tasks.register("buildRelease") {
         ":admanagekit-billing:assembleRelease",
         ":admanagekit-core:assembleRelease",
         ":admanagekit-compose:assembleRelease",
-        "dokkaHtmlMultiModule"
+        "dokkaGenerateHtml"
     )
 
     doLast {
@@ -27,7 +27,7 @@ tasks.register("buildRelease") {
         println("Release build complete!")
         println("=".repeat(60))
         println("AAR files: */build/outputs/aar/")
-        println("API Docs:  build/dokka/htmlMultiModule/index.html")
+        println("API Docs:  build/dokka/html/index.html")
         println("=".repeat(60))
     }
 }

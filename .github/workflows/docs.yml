@@ -39,7 +39,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Generate API Documentation
-        run: ./gradlew dokkaHtmlMultiModule
+        run: ./gradlew dokkaGenerateHtml
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
@@ -47,7 +47,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'build/dokka/htmlMultiModule'
+          path: 'build/dokka/html'
 
   deploy:
     environment:
