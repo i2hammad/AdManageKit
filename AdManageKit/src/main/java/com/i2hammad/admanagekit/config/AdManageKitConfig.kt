@@ -63,9 +63,9 @@ object AdManageKitConfig {
     
     /**
      * Enable automatic retry for failed ad loads.
-     * Default: true
+     * Default: false
      */
-    var autoRetryFailedAds: Boolean = true
+    var autoRetryFailedAds: Boolean = false
     
     /**
      * Maximum number of retry attempts for failed ad loads.
@@ -235,14 +235,13 @@ object AdManageKitConfig {
     var enableWelcomeBackDialog: Boolean = false
 
     /**
-     * @deprecated Use [appOpenLoadingStrategy] instead.
-     * - `appOpenFetchFreshAd = false` → `appOpenLoadingStrategy = AdLoadingStrategy.HYBRID`
-     * - `appOpenFetchFreshAd = true` → `appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND`
+     * Controls when app open ads are fetched.
+     *
+     * - `true`: Fetch fresh ad on foreground (onStart) — may show loading dialog while ad loads
+     * - `false`: Prefetch ad when app goes to background (onStop) — ad ready on return, no dialog needed
+     *
+     * Default: false
      */
-    @Deprecated(
-        message = "Use appOpenLoadingStrategy instead",
-        replaceWith = ReplaceWith("appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND")
-    )
     var appOpenFetchFreshAd: Boolean = false
 
     /**
@@ -465,7 +464,7 @@ object AdManageKitConfig {
         nativeCacheExpiry = 1.hours
         maxCachedAdsPerUnit = 3
         enableCrossAdUnitFallback = false
-        autoRetryFailedAds = true
+        autoRetryFailedAds = false
         maxRetryAttempts = 3
         circuitBreakerThreshold = 5
         circuitBreakerResetTimeout = 300.seconds

@@ -68,7 +68,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "3.3.6"
+                version = "3.3.7"
             }
 
 

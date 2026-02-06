@@ -57,7 +57,7 @@ object NativeAdManager {
      * Controls whether native ad caching is enabled.
      * When disabled, ads are not cached and getCachedNativeAd returns null.
      */
-    var enableCachingNativeAds: Boolean = true
+    var enableCachingNativeAds: Boolean = false
     
     /**
      * Enhanced data class representing a cached native ad with comprehensive metadata.

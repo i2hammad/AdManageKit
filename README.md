@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.6`** adds **Multi-Language Support** (42 languages) and **Dark Mode** for ad loading dialogs, plus optimized splash ad loading.
+**Latest Version `3.3.7`** improves app open ad UX with welcome dialog on cached ads, adds background prefetching control, and changes default caching behavior.
 
 ---
 
@@ -54,27 +54,30 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.6) |
+| Production apps (stable) | **Main branch** (v3.3.7) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.3.6
+## What's New in 3.3.7
 
-### Multi-Language Support
-Ad loading dialogs now display in the user's language with support for **42 languages**:
-- **Asia**: Chinese (Simplified/Traditional), Japanese, Korean, Hindi, Bengali, Tamil, Telugu, Thai, Vietnamese, Indonesian, Malay, Urdu
-- **Europe**: German, French, Spanish, Italian, Portuguese, Russian, Polish, Dutch, Swedish, Norwegian, Danish, Finnish, Czech, Hungarian, Greek, and more
-- **Middle East**: Arabic, Persian, Hebrew, Turkish
-- **Others**: Swahili, Filipino/Tagalog, Catalan
+### Welcome Dialog for Cached App Open Ads
+Cached app open ads now display the welcome back dialog before showing, providing a consistent transition across all display paths (ON_DEMAND, ONLY_CACHE, HYBRID).
 
-### Dark Mode Support
-The ad loading dialog now properly adapts to night mode with theme-aware colors for text, backgrounds, and progress indicators.
+### Background Ad Prefetching
+`appOpenFetchFreshAd` repurposed to control when app open ads are fetched:
+- `false` (default): Prefetch on background (onStop) — ad ready instantly on return
+- `true`: Fetch fresh on foreground (onStart) — may show loading dialog
 
-### Splash Ad Loading Optimization
-`loadInterstitialAdForSplash()` now skips redundant network requests if an ad is already loaded or currently loading, reducing unnecessary API calls during configuration changes.
+```kotlin
+AdManageKitConfig.appOpenFetchFreshAd = false // Prefetch in background (default)
+```
+
+### Default Changes
+- **Native ad caching disabled by default**: `NativeAdManager.enableCachingNativeAds` now defaults to `false`
+- **Auto-retry disabled by default**: `AdManageKitConfig.autoRetryFailedAds` now defaults to `false`
 
 ## What's New in 3.3.5
 
@@ -83,7 +86,6 @@ The ad loading dialog now properly adapts to night mode with theme-aware colors 
 - **Ad Freshness Tracking**: Cached ads track load time to prevent showing stale ads
 - **Smart Cache Usage**: ON_DEMAND strategy uses cached ads if still fresh (within `appOpenAdFreshnessThreshold`)
 - **Auto-Reload Config**: New `appOpenAutoReload` setting to control automatic reloading after ad dismissal
-- **Deprecated**: `appOpenFetchFreshAd` - migrate to `appOpenLoadingStrategy`
 
 ```kotlin
 AdManageKitConfig.apply {
@@ -253,12 +255,12 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.6'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.6'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.7'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.7'
 ```
 
 </td>
@@ -698,6 +700,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Rewarded Ads](docs/rewarded-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)
 - [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)
 - [Release Notes v3.3.5](docs/release-notes/RELEASE_NOTES_v3.3.5.md)
 - [Release Notes v3.3.4](docs/release-notes/RELEASE_NOTES_v3.3.4.md)

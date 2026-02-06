@@ -57,6 +57,7 @@ class MyApplication : Application() {
             maxCacheMemoryMB = 50
             enableWelcomeBackDialog = true
             appOpenFetchFreshAd = true
+            appOpenAutoReload = false
             welcomeDialogAppIcon = R.mipmap.ic_launcher_round
             
             // =================== RELIABILITY FEATURES ===================
@@ -88,7 +89,7 @@ class MyApplication : Application() {
             // - Fetches fresh ad with loading dialog if cache is empty
             // - Good balance between UX and ad coverage
             interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
-            appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
+            appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
 
             // Option 2: ONLY_CACHE - Best for smooth UX (gaming apps)

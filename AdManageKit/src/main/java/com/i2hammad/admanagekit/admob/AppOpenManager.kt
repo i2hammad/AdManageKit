@@ -426,7 +426,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Show the cached ad immediately (no dialog).
+     * Show the cached ad with welcome dialog.
      */
     private fun showCachedAd(activity: Activity) {
         if (activity.isFinishing || activity.isDestroyed) {
@@ -434,17 +434,34 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        isShowingAd.set(true)
-        val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
+        // Show welcome dialog first, then show ad on top
+        val dialogViews = showWelcomeBackDialog(activity)
+        currentWelcomeDialog = dialogViews
 
-        appOpenAd?.apply {
-            setOnPaidEventListener(createPaidEventListener())
-            setFullScreenContentCallback(fullScreenContentCallback)
-            show(activity)
-        } ?: run {
-            isShowingAd.set(false)
-            Log.e(LOG_TAG, "showCachedAd: appOpenAd became null")
-        }
+        // Brief delay to let dialog appear before showing ad
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (activity.isFinishing || activity.isDestroyed) {
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                }
+                return@postDelayed
+            }
+
+            isShowingAd.set(true)
+            val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
+
+            appOpenAd?.apply {
+                setOnPaidEventListener(createPaidEventListener())
+                setFullScreenContentCallback(fullScreenContentCallback)
+                show(activity)
+            } ?: run {
+                isShowingAd.set(false)
+                Log.e(LOG_TAG, "showCachedAd: appOpenAd became null")
+                animateDialogDismissal(dialogViews) {
+                    currentWelcomeDialog = null
+                }
+            }
+        }, 500)
     }
 
     /**
@@ -1403,6 +1420,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     override fun onStop(owner: LifecycleOwner) {
         isAppInForeground.set(false)
         Log.d(LOG_TAG, "onStop - app went to background")
+
+        // Prefetch ad in background so it's ready when user returns
+        // Only when appOpenFetchFreshAd is false (not fetching fresh on start)
+        if (!AdManageKitConfig.appOpenFetchFreshAd &&
+            !BillingConfig.getPurchaseProvider().isPurchased() &&
+            !isAdAvailable() && !isLoading.get()
+        ) {
+            Log.d(LOG_TAG, "onStop - prefetching ad for next foreground")
+            fetchAd()
+        }
     }
 
     // =================== SCREEN/FRAGMENT TAG EXCLUSIONS (v3.2.0+) ===================
