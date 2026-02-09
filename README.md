@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.7`** improves app open ad UX with welcome dialog on cached ads, adds background prefetching control, and changes default caching behavior.
+**Latest Version `3.3.8`** introduces multi-ad-provider waterfall mediation with Yandex Ads support, allowing automatic fallback across ad networks with zero changes to existing code.
 
 ---
 
@@ -54,12 +54,30 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.7) |
+| Production apps (stable) | **Main branch** (v3.3.8) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
+
+## What's New in 3.3.8
+
+### Multi-Provider Waterfall & Yandex Ads
+- **Multi-Ad-Provider Architecture**: New core interfaces (`InterstitialAdProvider`, `AppOpenAdProvider`, `BannerAdProvider`, `NativeAdProvider`, `RewardedAdProvider`) in `admanagekit-core` with zero external dependencies
+- **Waterfall Mediation**: Automatic fallback across ad networks for all ad types (interstitial, app open, banner, native, rewarded)
+- **Yandex Ads Module**: New `admanagekit-yandex` module with full Yandex Mobile Ads SDK integration
+- **Transparent Integration**: Configure provider chains once; all existing API calls use waterfall automatically
+- **Backward Compatible**: No changes required to existing AdMob-only code
+
+```kotlin
+// Register providers and configure waterfall chains
+AdProviderConfig.registerProvider(AdProvider.ADMOB, AdMobProviderRegistration())
+AdProviderConfig.registerProvider(AdProvider.YANDEX, YandexProviderRegistration())
+AdProviderConfig.setInterstitialChain(listOf(AdProvider.ADMOB, AdProvider.YANDEX))
+```
+
+See [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) and [Yandex Integration](docs/YANDEX_INTEGRATION.md) for the full guide.
 
 ## What's New in 3.3.7
 
@@ -255,15 +273,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.7'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.7'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.8'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.8'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.8'
 ```
 
 </td>
@@ -391,7 +409,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.8'
 ```
 
 ```kotlin
@@ -741,6 +759,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.3.8](docs/release-notes/RELEASE_NOTES_v3.3.8.md)
 - [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)
 - [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)
 - [Release Notes v3.3.5](docs/release-notes/RELEASE_NOTES_v3.3.5.md)
