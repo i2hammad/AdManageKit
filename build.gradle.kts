@@ -6,7 +6,16 @@ plugins {
     alias(libs.plugins.dokka)
 }
 
-// Generate documentation: ./gradlew dokkaGenerateHtml
+// Aggregate all module docs into root build/dokka/html/
+dependencies {
+    dokka(project(":admanagekit-core"))
+    dokka(project(":AdManageKit"))
+    dokka(project(":admanagekit-billing"))
+    dokka(project(":admanagekit-compose"))
+    dokka(project(":admanagekit-yandex"))
+}
+
+// Generate documentation: ./gradlew dokkaGeneratePublicationHtml
 // Output: build/dokka/html
 
 // Build release with documentation: ./gradlew buildRelease
@@ -19,7 +28,7 @@ tasks.register("buildRelease") {
         ":admanagekit-billing:assembleRelease",
         ":admanagekit-core:assembleRelease",
         ":admanagekit-compose:assembleRelease",
-        "dokkaGenerateHtml"
+        "dokkaGeneratePublicationHtml"
     )
 
     doLast {
