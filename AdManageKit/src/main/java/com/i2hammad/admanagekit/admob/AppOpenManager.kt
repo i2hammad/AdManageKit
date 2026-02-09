@@ -24,10 +24,17 @@ import com.google.android.gms.ads.appopen.AppOpenAd
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.AppOpenAdProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
+import com.i2hammad.admanagekit.waterfall.AppOpenWaterfall
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -77,6 +84,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     @Volatile
     private var lastLoadStartTime = 0L
     private val loadTimes = mutableListOf<Long>()
+
+    // Waterfall support
+    private var appOpenWaterfall: AppOpenWaterfall? = null
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getAppOpenChain().isNotEmpty()
 
     // Enhanced configuration
     private var maxRetryAttempts = 3
@@ -346,6 +358,28 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             Log.d(LOG_TAG, "User has purchased, skipping app open ad.")
+            return
+        }
+
+        if (useWaterfall) {
+            if (AdManager.getInstance().isAdOrDialogShowing()) return
+            val currentActivity = getCurrentActivity()
+            if (currentActivity != null && isActivityExcluded(currentActivity::class.java)) {
+                fetchViaWaterfall()
+                return
+            }
+            if (currentActivity != null && !isShowingAd.get() && !skipNextAd.get()) {
+                if (appOpenWaterfall?.isAdReady() == true) {
+                    showWaterfallCachedAd(currentActivity)
+                } else {
+                    val strategy = AdManageKitConfig.appOpenLoadingStrategy
+                    when (strategy) {
+                        AdLoadingStrategy.ONLY_CACHE -> fetchViaWaterfall()
+                        else -> showWaterfallWithWelcomeDialog(currentActivity, null)
+                    }
+                }
+            }
+            skipNextAd.set(false)
             return
         }
 
@@ -672,6 +706,19 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
+        if (useWaterfall) {
+            if (activity.isFinishing) { adManagerCallback.onNextAction(); return }
+            if (!isShowingAd.get() && appOpenWaterfall?.isAdReady() == true) {
+                showWaterfallLoadedAd(activity, adManagerCallback)
+            } else if (appOpenWaterfall?.isAdReady() != true) {
+                showWaterfallWithWelcomeDialog(activity, adManagerCallback)
+            } else {
+                adManagerCallback.onNextAction()
+            }
+            skipNextAd.set(false)
+            return
+        }
+
         if (activity.isFinishing) {
             adManagerCallback.onNextAction()
             return
@@ -882,6 +929,224 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
     }
 
+    // =================== WATERFALL HELPERS ===================
+
+    private fun resolveAdUnit(logicalName: String): (com.i2hammad.admanagekit.core.ad.AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun createAppOpenWaterfall(): AppOpenWaterfall {
+        return AppOpenWaterfall(
+            providers = AdProviderConfig.getAppOpenChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+    }
+
+    private fun fetchViaWaterfall() {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) return
+        if (appOpenWaterfall?.isAdReady() == true) return
+        if (!isLoading.compareAndSet(false, true)) return
+
+        val waterfall = createAppOpenWaterfall()
+        appOpenWaterfall = waterfall
+
+        waterfall.load(myApplication, object : AppOpenAdProvider.AppOpenAdCallback {
+            override fun onAdLoaded() {
+                isLoading.set(false)
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open waterfall ad loaded", true)
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isLoading.set(false)
+                appOpenWaterfall = null
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open waterfall failed: ${error.message}", false)
+                logFailedToLoadEvent(AdError(error.code, error.message, error.domain))
+            }
+        })
+    }
+
+    private fun fetchViaWaterfall(
+        adLoadCallback: AdLoadCallback,
+        timeoutMillis: Long
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) { adLoadCallback.onAdLoaded(); return }
+        if (appOpenWaterfall?.isAdReady() == true) { adLoadCallback.onAdLoaded(); return }
+
+        var hasTimedOut = false
+        val timeoutRunnable = scheduleTimeout(timeoutMillis) {
+            hasTimedOut = true
+            adLoadCallback.onFailedToLoad(LoadAdError(3, "Ad load timed out", "waterfall", null, null))
+        }
+
+        val waterfall = createAppOpenWaterfall()
+        appOpenWaterfall = waterfall
+
+        waterfall.load(myApplication, object : AppOpenAdProvider.AppOpenAdCallback {
+            override fun onAdLoaded() {
+                if (!hasTimedOut) {
+                    cancelTimeout(timeoutRunnable)
+                    adLoadCallback.onAdLoaded()
+                }
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                appOpenWaterfall = null
+                if (!hasTimedOut) {
+                    cancelTimeout(timeoutRunnable)
+                    adLoadCallback.onFailedToLoad(
+                        LoadAdError(error.code, error.message, error.domain, null, null)
+                    )
+                }
+            }
+        })
+    }
+
+    private fun showWaterfallCachedAd(activity: Activity) {
+        if (activity.isFinishing || activity.isDestroyed) return
+
+        val dialogViews = showWelcomeBackDialog(activity)
+        currentWelcomeDialog = dialogViews
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (activity.isFinishing || activity.isDestroyed) {
+                animateDialogDismissal(dialogViews) { currentWelcomeDialog = null }
+                return@postDelayed
+            }
+            showWaterfallLoadedAd(activity, null)
+        }, 500)
+    }
+
+    private fun showWaterfallLoadedAd(activity: Activity, callback: AdManagerCallback?) {
+        if (isShowingAd.get() || activity.isFinishing || activity.isDestroyed) {
+            callback?.onNextAction()
+            return
+        }
+
+        val waterfall = appOpenWaterfall
+        if (waterfall == null || !waterfall.isAdReady()) {
+            callback?.onNextAction()
+            return
+        }
+
+        isShowingAd.set(true)
+
+        waterfall.show(activity, object : AppOpenAdProvider.AppOpenShowCallback {
+            override fun onAdShowed() {
+                Handler(Looper.getMainLooper()).post {
+                    isShowingAd.set(true)
+                    isShownAd.set(true)
+                    dismissWelcomeDialogWithDelay(currentWelcomeDialog)
+                    AdDebugUtils.logEvent(adUnitId, "onAdImpression", "App open waterfall ad shown", true)
+                    logAdImpressionEvent()
+                    callback?.onAdLoaded()
+                }
+            }
+
+            override fun onAdDismissed() {
+                Handler(Looper.getMainLooper()).post {
+                    appOpenWaterfall = null
+                    isShowingAd.set(false)
+                    currentWelcomeDialog = null
+                    AdDebugUtils.logEvent(adUnitId, "onAdDismissed", "App open waterfall ad dismissed", true)
+                    if (AdManageKitConfig.appOpenAutoReload) {
+                        fetchViaWaterfall()
+                    }
+                    callback?.onNextAction()
+                }
+            }
+
+            override fun onAdFailedToShow(error: AdKitAdError) {
+                Handler(Looper.getMainLooper()).post {
+                    isShowingAd.set(false)
+                    appOpenWaterfall = null
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "App open waterfall failed to show: ${error.message}", false)
+                    currentWelcomeDialog?.let { dv ->
+                        dismissDialogSafely(dv.dialog)
+                        currentWelcomeDialog = null
+                    }
+                    callback?.onNextAction()
+                }
+            }
+
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                val revenueParams = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics.logEvent("ad_paid_event", revenueParams)
+            }
+        })
+    }
+
+    private fun showWaterfallWithWelcomeDialog(activity: Activity, callback: AdManagerCallback?) {
+        if (isShowingAd.get()) { callback?.onNextAction(); return }
+        if (AdManager.getInstance().isAdOrDialogShowing()) { callback?.onNextAction(); return }
+        if (currentWelcomeDialog?.dialog?.isShowing == true) { callback?.onNextAction(); return }
+        if (activity.isFinishing) { callback?.onNextAction(); return }
+
+        isFetchingWithDialog = true
+        val dialogViews = showWelcomeBackDialog(activity)
+        val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
+
+        var hasTimedOut = false
+        val timeoutRunnable = scheduleTimeout(timeoutMillis) {
+            hasTimedOut = true
+            isFetchingWithDialog = false
+            animateDialogDismissal(dialogViews) {
+                callback?.onNextAction()
+            }
+        }
+
+        val waterfall = createAppOpenWaterfall()
+        appOpenWaterfall = waterfall
+
+        waterfall.load(myApplication, object : AppOpenAdProvider.AppOpenAdCallback {
+            override fun onAdLoaded() {
+                Handler(Looper.getMainLooper()).post {
+                    if (!hasTimedOut) {
+                        cancelTimeout(timeoutRunnable)
+                        isFetchingWithDialog = false
+
+                        if (!isAppInForeground.get()) {
+                            pendingAdToShow.set(true)
+                            pendingAdCallback = callback
+                            animateDialogDismissal(dialogViews) { currentWelcomeDialog = null }
+                            return@post
+                        }
+
+                        currentWelcomeDialog = dialogViews
+                        if (!activity.isFinishing && !activity.isDestroyed) {
+                            showWaterfallLoadedAd(activity, callback)
+                        } else {
+                            dismissWelcomeDialogWithDelay(dialogViews)
+                            currentWelcomeDialog = null
+                            callback?.onNextAction()
+                        }
+                    }
+                }
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                Handler(Looper.getMainLooper()).post {
+                    appOpenWaterfall = null
+                    if (!hasTimedOut) {
+                        cancelTimeout(timeoutRunnable)
+                        isFetchingWithDialog = false
+                        logFailedToLoadEvent(AdError(error.code, error.message, error.domain))
+                        animateDialogDismissal(dialogViews) {
+                            callback?.onNextAction()
+                        }
+                    }
+                }
+            }
+        })
+    }
+
     /**
      * Clean up resources and prevent memory leaks
      */
@@ -894,6 +1159,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         // Clear ad reference
         appOpenAd = null
+        appOpenWaterfall?.destroy()
+        appOpenWaterfall = null
 
         // Clear activity reference
         currentActivity = null
@@ -957,6 +1224,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             Log.d(LOG_TAG, "User has purchased, skipping ad fetch.")
             return
         }
+        if (useWaterfall) { fetchViaWaterfall(); return }
         fetchAdWithRetry(0)
     }
 
@@ -1122,6 +1390,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds,
         customAdUnitId: String? = null
     ) {
+        if (useWaterfall) { fetchViaWaterfall(adLoadCallback, timeoutMillis); return }
+
         // Don't fetch ads if user has purchased
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -1206,6 +1476,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Thread-safe implementation.
      */
     fun isAdAvailable(): Boolean {
+        if (useWaterfall) return appOpenWaterfall?.isAdReady() == true
         return appOpenAd != null
     }
 
@@ -1348,7 +1619,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 Log.d(LOG_TAG, "onStart - showing ad on: ${activity.javaClass.simpleName}")
 
                 // Check if we have a pending ad that was loaded while in background
-                if (pendingAdToShow.getAndSet(false) && appOpenAd != null) {
+                val hasPendingAd = appOpenAd != null || (useWaterfall && appOpenWaterfall?.isAdReady() == true)
+                if (pendingAdToShow.getAndSet(false) && hasPendingAd) {
                     Log.d(LOG_TAG, "Showing pending ad that was loaded while in background")
                     val callback = pendingAdCallback
                     pendingAdCallback = null
@@ -1404,9 +1676,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 return@postDelayed
             }
 
-            if (!activity.isFinishing && !activity.isDestroyed && appOpenAd != null) {
+            val hasAdToShow = appOpenAd != null || (useWaterfall && appOpenWaterfall?.isAdReady() == true)
+            if (!activity.isFinishing && !activity.isDestroyed && hasAdToShow) {
                 Log.d(LOG_TAG, "Showing pending ad after dialog")
-                showLoadedAd(activity, callback)
+                if (useWaterfall) {
+                    showWaterfallLoadedAd(activity, callback)
+                } else {
+                    showLoadedAd(activity, callback)
+                }
             } else {
                 // Dismiss dialog if can't show ad
                 animateDialogDismissal(dialogViews) {

@@ -23,9 +23,16 @@ import com.google.android.gms.ads.*
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.BannerAdProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.i2hammad.admanagekit.waterfall.BannerWaterfall
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -64,6 +71,11 @@ class BannerAdView @JvmOverloads constructor(
     private var autoRefreshEnabled = false
     private val refreshIntervalSeconds get() = AdManageKitConfig.defaultBannerRefreshInterval.inWholeSeconds.toInt()
     
+    // Waterfall support
+    private var bannerWaterfall: BannerWaterfall? = null
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getBannerChain().isNotEmpty()
+
     // Performance tracking
     private var loadStartTime: Long = 0
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
@@ -178,6 +190,8 @@ class BannerAdView @JvmOverloads constructor(
         placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
         callback: AdLoadCallback? = null
     ) {
+        if (useWaterfall) { loadBannerViaWaterfall(adUnitId, callback); return }
+
         // Prevent concurrent loads
         if (!isAdLoading.compareAndSet(false, true)) {
             AdDebugUtils.logDebug("BannerAdView", "Ad loading already in progress for $adUnitId")
@@ -470,6 +484,104 @@ class BannerAdView @JvmOverloads constructor(
         }
     }
     
+    // =================== WATERFALL METHODS ===================
+
+    private fun resolveAdUnit(logicalName: String): (com.i2hammad.admanagekit.core.ad.AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun loadBannerViaWaterfall(adUnitId: String, callback: AdLoadCallback?) {
+        if (!isAdLoading.compareAndSet(false, true)) return
+
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            isAdLoading.set(false)
+            shimmerFrameLayout.stopShimmer()
+            shimmerFrameLayout.visibility = View.GONE
+            callback?.onFailedToLoad(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
+            return
+        }
+
+        visibility = View.VISIBLE
+        shimmerFrameLayout.visibility = View.VISIBLE
+        shimmerFrameLayout.startShimmer()
+        loadStartTime = System.currentTimeMillis()
+
+        bannerWaterfall?.destroy()
+        val waterfall = BannerWaterfall(
+            providers = AdProviderConfig.getBannerChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+        bannerWaterfall = waterfall
+
+        waterfall.load(context, object : BannerAdProvider.BannerAdCallback {
+            override fun onBannerLoaded(bannerView: View) {
+                ensureMainThread {
+                    layBannerAd.removeAllViews()
+                    val parent = bannerView.parent as? ViewGroup
+                    parent?.removeView(bannerView)
+                    layBannerAd.addView(bannerView)
+                    shimmerFrameLayout.stopShimmer()
+                    shimmerFrameLayout.visibility = View.GONE
+                    isAdLoading.set(false)
+                    loadAttempt.set(0)
+                    visibility = View.VISIBLE
+
+                    if (autoRefreshEnabled) { scheduleNextRefresh() }
+
+                    val loadTime = System.currentTimeMillis() - loadStartTime
+                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Banner waterfall ad loaded in ${loadTime}ms", true)
+                    callback?.onAdLoaded()
+                }
+            }
+
+            override fun onBannerFailedToLoad(error: AdKitAdError) {
+                ensureMainThread {
+                    shimmerFrameLayout.stopShimmer()
+                    shimmerFrameLayout.visibility = View.GONE
+                    isAdLoading.set(false)
+                    bannerWaterfall = null
+                    visibility = View.GONE
+
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Banner waterfall failed: ${error.message}", false)
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putString("ad_error_code", error.code.toString())
+                    }
+                    firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    callback?.onFailedToLoad(
+                        AdError(error.code, error.message, error.domain)
+                    )
+                }
+            }
+
+            override fun onBannerClicked() { callback?.onAdClicked() }
+            override fun onBannerImpression() {
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                callback?.onAdImpression()
+            }
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
+            }
+        })
+    }
+
     // =================== AUTO-REFRESH METHODS ===================
     
     /**
@@ -556,14 +668,18 @@ class BannerAdView @JvmOverloads constructor(
     }
 
     fun destroyAd() {
+        bannerWaterfall?.destroy()
+        bannerWaterfall = null
         cleanup()
     }
 
     fun resumeAd() {
+        if (useWaterfall) { bannerWaterfall?.resume(); return }
         adView?.resume()
     }
 
     fun pauseAd() {
+        if (useWaterfall) { bannerWaterfall?.pause(); return }
         adView?.pause()
     }
     

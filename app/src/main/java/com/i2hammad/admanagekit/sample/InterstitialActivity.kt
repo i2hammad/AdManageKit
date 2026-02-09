@@ -55,7 +55,7 @@ class InterstitialActivity : AppCompatActivity() {
         // Native ad caching is now controlled by configuration
 
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
-        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110", 
+        nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110",
             useCachedAd = true, object : AdLoadCallback() {
                 override fun onAdLoaded() {
                     Log.d("AdManageKit", "✅ NativeBannerMedium loaded in InterstitialActivity")
@@ -128,22 +128,7 @@ class InterstitialActivity : AppCompatActivity() {
     fun loadInterstitialAd() {
         statusTextView.text = "Interstitial ad requested."
         btnInterstitialAd.isEnabled = true
-        AdManager.getInstance().loadInterstitialAd(this,
-            "ca-app-pub-3940256099942544/1033173712",
-            object : InterstitialAdLoadCallback() {
-                override fun onAdLoaded(onAdLoaded: InterstitialAd) {
-                    super.onAdLoaded(onAdLoaded)
-                    statusTextView.text = "Interstitial ad loaded successfully."
-                    btnInterstitialAd.text = "Show interstitial Ad and Load Native Ads"
-
-                }
-
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    super.onAdFailedToLoad(loadAdError)
-                    statusTextView.text = "Interstitial ad failed to load."
-                    btnInterstitialAd.text = "Load Native Ads"
-                }
-            })
+        AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-3940256099942544/1033173712")
 
 
     }

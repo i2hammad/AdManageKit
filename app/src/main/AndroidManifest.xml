@@ -57,6 +57,12 @@
             android:label="Interstitial Ad Test Suite"
             android:theme="@style/Theme.AdManageKit" />
 
+        <activity
+            android:name=".WaterfallTestActivity"
+            android:exported="false"
+            android:label="Waterfall Ad Test"
+            android:theme="@style/Theme.AdManageKit" />
+
         <meta-data android:name="com.google.android.gms.ads.flag.NATIVE_AD_DEBUGGER_ENABLED"
             android:value="false" />
         <meta-data

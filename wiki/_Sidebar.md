@@ -10,6 +10,10 @@
 - [[Configuration]]
 - [[Jetpack Compose]]
 
+### Multi-Provider
+- [[Multi-Provider Waterfall]]
+- [[Yandex Integration]]
+
 ### Billing
 - [[Billing Integration]]
 - [[Purchase Categories]]

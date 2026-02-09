@@ -49,6 +49,14 @@ export const TOPIC_MAP: Record<string, string[]> = {
   ],
   "banner-improvements": ["docs/BANNER_AD_IMPROVEMENTS.md"],
   "loading-strategy-examples": ["docs/LOADING_STRATEGY_EXAMPLES.md"],
+  "multi-provider-waterfall": [
+    "docs/MULTI_PROVIDER_WATERFALL.md",
+    "wiki/Multi-Provider-Waterfall.md",
+  ],
+  "yandex-integration": [
+    "docs/YANDEX_INTEGRATION.md",
+    "wiki/Yandex-Integration.md",
+  ],
 };
 
 export const API_CLASS_NAMES = [
@@ -71,6 +79,8 @@ export const API_CLASS_NAMES = [
 ] as const;
 
 export const RELEASE_VERSIONS = [
+  "3.3.8",
+  "3.3.7",
   "3.3.5",
   "3.3.4",
   "3.3.3",

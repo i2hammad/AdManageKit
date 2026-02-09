@@ -25,11 +25,19 @@ import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.NativeAdProvider
+import com.i2hammad.admanagekit.core.ad.NativeAdSize
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.databinding.LayoutNativeTemplatePreviewBinding
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.NativeAdIntegrationManager
+import com.i2hammad.admanagekit.waterfall.NativeWaterfall
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,6 +82,12 @@ class NativeTemplateView @JvmOverloads constructor(
 
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
     private var shimmerInflated = false
+
+    // Waterfall support
+    private var nativeWaterfall: NativeWaterfall? = null
+    private var waterfallNativeAdRef: Any? = null
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getNativeChain().isNotEmpty()
 
     /**
      * AdChoices placement position. Default is TOP_RIGHT.
@@ -288,6 +302,8 @@ class NativeTemplateView @JvmOverloads constructor(
     ) {
         this.adUnitId = adUnitId
 
+        if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
+
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainer
         val purchaseProvider = BillingConfig.getPurchaseProvider()
 
@@ -400,6 +416,15 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.VIDEO_LARGE,
             NativeAdTemplate.VIDEO_VERTICAL,
             NativeAdTemplate.VIDEO_FULLSCREEN -> NativeAdIntegrationManager.ScreenType.LARGE
+        }
+    }
+
+    private fun getNativeAdSizeForTemplate(): NativeAdSize {
+        return when (getScreenTypeForTemplate()) {
+            NativeAdIntegrationManager.ScreenType.SMALL -> NativeAdSize.SMALL
+            NativeAdIntegrationManager.ScreenType.MEDIUM -> NativeAdSize.MEDIUM
+            NativeAdIntegrationManager.ScreenType.LARGE -> NativeAdSize.LARGE
+            else -> NativeAdSize.LARGE
         }
     }
 
@@ -712,6 +737,87 @@ class NativeTemplateView @JvmOverloads constructor(
      */
     fun setAdManagerCallback(callback: AdLoadCallback) {
         this.callback = callback
+    }
+
+    // =================== WATERFALL METHODS ===================
+
+    private fun resolveAdUnit(logicalName: String): (AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun loadViaWaterfall(context: Context, adUnitId: String, callback: AdLoadCallback?) {
+        val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainer
+        val adPlaceholder: FrameLayout = binding.flAdPlaceholder
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            shimmerFrameLayout.visibility = GONE
+            callback?.onFailedToLoad(
+                AdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN)
+            )
+            return
+        }
+
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context)
+
+        val waterfall = NativeWaterfall(
+            providers = AdProviderConfig.getNativeChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+        nativeWaterfall = waterfall
+
+        waterfall.load(context, callback = object : NativeAdProvider.NativeAdCallback {
+            override fun onNativeAdLoaded(adView: android.view.View, nativeAdRef: Any) {
+                waterfallNativeAdRef = nativeAdRef
+
+                // AdMob returns raw NativeAd — use existing template layout and population logic
+                if (nativeAdRef is NativeAd) {
+                    displayAd(nativeAdRef)
+                } else {
+                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view
+                    adPlaceholder.removeAllViews()
+                    val parent = adView.parent as? android.view.ViewGroup
+                    parent?.removeView(adView)
+                    adPlaceholder.addView(adView)
+                    binding.root.visibility = VISIBLE
+                    adPlaceholder.visibility = VISIBLE
+                    shimmerFrameLayout.visibility = GONE
+                }
+
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "NativeTemplateView (${currentTemplate.name}) waterfall loaded", true)
+                callback?.onAdLoaded()
+            }
+
+            override fun onNativeAdFailedToLoad(error: AdKitAdError) {
+                nativeWaterfall = null
+                adPlaceholder.visibility = GONE
+                shimmerFrameLayout.visibility = GONE
+
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeTemplateView (${currentTemplate.name}) waterfall failed: ${error.message}", false)
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", error.code.toString())
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                callback?.onFailedToLoad(AdError(error.code, error.message, error.domain))
+            }
+
+            override fun onNativeAdClicked() { callback?.onAdClicked() }
+            override fun onNativeAdImpression() {
+                val params = Bundle().apply { putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId) }
+                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                callback?.onAdImpression()
+            }
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
+            }
+        }, sizeHint = getNativeAdSizeForTemplate())
     }
 
     /**

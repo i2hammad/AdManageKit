@@ -261,6 +261,9 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.7'
 
 // For Jetpack Compose support
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.7'
+
+// For Yandex Ads multi-provider support
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.7'
 ```
 
 </td>
@@ -327,10 +330,19 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4
 - UMP consent management (GDPR/CCPA)
 - Automatic ad hiding for purchased users
 
+### Multi-Provider Waterfall (New)
+- **Multiple Ad Networks**: Load ads from AdMob, Yandex, and more with automatic fallback
+- **Zero Code Changes**: Configure provider chains once; all existing API calls use waterfall automatically
+- **Per-Ad-Type Chains**: Configure different provider orders for each ad format
+- **Region-Based**: Prioritize providers by user locale (e.g., Yandex first for Russia)
+- [View Waterfall Documentation](docs/MULTI_PROVIDER_WATERFALL.md)
+- [Yandex Integration Guide](docs/YANDEX_INTEGRATION.md)
+
 ### Multi-Module Architecture
 - **Core Module**: Shared interfaces and configuration
 - **Compose Module**: Jetpack Compose integration
 - **Billing Module**: Google Play Billing Library v8
+- **Yandex Module**: Yandex Ads SDK provider
 
 ---
 
@@ -372,6 +384,33 @@ class MyApp : Application() {
     }
 }
 ```
+
+### Multi-Provider Waterfall (Optional)
+
+Add Yandex (or other providers) as fallback ad networks with zero changes to your existing ad loading code:
+
+```groovy
+// Add Yandex module
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.7'
+```
+
+```kotlin
+// In Application.onCreate(), after AdManageKitConfig setup:
+YandexProviderRegistration.initialize(this)
+val admob = AdMobProviderRegistration.create()
+val yandex = YandexProviderRegistration.create()
+
+// Map your AdMob ad unit IDs to Yandex equivalents
+AdUnitMapping.register("ca-app-pub-xxx/your-interstitial", mapOf("yandex" to "R-M-XXXXXX-Y"))
+AdUnitMapping.register("ca-app-pub-xxx/your-native", mapOf("yandex" to "R-M-XXXXXX-Y"))
+
+// Set provider chains (order = priority)
+AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
+AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
+// ... same for banner, app open, rewarded
+```
+
+See [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) and [Yandex Integration](docs/YANDEX_INTEGRATION.md) for the full guide.
 
 ### NativeTemplateView (v2.6.0+)
 
@@ -699,6 +738,8 @@ AppPurchase.getInstance().changeSubscription(
 - [Interstitial Ads](docs/interstitial-ads.md)
 - [Rewarded Ads](docs/rewarded-ads.md)
 - [App Open Ads](docs/app-open-ads.md)
+- [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
+- [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
 - [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)
 - [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)
@@ -712,6 +753,8 @@ AppPurchase.getInstance().changeSubscription(
 - [API Reference](docs/API_REFERENCE.md)
 
 ### Wiki
+- [Multi-Provider Waterfall](wiki/Multi-Provider-Waterfall.md)
+- [Yandex Integration](wiki/Yandex-Integration.md)
 - [Rewarded Ads](wiki/Rewarded-Ads.md)
 - [Billing Integration](wiki/Billing-Integration.md)
 - [Purchase Categories](wiki/Purchase-Categories.md)

@@ -28,10 +28,17 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.InterstitialAdProvider
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
+import com.i2hammad.admanagekit.waterfall.InterstitialWaterfall
 import java.util.concurrent.ConcurrentHashMap
 import androidx.core.graphics.drawable.toDrawable
 
@@ -91,6 +98,12 @@ class AdManager() {
 
     // Flag to track if we're currently fetching an ad with dialog displayed
     private var isFetchingWithDialog = false
+
+    // Waterfall support
+    private var interstitialWaterfall: InterstitialWaterfall? = null
+    private var isWaterfallLoading = false
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getInterstitialChain().isNotEmpty()
 
     companion object {
         const val PURCHASED_APP_ERROR_CODE = 1001
@@ -231,6 +244,8 @@ class AdManager() {
     fun loadInterstitialAdForSplash(
         context: Context, adUnitId: String, timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds, callback: AdManagerCallback
     ) {
+        if (useWaterfall) { loadWaterfallForSplash(context, adUnitId, timeoutMillis, callback); return }
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             // User has purchased, no ads should be shown
@@ -360,6 +375,8 @@ class AdManager() {
     }
 
     fun loadInterstitialAd(context: Context, adUnitId: String) {
+        if (useWaterfall) { loadViaWaterfall(context, adUnitId); return }
+
         // Skip loading for premium users - no need to request ads
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -737,6 +754,8 @@ class AdManager() {
      * @param overrideAdUnitId Optional ad unit ID to use instead of the default (used by InterstitialAdBuilder).
      */
     private fun forceShowInterstitialInternal(activity: Activity, callback: AdManagerCallback, overrideAdUnitId: String? = null) {
+        if (useWaterfall) { forceShowWaterfallInternal(activity, callback); return }
+
         // Prevent duplicate requests if dialog is already showing or ad is being fetched/displayed
         if (isFetchingWithDialog || isDisplayingAd) {
             Log.d("AdManager", "Skipping forceShowInterstitialInternal: already fetching or showing (isFetchingWithDialog=$isFetchingWithDialog, isDisplayingAd=$isDisplayingAd)")
@@ -1013,6 +1032,7 @@ class AdManager() {
     fun isReady(): Boolean {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) return false
+        if (useWaterfall) return interstitialWaterfall?.isAdReady() == true
 
         // Check pool first, then legacy single ad
         return adPool.isNotEmpty() || mInterstitialAd != null
@@ -1026,6 +1046,7 @@ class AdManager() {
     fun isReady(adUnitId: String): Boolean {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) return false
+        if (useWaterfall) return interstitialWaterfall?.isAdReady() == true
 
         return adPool.containsKey(adUnitId)
     }
@@ -1034,7 +1055,10 @@ class AdManager() {
      * Get the number of ads currently in the pool.
      * @return Number of ready ads
      */
-    fun getPoolSize(): Int = adPool.size
+    fun getPoolSize(): Int {
+        if (useWaterfall) return if (interstitialWaterfall?.isAdReady() == true) 1 else 0
+        return adPool.size
+    }
 
     /**
      * Get all ad unit IDs that currently have ads ready.
@@ -1168,6 +1192,8 @@ class AdManager() {
     }
 
     private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
+        if (useWaterfall) { showWaterfallAd(activity, callback, reloadAd); return }
+
         if (!isReady()) {
             callback.onNextAction()
             return
@@ -1337,6 +1363,7 @@ class AdManager() {
      * Check if an ad is currently being loaded
      */
     fun isLoading(): Boolean {
+        if (useWaterfall) return isWaterfallLoading
         return isAdLoading
     }
 
@@ -1363,6 +1390,8 @@ class AdManager() {
         timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
         showDialogIfLoading: Boolean = true
     ) {
+        if (useWaterfall) { waterfallShowOrWait(activity, callback, timeoutMillis, showDialogIfLoading); return }
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onNextAction()
@@ -1467,6 +1496,326 @@ class AdManager() {
         }
 
         handler.post(checkRunnable)
+    }
+
+    // =================== WATERFALL HELPERS ===================
+
+    private fun resolveAdUnit(logicalName: String): (com.i2hammad.admanagekit.core.ad.AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun createWaterfall(adUnitId: String): InterstitialWaterfall {
+        return InterstitialWaterfall(
+            providers = AdProviderConfig.getInterstitialChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+    }
+
+    private fun loadViaWaterfall(context: Context, adUnitId: String) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) return
+        if (isWaterfallLoading) return
+        if (interstitialWaterfall?.isAdReady() == true) return
+
+        if (this.adUnitId == null) this.adUnitId = adUnitId
+        initializeFirebase(context)
+        isWaterfallLoading = true
+        isAdLoading = true
+        logAdRequest(adUnitId, "interstitial")
+
+        val waterfall = createWaterfall(adUnitId)
+        interstitialWaterfall = waterfall
+
+        waterfall.load(context, object : InterstitialAdProvider.InterstitialAdCallback {
+            override fun onAdLoaded() {
+                isWaterfallLoading = false
+                isAdLoading = false
+                retryAttempts.remove(adUnitId)
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial waterfall ad loaded", true)
+                logAdFill(adUnitId, "interstitial")
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isWaterfallLoading = false
+                isAdLoading = false
+                interstitialWaterfall = null
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial waterfall failed: ${error.message}", false)
+
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", error.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", error.message)
+                    }
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
+
+                if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
+                    val currentAttempt = retryAttempts[adUnitId] ?: 0
+                    retryAttempts[adUnitId] = currentAttempt + 1
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = currentAttempt,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        loadViaWaterfall(context, adUnitId)
+                    }
+                }
+            }
+        })
+    }
+
+    private fun loadWaterfallForSplash(
+        context: Context,
+        adUnitId: String,
+        timeoutMillis: Long,
+        callback: AdManagerCallback
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) { callback.onNextAction(); return }
+        if (interstitialWaterfall?.isAdReady() == true) {
+            this.adUnitId = adUnitId
+            callback.onNextAction(); callback.onAdLoaded(); return
+        }
+
+        this.adUnitId = adUnitId
+        initializeFirebase(context)
+        isWaterfallLoading = true
+        isAdLoading = true
+        var callbackCalled = false
+
+        val waterfall = createWaterfall(adUnitId)
+        interstitialWaterfall = waterfall
+
+        waterfall.load(context, object : InterstitialAdProvider.InterstitialAdCallback {
+            override fun onAdLoaded() {
+                isWaterfallLoading = false
+                isAdLoading = false
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    callback.onNextAction(); callback.onAdLoaded()
+                }
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isWaterfallLoading = false
+                isAdLoading = false
+                interstitialWaterfall = null
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    callback.onNextAction()
+                    callback.onFailedToLoad(
+                        LoadAdError(error.code, error.message, error.domain, null, null)
+                    )
+                }
+            }
+        })
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!callbackCalled) {
+                callbackCalled = true
+                callback.onNextAction()
+            }
+        }, timeoutMillis)
+    }
+
+    private fun showWaterfallAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
+        val waterfall = interstitialWaterfall
+        if (waterfall == null || !waterfall.isAdReady()) {
+            callback.onNextAction()
+            return
+        }
+
+        waterfall.show(activity, object : InterstitialAdProvider.InterstitialShowCallback {
+            override fun onAdShowed() {
+                isDisplayingAd = true
+                lastAdShowTime = System.currentTimeMillis()
+                adDisplayCount++
+                callback.onAdShowed()
+                logAdImpression(adUnitId ?: "", "interstitial")
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId ?: "")
+                }
+                firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+            }
+
+            override fun onAdDismissed() {
+                isDisplayingAd = false
+                interstitialWaterfall = null
+                callback.onNextAction()
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId ?: "")
+                }
+                firebaseAnalytics.logEvent("ad_dismissed", params)
+                if (reloadAd) {
+                    adUnitId?.let { loadViaWaterfall(activity, it) }
+                }
+            }
+
+            override fun onAdFailedToShow(error: AdKitAdError) {
+                isDisplayingAd = false
+                interstitialWaterfall = null
+                callback.onNextAction()
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId ?: "")
+                    putString("ad_error_code", error.code.toString())
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_show", params)
+                if (reloadAd) {
+                    adUnitId?.let { loadViaWaterfall(activity, it) }
+                }
+            }
+
+            override fun onAdImpression() {}
+            override fun onAdClicked() {}
+
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId ?: "")
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics.logEvent("ad_paid_event", params)
+            }
+        })
+    }
+
+    private fun forceShowWaterfallInternal(activity: Activity, callback: AdManagerCallback) {
+        if (isFetchingWithDialog || isDisplayingAd) { callback.onNextAction(); return }
+        if (currentLoadingDialog?.dialog?.isShowing == true) { callback.onNextAction(); return }
+
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) { callback.onNextAction(); return }
+
+        val currentAdUnitId = adUnitId ?: ""
+        if (currentAdUnitId.isEmpty()) { callback.onNextAction(); return }
+
+        initializeFirebase(activity)
+
+        // Check if waterfall ad is already ready
+        if (interstitialWaterfall?.isAdReady() == true) {
+            val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+            showWaterfallAd(activity, callback, effectiveAutoReload)
+            return
+        }
+
+        isFetchingWithDialog = true
+        val dialogViews = showBeautifulLoadingDialog(activity)
+        val timeoutMillis = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
+        var resolved = false
+        var dialogDismissed = false
+
+        fun dismissDialogOnce(onDismissed: () -> Unit) {
+            Handler(Looper.getMainLooper()).post {
+                isFetchingWithDialog = false
+                if (!dialogDismissed) {
+                    dialogDismissed = true
+                    animateDialogDismissal(dialogViews, onDismissed)
+                } else {
+                    onDismissed()
+                }
+            }
+        }
+
+        val waterfall = createWaterfall(currentAdUnitId)
+        interstitialWaterfall = waterfall
+        isWaterfallLoading = true
+        isAdLoading = true
+
+        waterfall.load(activity, object : InterstitialAdProvider.InterstitialAdCallback {
+            override fun onAdLoaded() {
+                isWaterfallLoading = false
+                isAdLoading = false
+                if (resolved) return
+                resolved = true
+                val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+                dismissDialogOnce {
+                    showWaterfallAd(activity, callback, effectiveAutoReload)
+                }
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isWaterfallLoading = false
+                isAdLoading = false
+                interstitialWaterfall = null
+                if (resolved) return
+                resolved = true
+                dismissDialogOnce { callback.onNextAction() }
+            }
+        })
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!resolved) {
+                resolved = true
+                dismissDialogOnce { callback.onNextAction() }
+            }
+        }, timeoutMillis)
+    }
+
+    private fun waterfallShowOrWait(
+        activity: Activity,
+        callback: AdManagerCallback,
+        timeoutMillis: Long,
+        showDialogIfLoading: Boolean
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) { callback.onNextAction(); return }
+
+        val currentAdUnitId = adUnitId ?: ""
+        if (currentAdUnitId.isEmpty()) { callback.onNextAction(); return }
+
+        val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+
+        when {
+            interstitialWaterfall?.isAdReady() == true -> {
+                showWaterfallAd(activity, callback, effectiveAutoReload)
+            }
+            isWaterfallLoading -> {
+                // Wait for current load with timeout
+                val checkIntervalMs = 100L
+                var elapsedMs = 0L
+                val handler = Handler(Looper.getMainLooper())
+                var dialogViews: LoadingDialogViews? = null
+                if (showDialogIfLoading) {
+                    dialogViews = showBeautifulLoadingDialog(activity)
+                }
+                val checkRunnable = object : Runnable {
+                    override fun run() {
+                        when {
+                            interstitialWaterfall?.isAdReady() == true -> {
+                                if (dialogViews != null) {
+                                    animateDialogDismissal(dialogViews) {
+                                        showWaterfallAd(activity, callback, effectiveAutoReload)
+                                    }
+                                } else {
+                                    showWaterfallAd(activity, callback, effectiveAutoReload)
+                                }
+                            }
+                            elapsedMs >= timeoutMillis -> {
+                                if (dialogViews != null) {
+                                    animateDialogDismissal(dialogViews) { callback.onNextAction() }
+                                } else { callback.onNextAction() }
+                            }
+                            isWaterfallLoading -> {
+                                elapsedMs += checkIntervalMs
+                                handler.postDelayed(this, checkIntervalMs)
+                            }
+                            else -> {
+                                if (dialogViews != null) {
+                                    animateDialogDismissal(dialogViews) { callback.onNextAction() }
+                                } else { callback.onNextAction() }
+                            }
+                        }
+                    }
+                }
+                handler.post(checkRunnable)
+            }
+            else -> {
+                forceShowWaterfallInternal(activity, callback)
+            }
+        }
     }
 
     // =================== FIREBASE ANALYTICS TRACKING ===================

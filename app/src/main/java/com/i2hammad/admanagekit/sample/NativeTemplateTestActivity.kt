@@ -38,8 +38,8 @@ class NativeTemplateTestActivity : AppCompatActivity() {
     private lateinit var flexibleDemo: NativeTemplateView
 
     // Test ad units
-    private val standardAdUnitId = "ca-app-pub-3940256099942544/2247696110" // Test native ad unit
-    private val videoAdUnitId = "ca-app-pub-3940256099942544/1044960115" // Test video native unit
+    private val standardAdUnitId = "ca-app-pub-3940256099942544/2247696110"
+    private val videoAdUnitId = "ca-app-pub-3940256099942544/1044960115"
 
     private val currentAdUnitId: String
         get() = if (switchVideoAd.isChecked) videoAdUnitId else standardAdUnitId

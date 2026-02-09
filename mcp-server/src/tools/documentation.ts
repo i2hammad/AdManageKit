@@ -245,6 +245,10 @@ export function registerDocumentationTools(server: McpServer) {
 - **subscriptions** - Subscription management
 - **subscription-upgrades** - Upgrade/downgrade flows
 
+## Multi-Provider
+- **multi-provider-waterfall** - Waterfall ad loading from multiple networks
+- **yandex-integration** - Yandex Ads SDK provider setup
+
 ## Other
 - **java-usage** - Java (non-Kotlin) usage guide
 

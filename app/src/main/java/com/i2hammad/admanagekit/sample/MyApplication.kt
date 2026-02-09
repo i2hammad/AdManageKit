@@ -11,9 +11,13 @@ import com.i2hammad.admanagekit.billing.BillingPurchaseProvider
 import com.i2hammad.admanagekit.billing.PurchaseItem
 import com.i2hammad.admanagekit.billing.PurchaseListener
 import com.i2hammad.admanagekit.core.NoPurchaseProvider
+import com.i2hammad.admanagekit.admob.provider.AdMobProviderRegistration
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
 import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.i2hammad.admanagekit.yandex.YandexProviderRegistration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 
@@ -31,7 +35,10 @@ class MyApplication : Application() {
         
         // Configure AdManageKit with comprehensive settings
         configureAdManageKit()
-        
+
+        // Initialize multi-provider waterfall system
+        configureMultiProvider()
+
         initBilling()
         appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
         appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
@@ -148,6 +155,44 @@ class MyApplication : Application() {
         android.util.Log.d("MyApplication", "AdManageKit configured for TESTING mode with enhanced logging and debug features")
     }
 
+
+    private fun configureMultiProvider() {
+        // Initialize Yandex SDK
+        YandexProviderRegistration.initialize(this)
+
+        // Create provider registrations
+        val admob = AdMobProviderRegistration.create()
+        val yandex = YandexProviderRegistration.create()
+
+        // Register Yandex equivalents keyed by AdMob ad unit ID.
+        // Existing code keeps using AdMob IDs as-is — the waterfall resolver
+        // falls back to the raw ID for AdMob, and looks up the mapping for Yandex.
+        AdUnitMapping.register("ca-app-pub-3940256099942544/1033173712", mapOf(
+            "yandex" to "demo-interstitial-yandex"
+        ))
+        AdUnitMapping.register("ca-app-pub-3940256099942544/9214589741", mapOf(
+            "yandex" to "demo-banner-yandex"
+        ))
+        AdUnitMapping.register("ca-app-pub-3940256099942544/2247696110", mapOf(
+            "yandex" to "demo-native-content-yandex"
+        ))
+        AdUnitMapping.register("ca-app-pub-3940256099942544/1044960115", mapOf(
+            "yandex" to "demo-native-content-yandex"
+        ))
+        AdUnitMapping.register("ca-app-pub-3940256099942544/9257395921", mapOf(
+            "yandex" to "demo-appopenad-yandex"
+        ))
+        AdUnitMapping.register("ca-app-pub-3940256099942544/5224354917", mapOf(
+            "yandex" to "demo-rewarded-yandex"
+        ))
+
+        // Configure provider chains: Yandex first, AdMob fallback
+        AdProviderConfig.setInterstitialChain(listOf(yandex.interstitialProvider, admob.interstitialProvider))
+        AdProviderConfig.setBannerChain(listOf(yandex.bannerProvider, admob.bannerProvider))
+        AdProviderConfig.setNativeChain(listOf(yandex.nativeProvider, admob.nativeProvider))
+        AdProviderConfig.setAppOpenChain(listOf(yandex.appOpenProvider, admob.appOpenProvider))
+        AdProviderConfig.setRewardedChain(listOf(yandex.rewardedProvider, admob.rewardedProvider))
+    }
 
     private fun initBilling() {
 

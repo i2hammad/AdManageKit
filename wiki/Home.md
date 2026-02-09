@@ -124,6 +124,10 @@ class MyApp : Application() {
 - [[Configuration]] - Complete AdManageKitConfig reference
 - [[Jetpack Compose]] - Compose integration and helpers
 
+### Multi-Provider Ads
+- [[Multi-Provider Waterfall]] - Load ads from multiple networks with automatic fallback
+- [[Yandex Integration]] - Yandex Ads SDK provider setup and configuration
+
 ## Sample Project
 
 The `app` module demonstrates all features. To run:

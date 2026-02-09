@@ -12,7 +12,7 @@
 - `./gradlew assembleDebug` builds the sample app for quick validation.
 - `./gradlew :AdManageKit:assembleRelease` (or module-specific `:admanagekit-*:assembleRelease`) produces AARs under `*/build/outputs/aar/`.
 - `./gradlew buildRelease` runs all release builds plus Dokka multi-module docs in one step.
-- `./gradlew dokkaHtmlMultiModule` regenerates API docs locally (output in `build/dokka/htmlMultiModule`).
+- `./gradlew dokkaGenerateHtml` regenerates API docs locally (output in `build/dokka/html`).
 - `./gradlew test` runs JVM unit tests; `./gradlew connectedAndroidTest` runs device/emulator tests per module.
 
 ## Coding Style & Naming Conventions

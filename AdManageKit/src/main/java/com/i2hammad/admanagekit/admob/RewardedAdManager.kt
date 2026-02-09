@@ -16,8 +16,15 @@ import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.RewardedAdProvider
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
+import com.i2hammad.admanagekit.waterfall.RewardedWaterfall
 
 /**
  * RewardedAdManager is a singleton class responsible for managing rewarded ads
@@ -61,6 +68,11 @@ object RewardedAdManager {
 
     // Retry tracking
     private var retryAttempts: Int = 0
+
+    // Waterfall support
+    private var rewardedWaterfall: RewardedWaterfall? = null
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getRewardedChain().isNotEmpty()
 
     // Analytics counters
     private var sessionAdRequests = 0
@@ -154,6 +166,8 @@ object RewardedAdManager {
      * @param context The context
      */
     fun loadRewardedAd(context: Context) {
+        if (useWaterfall) { loadViaWaterfall(context); return }
+
         // Guard: Skip loading for premium users
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -239,6 +253,8 @@ object RewardedAdManager {
      * @param callback Callback for load events
      */
     fun loadRewardedAd(context: Context, callback: OnRewardedAdLoadCallback) {
+        if (useWaterfall) { loadViaWaterfall(context, callback); return }
+
         // Guard: Skip loading for premium users
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -314,6 +330,8 @@ object RewardedAdManager {
         timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
         callback: OnRewardedAdLoadCallback
     ) {
+        if (useWaterfall) { loadViaWaterfallWithTimeout(context, timeoutMillis, callback); return }
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onAdFailedToLoad(
@@ -417,6 +435,8 @@ object RewardedAdManager {
         callback: RewardedAdCallback,
         autoReload: Boolean = AdManageKitConfig.rewardedAutoReload
     ) {
+        if (useWaterfall) { showViaWaterfall(activity, callback, autoReload); return }
+
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             AdDebugUtils.logEvent(adUnitId, "skipShow", "Skipping ad show - user is premium", true)
@@ -560,7 +580,9 @@ object RewardedAdManager {
      */
     fun isAdLoaded(): Boolean {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
-        return rewardedAd != null && !purchaseProvider.isPurchased()
+        if (purchaseProvider.isPurchased()) return false
+        if (useWaterfall) return rewardedWaterfall?.isAdReady() == true
+        return rewardedAd != null
     }
 
     /**
@@ -590,7 +612,7 @@ object RewardedAdManager {
     fun preload(context: Context) {
         if (!isAdLoaded() && !isLoading) {
             AdDebugUtils.logEvent(adUnitId, "preload", "Preloading rewarded ad", true)
-            loadRewardedAd(context)
+            if (useWaterfall) { loadViaWaterfall(context) } else { loadRewardedAd(context) }
         }
     }
 
@@ -627,6 +649,264 @@ object RewardedAdManager {
         sessionAdRequests = 0
         sessionAdFills = 0
         sessionAdImpressions = 0
+    }
+
+    // =================== WATERFALL HELPERS ===================
+
+    private fun resolveAdUnit(logicalName: String): (AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun createWaterfall(): RewardedWaterfall {
+        return RewardedWaterfall(
+            providers = AdProviderConfig.getRewardedChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+    }
+
+    private fun loadViaWaterfall(context: Context) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            AdDebugUtils.logEvent(adUnitId, "skipLoad", "Skipping waterfall load - user is premium", true)
+            return
+        }
+        if (isLoading) return
+        if (rewardedWaterfall?.isAdReady() == true) return
+
+        isLoading = true
+        initializeFirebase(context)
+        logAdRequest()
+
+        val waterfall = createWaterfall()
+        rewardedWaterfall = waterfall
+
+        waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
+            override fun onAdLoaded() {
+                isLoading = false
+                retryAttempts = 0
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded", true)
+                logAdFill()
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isLoading = false
+                rewardedWaterfall = null
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded waterfall failed: ${error.message}", false)
+
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", "${error.code}")
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", error.message)
+                    }
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+
+                if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
+                    retryAttempts++
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = retryAttempts - 1,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        loadViaWaterfall(context)
+                    }
+                }
+            }
+        })
+    }
+
+    private fun loadViaWaterfall(context: Context, callback: OnRewardedAdLoadCallback) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onAdFailedToLoad(
+                LoadAdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN, null, null)
+            )
+            return
+        }
+        if (isLoading) return
+        if (rewardedWaterfall?.isAdReady() == true) { callback.onAdLoaded(); return }
+
+        isLoading = true
+        initializeFirebase(context)
+        logAdRequest()
+
+        val waterfall = createWaterfall()
+        rewardedWaterfall = waterfall
+
+        waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
+            override fun onAdLoaded() {
+                isLoading = false
+                retryAttempts = 0
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded with callback", true)
+                logAdFill()
+                callback.onAdLoaded()
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isLoading = false
+                rewardedWaterfall = null
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded waterfall failed: ${error.message}", false)
+
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", "${error.code}")
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+
+                callback.onAdFailedToLoad(
+                    LoadAdError(error.code, error.message, error.domain, null, null)
+                )
+            }
+        })
+    }
+
+    private fun loadViaWaterfallWithTimeout(
+        context: Context,
+        timeoutMillis: Long,
+        callback: OnRewardedAdLoadCallback
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onAdFailedToLoad(
+                LoadAdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN, null, null)
+            )
+            return
+        }
+        if (rewardedWaterfall?.isAdReady() == true) { callback.onAdLoaded(); return }
+
+        isLoading = true
+        initializeFirebase(context)
+        logAdRequest()
+
+        var callbackCalled = false
+
+        val waterfall = createWaterfall()
+        rewardedWaterfall = waterfall
+
+        waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
+            override fun onAdLoaded() {
+                isLoading = false
+                retryAttempts = 0
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    logAdFill()
+                    callback.onAdLoaded()
+                }
+            }
+
+            override fun onAdFailedToLoad(error: AdKitAdError) {
+                isLoading = false
+                rewardedWaterfall = null
+                if (!callbackCalled) {
+                    callbackCalled = true
+                    callback.onAdFailedToLoad(
+                        LoadAdError(error.code, error.message, error.domain, null, null)
+                    )
+                }
+            }
+        })
+
+        Handler(Looper.getMainLooper()).postDelayed({
+            if (!callbackCalled && isLoading) {
+                callbackCalled = true
+                isLoading = false
+                callback.onAdFailedToLoad(
+                    LoadAdError(-1, "Ad loading timed out", "com.i2hammad.admanagekit", null, null)
+                )
+            }
+        }, timeoutMillis)
+    }
+
+    private fun showViaWaterfall(
+        activity: Activity,
+        callback: RewardedAdCallback,
+        autoReload: Boolean
+    ) {
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            callback.onAdDismissed()
+            return
+        }
+
+        val waterfall = rewardedWaterfall
+        if (waterfall == null || !waterfall.isAdReady()) {
+            loadViaWaterfall(activity)
+            callback.onAdDismissed()
+            return
+        }
+
+        waterfall.show(activity, object : RewardedAdProvider.RewardedShowCallback {
+            override fun onAdShowed() {
+                isShowingAd = true
+                AdDebugUtils.logEvent(adUnitId, "onAdShowed", "Rewarded waterfall ad showing", true)
+                logAdImpression()
+                callback.onAdShowed()
+            }
+
+            override fun onAdDismissed() {
+                isShowingAd = false
+                rewardedWaterfall = null
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics?.logEvent("ad_dismissed", params)
+                if (autoReload) {
+                    loadViaWaterfall(activity)
+                }
+                callback.onAdDismissed()
+            }
+
+            override fun onAdFailedToShow(error: AdKitAdError) {
+                isShowingAd = false
+                rewardedWaterfall = null
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", "${error.code}")
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_show", params)
+                if (autoReload) {
+                    loadViaWaterfall(activity)
+                }
+                callback.onAdFailedToShow(
+                    com.google.android.gms.ads.AdError(error.code, error.message, error.domain)
+                )
+                callback.onAdDismissed()
+            }
+
+            override fun onAdClicked() {
+                callback.onAdClicked()
+            }
+
+            override fun onAdImpression() {
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+            }
+
+            override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
+                AdDebugUtils.logEvent(adUnitId, "onRewardEarned", "Waterfall reward: $rewardAmount $rewardType", true)
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("reward_type", rewardType)
+                    putInt("reward_amount", rewardAmount)
+                }
+                firebaseAnalytics?.logEvent("rewarded_ad_reward", params)
+                callback.onRewardEarned(rewardType, rewardAmount)
+            }
+
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
+            }
+        })
     }
 
     // =================== PRIVATE HELPERS ===================

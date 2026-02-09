@@ -64,6 +64,12 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Setup button to open Waterfall Ad Test
+        findViewById<Button>(R.id.btnOpenWaterfallTest).setOnClickListener {
+            val intent = Intent(this, WaterfallTestActivity::class.java)
+            startActivity(intent)
+        }
+
         loadAds()
 
 
@@ -71,6 +77,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun loadAds() {
+        // Use logical name for waterfall resolution (maps to provider-specific IDs via AdUnitMapping)
         val adUnitId = "ca-app-pub-3940256099942544/2247696110"
 
         // =================== EXAMPLE 1: Using Global Strategy (from AdManageKitConfig) ===================

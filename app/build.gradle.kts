@@ -42,6 +42,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(project(":AdManageKit"))
     implementation(project(":admanagekit-billing"))
+    implementation(project(":admanagekit-yandex"))
     implementation(libs.androidx.work.runtime)
 //    implementation(libs.play.services.ads)
 }

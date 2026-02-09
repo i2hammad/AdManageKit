@@ -20,8 +20,16 @@ import com.google.android.gms.ads.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.NativeAdProvider
+import com.i2hammad.admanagekit.core.ad.NativeAdSize
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
+import com.i2hammad.admanagekit.waterfall.NativeWaterfall
 import com.i2hammad.admanagekit.databinding.LayoutNativeBannerMediumPreviewBinding
 
 class NativeBannerMedium @JvmOverloads constructor(
@@ -33,6 +41,12 @@ class NativeBannerMedium @JvmOverloads constructor(
     private var adUnitId: String = "unknown"
     private var firebaseAnalytics: FirebaseAnalytics? = null
     var callback: AdLoadCallback? = null
+
+    // Waterfall support
+    private var nativeWaterfall: NativeWaterfall? = null
+    private var waterfallNativeAdRef: Any? = null
+    private val useWaterfall: Boolean
+        get() = AdProviderConfig.getNativeChain().isNotEmpty()
 
     // =================== DEPRECATED METHODS (use loadingStrategy instead) ===================
 
@@ -110,6 +124,9 @@ class NativeBannerMedium @JvmOverloads constructor(
         loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
+
+        if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
+
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
         val purchaseProvider = BillingConfig.getPurchaseProvider()
 
@@ -310,6 +327,87 @@ class NativeBannerMedium @JvmOverloads constructor(
         })
 
         builder.build().loadAd(AdRequest.Builder().build())
+    }
+
+    // =================== WATERFALL METHODS ===================
+
+    private fun resolveAdUnit(logicalName: String): (com.i2hammad.admanagekit.core.ad.AdProvider) -> String? = { provider ->
+        AdUnitMapping.getAdUnitId(logicalName, provider)
+            ?: logicalName.takeIf { provider == AdProvider.ADMOB }
+    }
+
+    private fun loadViaWaterfall(context: Context, adUnitId: String, callback: AdLoadCallback?) {
+        val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainerNative
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            shimmerFrameLayout.visibility = View.GONE
+            callback?.onFailedToLoad(
+                AdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN)
+            )
+            return
+        }
+
+        firebaseAnalytics = FirebaseAnalytics.getInstance(context)
+        val adPlaceholder: FrameLayout = binding.flAdplaceholder
+
+        val waterfall = NativeWaterfall(
+            providers = AdProviderConfig.getNativeChain(),
+            adUnitResolver = resolveAdUnit(adUnitId)
+        )
+        nativeWaterfall = waterfall
+
+        waterfall.load(context, callback = object : NativeAdProvider.NativeAdCallback {
+            override fun onNativeAdLoaded(adView: android.view.View, nativeAdRef: Any) {
+                waterfallNativeAdRef = nativeAdRef
+
+                // AdMob returns raw NativeAd — use existing layout and population logic
+                if (nativeAdRef is NativeAd) {
+                    displayAd(nativeAdRef)
+                } else {
+                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view
+                    adPlaceholder.removeAllViews()
+                    val parent = adView.parent as? android.view.ViewGroup
+                    parent?.removeView(adView)
+                    adPlaceholder.addView(adView)
+                    binding.root.visibility = View.VISIBLE
+                    adPlaceholder.visibility = View.VISIBLE
+                    shimmerFrameLayout.visibility = View.GONE
+                }
+
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "NativeBannerMedium waterfall loaded", true)
+                callback?.onAdLoaded()
+            }
+
+            override fun onNativeAdFailedToLoad(error: AdKitAdError) {
+                nativeWaterfall = null
+                adPlaceholder.visibility = View.GONE
+                shimmerFrameLayout.visibility = View.GONE
+
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeBannerMedium waterfall failed: ${error.message}", false)
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", error.code.toString())
+                }
+                firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                callback?.onFailedToLoad(AdError(error.code, error.message, error.domain))
+            }
+
+            override fun onNativeAdClicked() { callback?.onAdClicked() }
+            override fun onNativeAdImpression() {
+                val params = Bundle().apply { putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId) }
+                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                callback?.onAdImpression()
+            }
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
+            }
+        }, sizeHint = NativeAdSize.MEDIUM)
     }
 
     fun setAdManagerCallback(callback: AdLoadCallback) {
