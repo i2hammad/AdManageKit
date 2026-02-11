@@ -546,6 +546,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             isFetchingWithDialog = false
             animateDialogDismissal(dialogViews) {
                 Log.e(LOG_TAG, "App open ad load timed out")
+                callback?.onAdTimedOut()
                 callback?.onNextAction()
             }
         }
@@ -602,6 +603,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             isFetchingWithDialog = false
                             logFailedToLoadEvent(error)
                             animateDialogDismissal(dialogViews) {
+                                callback?.onFailedToLoad(error)
                                 callback?.onNextAction()
                             }
                         }
@@ -1098,6 +1100,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             hasTimedOut = true
             isFetchingWithDialog = false
             animateDialogDismissal(dialogViews) {
+                callback?.onAdTimedOut()
                 callback?.onNextAction()
             }
         }
@@ -1137,8 +1140,10 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         isFetchingWithDialog = false
-                        logFailedToLoadEvent(AdError(error.code, error.message, error.domain))
+                        val adError = AdError(error.code, error.message, error.domain)
+                        logFailedToLoadEvent(adError)
                         animateDialogDismissal(dialogViews) {
+                            callback?.onFailedToLoad(adError)
                             callback?.onNextAction()
                         }
                     }

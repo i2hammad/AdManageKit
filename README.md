@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.8`** introduces multi-ad-provider waterfall mediation with Yandex Ads support, allowing automatic fallback across ad networks with zero changes to existing code.
+**Latest Version `3.3.9`** brings app open ad callback improvements, adaptive full-width banners in waterfall, and collapsible banner support for multi-provider chains.
 
 ---
 
@@ -54,12 +54,31 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.8) |
+| Production apps (stable) | **Main branch** (v3.3.9) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
+
+## What's New in 3.3.9
+
+### App Open Ad Callback Improvements
+- **New `onAdTimedOut()` callback**: Dedicated event when ad load exceeds timeout (separate from `onFailedToLoad`)
+- **`onFailedToLoad()` now fires**: Previously never called for app open ads with dialog; now fires correctly for both AdMob and waterfall paths
+- **Dialog-first guarantee**: Welcome dialog is always dismissed before any callback fires
+
+```kotlin
+appOpenManager.forceShowAdIfAvailable(activity, object : AdManagerCallback() {
+    override fun onAdTimedOut() { /* timeout-specific handling */ }
+    override fun onFailedToLoad(error: AdKitError?) { /* load failure handling */ }
+    override fun onNextAction() { navigateNext() }
+})
+```
+
+### Adaptive Full-Width Banner in Waterfall
+- **Fixed**: Banner ads via waterfall now use adaptive full-width sizing (was fixed 320x50dp)
+- **Collapsible support**: Collapsible banner settings now pass through waterfall to AdMob providers
 
 ## What's New in 3.3.8
 
@@ -273,15 +292,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.9'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.9'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.9'
 ```
 
 </td>
@@ -409,7 +428,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.9'
 ```
 
 ```kotlin
@@ -759,6 +778,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.3.9](docs/release-notes/RELEASE_NOTES_v3.3.9.md)
 - [Release Notes v3.3.8](docs/release-notes/RELEASE_NOTES_v3.3.8.md)
 - [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)
 - [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)

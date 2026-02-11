@@ -36,4 +36,11 @@ abstract class AdManagerCallback {
     open fun onAdShowed() {
         // Default implementation
     }
+
+    /**
+     * Called when the ad load timed out before an ad could be loaded.
+     */
+    open fun onAdTimedOut() {
+        // Default implementation
+    }
 }

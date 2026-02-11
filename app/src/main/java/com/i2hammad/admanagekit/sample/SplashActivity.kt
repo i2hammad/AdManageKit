@@ -175,6 +175,8 @@ class SplashActivity : AppCompatActivity() {
             object : AdManagerCallback() {
                 override fun onNextAction() {
                     super.onNextAction()
+                    Log.d("SplashActivity", "onNext Called")
+
                     if (!AppOpenManager.isShowingAd()){
                         Log.d("SplashActivity", "showAppOpenAd: App open ad shown or dismissed")
                         statusTextView.text = "App open ad completed."

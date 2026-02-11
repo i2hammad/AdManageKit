@@ -32,11 +32,11 @@ class AdMobProviderRegistration private constructor(
         /**
          * Create an AdMob provider registration with all ad types.
          *
-         * @param bannerAdSize AdMob banner size (default: BANNER)
+         * @param bannerAdSize AdMob banner size, or null for adaptive full-width banner (default).
          */
         @JvmStatic
         @JvmOverloads
-        fun create(bannerAdSize: AdSize = AdSize.BANNER): AdMobProviderRegistration {
+        fun create(bannerAdSize: AdSize? = null): AdMobProviderRegistration {
             return AdMobProviderRegistration(
                 interstitialProvider = AdMobInterstitialProvider(),
                 bannerProvider = AdMobBannerProvider(bannerAdSize),

@@ -190,7 +190,7 @@ class BannerAdView @JvmOverloads constructor(
         placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
         callback: AdLoadCallback? = null
     ) {
-        if (useWaterfall) { loadBannerViaWaterfall(adUnitId, callback); return }
+        if (useWaterfall) { loadBannerViaWaterfall(adUnitId, collapsible, placement, callback); return }
 
         // Prevent concurrent loads
         if (!isAdLoading.compareAndSet(false, true)) {
@@ -491,7 +491,12 @@ class BannerAdView @JvmOverloads constructor(
             ?: logicalName.takeIf { provider == AdProvider.ADMOB }
     }
 
-    private fun loadBannerViaWaterfall(adUnitId: String, callback: AdLoadCallback?) {
+    private fun loadBannerViaWaterfall(
+        adUnitId: String,
+        collapsible: Boolean = false,
+        placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
+        callback: AdLoadCallback?
+    ) {
         if (!isAdLoading.compareAndSet(false, true)) return
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -515,13 +520,22 @@ class BannerAdView @JvmOverloads constructor(
         loadStartTime = System.currentTimeMillis()
 
         bannerWaterfall?.destroy()
+        val providers = AdProviderConfig.getBannerChain()
+
+        // Configure collapsible on AdMob providers before loading
+        providers.filterIsInstance<com.i2hammad.admanagekit.admob.provider.AdMobBannerProvider>()
+            .forEach {
+                it.collapsible = collapsible
+                it.collapsiblePlacement = placement
+            }
+
         val waterfall = BannerWaterfall(
-            providers = AdProviderConfig.getBannerChain(),
+            providers = providers,
             adUnitResolver = resolveAdUnit(adUnitId)
         )
         bannerWaterfall = waterfall
 
-        waterfall.load(context, object : BannerAdProvider.BannerAdCallback {
+        waterfall.load(activityRef?.get() ?: context, object : BannerAdProvider.BannerAdCallback {
             override fun onBannerLoaded(bannerView: View) {
                 ensureMainThread {
                     layBannerAd.removeAllViews()
