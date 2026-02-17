@@ -5,6 +5,55 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] - 2026-02-17
+
+### Fixed
+- **App Open Splash Show Rate (~50% miss)**: `forceShowAdIfAvailable()` now correctly takes over a dialog-based fetch already started by `onStart()`'s automatic `showAdIfAvailable()`, instead of firing `onNextAction()` prematurely via the dialog guard
+- **`showAdIfAvailable()` no longer races against `forceShowAdIfAvailable()`**: Added `isFetchingWithDialog` guard so the lifecycle-driven auto-show path skips when a splash fetch is already in progress
+- **Native Large Ad Tablet Layout**: `layout_native_large.xml` (sw600dp) container changed from `LinearLayout` to `FrameLayout`, fixing layout rendering issues on tablet screens
+
+### Changed
+- `dialogFetchCallback` field added to `AppOpenManager` — the active dialog fetch callback is now replaceable, allowing `forceShowAdIfAvailable()` to attach to an already-running fetch
+- Stable release consolidating multi-provider waterfall (3.3.8) and app open ad callback improvements (3.3.9)
+
+## [3.3.9] - 2026-02-10
+
+### Fixed
+- **App Open Ad Callbacks**: `AdManagerCallback.onFailedToLoad()` now fires correctly for app open ad failures (previously never called when a dialog was showing)
+- **Dialog-first guarantee**: Welcome dialog is always dismissed before `onFailedToLoad`, `onAdTimedOut`, or `onNextAction` callbacks fire
+- **Waterfall Banner Sizing**: Banner ads via waterfall now use adaptive full-width sizing (was fixed 320×50dp)
+- **Collapsible Banner Passthrough**: Collapsible banner settings now pass through waterfall to `AdMobBannerProvider`
+
+### Added
+- **`onAdTimedOut()` callback**: New dedicated `AdManagerCallback` event when app open ad load exceeds timeout duration (distinct from `onFailedToLoad`)
+
+### Changed
+- `AdMobBannerProvider` default ad size changed from `AdSize.BANNER` (fixed 320×50dp) to adaptive full-width
+- `AdMobProviderRegistration.create()` default `bannerAdSize` parameter changed from `AdSize.BANNER` to `null` (adaptive)
+
+## [3.3.8] - 2026-01-20
+
+### Added
+- **Multi-Ad-Provider Architecture**: New core interfaces (`InterstitialAdProvider`, `AppOpenAdProvider`, `BannerAdProvider`, `NativeAdProvider`, `RewardedAdProvider`) in `admanagekit-core` with zero external dependencies
+- **Waterfall Mediation**: Automatic fallback across ad networks for all ad types (interstitial, app open, banner, native, rewarded)
+- **Yandex Ads Module**: New `admanagekit-yandex` module with full Yandex Mobile Ads SDK integration
+- **`AdProviderConfig`**: Centralized provider registry and chain configuration
+- **`AdMobProviderRegistration` / `YandexProviderRegistration`**: Registration helpers for easy provider setup
+
+### Changed
+- All existing `AdManager`, `AppOpenManager`, `BannerAdView` calls automatically use the waterfall when providers are registered
+- No changes required to existing AdMob-only code (fully backward compatible)
+
+## [3.3.7] - 2026-01-10
+
+### Added
+- **Welcome Dialog for Cached App Open Ads**: Cached app open ads now display the welcome back dialog before showing
+- **`appOpenFetchFreshAd` config**: Controls whether app open ads are prefetched on background (`false`, default) or fetched fresh on foreground (`true`)
+
+### Changed
+- `NativeAdManager.enableCachingNativeAds` now defaults to `false`
+- `AdManageKitConfig.autoRetryFailedAds` now defaults to `false`
+
 ## [3.3.6] - 2025-01-29
 
 ### Added

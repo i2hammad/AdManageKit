@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.3.9`** brings app open ad callback improvements, adaptive full-width banners in waterfall, and collapsible banner support for multi-provider chains.
+**Latest Version `3.4.0`** fixes a ~50% app open splash ad show-rate miss, the native large ad tablet layout, and stabilizes the multi-provider waterfall with Yandex Ads integration.
 
 ---
 
@@ -54,10 +54,23 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.3.9) |
+| Production apps (stable) | **Main branch** (v3.4.0) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
+
+---
+
+## What's New in 3.4.0
+
+### App Open Splash Ad Show Rate Fix
+- **Fixed ~50% show-rate miss**: `forceShowAdIfAvailable()` now takes over an in-progress dialog fetch (started by `onStart()`'s `showAdIfAvailable()`) instead of triggering the dialog guard and firing `onNextAction()` prematurely
+- **`showAdIfAvailable()` guarded**: Lifecycle-driven auto-show now skips if a `forceShowAdIfAvailable()` fetch is already in progress (`isFetchingWithDialog` check)
+- No API changes required
+
+### Native Large Ad Tablet Layout Fix
+- **Fixed**: `layout_native_large.xml` (sw600dp) container changed from `LinearLayout` to `FrameLayout`, preventing layout rendering issues on tablet screens (600dp+)
+- **Stable release**: Consolidates all improvements from 3.3.8 and 3.3.9 including multi-provider waterfall, Yandex Ads, and app open ad callback improvements
 
 ---
 
@@ -292,15 +305,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.3.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.3.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.0'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.0'
 ```
 
 </td>
@@ -428,7 +441,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.3.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.0'
 ```
 
 ```kotlin
@@ -778,6 +791,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.0](docs/release-notes/RELEASE_NOTES_v3.4.0.md)
 - [Release Notes v3.3.9](docs/release-notes/RELEASE_NOTES_v3.3.9.md)
 - [Release Notes v3.3.8](docs/release-notes/RELEASE_NOTES_v3.3.8.md)
 - [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)

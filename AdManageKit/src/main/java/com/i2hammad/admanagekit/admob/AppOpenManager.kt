@@ -152,6 +152,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private var isFetchingWithDialog = false
 
     /**
+     * The callback attached to the current dialog-based fetch.
+     * Updated via forceShowAdIfAvailable() so a later caller can take over
+     * an already-in-progress load (e.g. onStart's showAdIfAvailable vs. splash onResume).
+     */
+    private var dialogFetchCallback: AdManagerCallback? = null
+
+    /**
      * Get themed context for dialog inflation.
      * Uses activity's theme if it has Material attributes (preserves app colors),
      * otherwise wraps with Material3 as fallback for non-Material themes.
@@ -354,6 +361,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * Shows the ad if one isn't already showing.
      */
     fun showAdIfAvailable() {
+        // Skip if a dialog-based fetch is already in progress (e.g. forceShowAdIfAvailable
+        // started a load from onCreate before onStart's automatic call runs).
+        if (isFetchingWithDialog) {
+            Log.d(LOG_TAG, "showAdIfAvailable: skipping - dialog fetch already in progress")
+            return
+        }
         // Check if user has purchased to remove ads
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -537,6 +550,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
         // Reset flag (in case stuck from previous interrupted fetch) and set for this fetch
         isFetchingWithDialog = true
+        dialogFetchCallback = callback
         val dialogViews = showWelcomeBackDialog(activity)
         val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
 
@@ -544,10 +558,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val timeoutRunnable = scheduleTimeout(timeoutMillis) {
             hasTimedOut = true
             isFetchingWithDialog = false
+            val timedOutCallback = dialogFetchCallback
+            dialogFetchCallback = null
             animateDialogDismissal(dialogViews) {
                 Log.e(LOG_TAG, "App open ad load timed out")
-                callback?.onAdTimedOut()
-                callback?.onNextAction()
+                timedOutCallback?.onAdTimedOut()
+                timedOutCallback?.onNextAction()
             }
         }
 
@@ -562,6 +578,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         if (!hasTimedOut) {
                             cancelTimeout(timeoutRunnable)
                             isFetchingWithDialog = false
+                            val loadedCallback = dialogFetchCallback
+                            dialogFetchCallback = null
                             appOpenAd = ad
                             adLoadTime = System.currentTimeMillis()
 
@@ -572,7 +590,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                                 // App is in background - save ad for later, dismiss dialog
                                 Log.d(LOG_TAG, "App in background, saving ad for when user returns")
                                 pendingAdToShow.set(true)
-                                pendingAdCallback = callback
+                                pendingAdCallback = loadedCallback
                                 animateDialogDismissal(dialogViews) {
                                     currentWelcomeDialog = null
                                 }
@@ -585,12 +603,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                             Log.d(LOG_TAG, "Ad loaded, showing on top of welcome dialog")
 
                             if (!activity.isFinishing && !activity.isDestroyed) {
-                                showLoadedAd(activity, callback)
+                                showLoadedAd(activity, loadedCallback)
                             } else {
                                 Log.d(LOG_TAG, "Activity not in valid state after ad load")
                                 dismissWelcomeDialogWithDelay(dialogViews)
                                 currentWelcomeDialog = null
-                                callback?.onNextAction()
+                                loadedCallback?.onNextAction()
                             }
                         }
                     }
@@ -601,10 +619,12 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         if (!hasTimedOut) {
                             cancelTimeout(timeoutRunnable)
                             isFetchingWithDialog = false
+                            val failedCallback = dialogFetchCallback
+                            dialogFetchCallback = null
                             logFailedToLoadEvent(error)
                             animateDialogDismissal(dialogViews) {
-                                callback?.onFailedToLoad(error)
-                                callback?.onNextAction()
+                                failedCallback?.onFailedToLoad(error)
+                                failedCallback?.onNextAction()
                             }
                         }
                     }
@@ -713,7 +733,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             if (!isShowingAd.get() && appOpenWaterfall?.isAdReady() == true) {
                 showWaterfallLoadedAd(activity, adManagerCallback)
             } else if (appOpenWaterfall?.isAdReady() != true) {
-                showWaterfallWithWelcomeDialog(activity, adManagerCallback)
+                if (isFetchingWithDialog) {
+                    // A dialog fetch is already in progress (e.g. started by onStart's
+                    // showAdIfAvailable). Attach our callback so the result reaches the caller.
+                    Log.d(LOG_TAG, "forceShowAdIfAvailable: attaching callback to in-progress waterfall fetch")
+                    dialogFetchCallback = adManagerCallback
+                } else {
+                    showWaterfallWithWelcomeDialog(activity, adManagerCallback)
+                }
             } else {
                 adManagerCallback.onNextAction()
             }
@@ -731,9 +758,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             Log.e(LOG_TAG, "Will show ad (cached).")
             showLoadedAd(activity, adManagerCallback)
         } else if (!isAdAvailable()) {
-            // No cached ad - always show welcome dialog while fetching
-            Log.d(LOG_TAG, "No cached ad, fetching with welcome dialog.")
-            showAdWithWelcomeDialog(activity, adManagerCallback)
+            if (isFetchingWithDialog) {
+                // A dialog fetch is already in progress (e.g. started by onStart's
+                // showAdIfAvailable). Attach our callback so the result reaches the caller.
+                Log.d(LOG_TAG, "forceShowAdIfAvailable: attaching callback to in-progress fetch")
+                dialogFetchCallback = adManagerCallback
+            } else {
+                // No cached ad - always show welcome dialog while fetching
+                Log.d(LOG_TAG, "No cached ad, fetching with welcome dialog.")
+                showAdWithWelcomeDialog(activity, adManagerCallback)
+            }
         } else {
             // Already showing or other condition
             adManagerCallback.onNextAction()
@@ -1092,6 +1126,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         if (activity.isFinishing) { callback?.onNextAction(); return }
 
         isFetchingWithDialog = true
+        dialogFetchCallback = callback
         val dialogViews = showWelcomeBackDialog(activity)
         val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
 
@@ -1099,9 +1134,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val timeoutRunnable = scheduleTimeout(timeoutMillis) {
             hasTimedOut = true
             isFetchingWithDialog = false
+            val timedOutCallback = dialogFetchCallback
+            dialogFetchCallback = null
             animateDialogDismissal(dialogViews) {
-                callback?.onAdTimedOut()
-                callback?.onNextAction()
+                timedOutCallback?.onAdTimedOut()
+                timedOutCallback?.onNextAction()
             }
         }
 
@@ -1114,21 +1151,23 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         isFetchingWithDialog = false
+                        val loadedCallback = dialogFetchCallback
+                        dialogFetchCallback = null
 
                         if (!isAppInForeground.get()) {
                             pendingAdToShow.set(true)
-                            pendingAdCallback = callback
+                            pendingAdCallback = loadedCallback
                             animateDialogDismissal(dialogViews) { currentWelcomeDialog = null }
                             return@post
                         }
 
                         currentWelcomeDialog = dialogViews
                         if (!activity.isFinishing && !activity.isDestroyed) {
-                            showWaterfallLoadedAd(activity, callback)
+                            showWaterfallLoadedAd(activity, loadedCallback)
                         } else {
                             dismissWelcomeDialogWithDelay(dialogViews)
                             currentWelcomeDialog = null
-                            callback?.onNextAction()
+                            loadedCallback?.onNextAction()
                         }
                     }
                 }
@@ -1140,11 +1179,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
                         isFetchingWithDialog = false
+                        val failedCallback = dialogFetchCallback
+                        dialogFetchCallback = null
                         val adError = AdError(error.code, error.message, error.domain)
                         logFailedToLoadEvent(adError)
                         animateDialogDismissal(dialogViews) {
-                            callback?.onFailedToLoad(adError)
-                            callback?.onNextAction()
+                            failedCallback?.onFailedToLoad(adError)
+                            failedCallback?.onNextAction()
                         }
                     }
                 }
