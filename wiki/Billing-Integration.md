@@ -7,8 +7,8 @@ AdManageKit provides a comprehensive billing integration module (`admanagekit-bi
 ### 1. Add Dependency
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.9.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
 ```
 
 ### 2. Define Products
@@ -56,6 +56,16 @@ AppPurchase.getInstance().subscribe(activity, "premium_monthly")
 if (AppPurchase.getInstance().isPurchased()) {
     // User has premium (subscription, lifetime, or remove_ads)
 }
+```
+
+### 6. Product Metadata (v3.4.1+)
+
+```kotlin
+val billing = AppPurchase.getInstance()
+val name = billing.getProductName("premium_monthly")           // "Monthly Premium"
+val description = billing.getProductDescription("premium_monthly")
+val hasTrial = billing.hasFreeTrial("premium_monthly")         // true/false
+val period = billing.getBillingPeriod("premium_monthly")       // "P1M"
 ```
 
 ## Pages

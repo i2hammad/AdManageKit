@@ -22,8 +22,8 @@
 ### 1. Add Dependencies
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.9.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.9.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
 ```
 
 ### 2. Initialize in Application Class
@@ -131,6 +131,47 @@ val result = AppPurchase.getInstance().subscribe(activity, "premium_monthly")
 val price = AppPurchase.getInstance().getPrice("remove_ads")  // "$2.99"
 val subPrice = AppPurchase.getInstance().getPriceSub("premium_monthly")  // "$9.99/month"
 ```
+
+### Product Metadata (v3.4.1+)
+
+Retrieve Play Console localized product information — no local translations needed:
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// Product names (localized by Google based on device language)
+val title = billing.getProductTitle("premium_monthly")        // "Monthly Premium (My App)"
+val name = billing.getProductName("premium_monthly")           // "Monthly Premium"
+val description = billing.getProductDescription("premium_monthly")
+
+// Raw ProductDetails for anything not covered above
+val details = billing.getProductDetails("premium_monthly")
+```
+
+### Free Trial & Billing Period (v3.4.1+)
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// Check for free trial
+if (billing.hasFreeTrial("premium_monthly")) {
+    val trialPeriod = billing.getFreeTrialPeriod("premium_monthly")  // "P7D"
+    showTrialBadge(trialPeriod)
+}
+
+// Get billing cycle
+val period = billing.getBillingPeriod("premium_monthly")  // "P1M", "P1Y", etc.
+```
+
+| Method | Returns | Example |
+|--------|---------|---------|
+| `getProductTitle(id)` | `String?` | `"Monthly Premium (My App)"` |
+| `getProductName(id)` | `String?` | `"Monthly Premium"` |
+| `getProductDescription(id)` | `String?` | `"Unlock all premium features"` |
+| `getProductDetails(id)` | `ProductDetails?` | Raw object |
+| `hasFreeTrial(id)` | `boolean` | `true` / `false` |
+| `getFreeTrialPeriod(id)` | `String?` | `"P7D"` |
+| `getBillingPeriod(id)` | `String?` | `"P1M"` |
 
 ---
 

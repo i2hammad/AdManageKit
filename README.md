@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.0`** fixes a ~50% app open splash ad show-rate miss, the native large ad tablet layout, and stabilizes the multi-provider waterfall with Yandex Ads integration.
+**Latest Version `3.4.1`** adds product metadata APIs, free trial detection, and billing period queries to `AppPurchase` — display Play Console localized product info directly in your UI.
 
 ---
 
@@ -54,12 +54,45 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.0) |
+| Production apps (stable) | **Main branch** (v3.4.1) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
+
+## What's New in 3.4.1
+
+### Product Metadata APIs
+New `AppPurchase` methods expose Play Console localized product information — no need for local translations:
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// Product info (auto-localized by Google)
+val name = billing.getProductName("premium_monthly")          // "Monthly Premium"
+val title = billing.getProductTitle("premium_monthly")         // "Monthly Premium (My App)"
+val description = billing.getProductDescription("premium_monthly")  // "Unlock all features"
+val details = billing.getProductDetails("premium_monthly")     // Raw ProductDetails
+
+// Free trial detection
+if (billing.hasFreeTrial("premium_monthly")) {
+    val trial = billing.getFreeTrialPeriod("premium_monthly")  // "P7D"
+}
+
+// Billing period
+val period = billing.getBillingPeriod("premium_monthly")       // "P1M"
+```
+
+| Method | Returns | Example |
+|--------|---------|---------|
+| `getProductTitle()` | `String?` | `"Monthly Premium (My App)"` |
+| `getProductName()` | `String?` | `"Monthly Premium"` |
+| `getProductDescription()` | `String?` | `"Unlock all premium features"` |
+| `getProductDetails()` | `ProductDetails?` | Raw object |
+| `hasFreeTrial()` | `boolean` | `true` / `false` |
+| `getFreeTrialPeriod()` | `String?` | `"P7D"` |
+| `getBillingPeriod()` | `String?` | `"P1M"` |
 
 ## What's New in 3.4.0
 
@@ -305,15 +338,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.1'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.1'
 ```
 
 </td>
@@ -441,7 +474,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.1'
 ```
 
 ```kotlin
@@ -791,6 +824,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.1](docs/release-notes/RELEASE_NOTES_v3.4.1.md)
 - [Release Notes v3.4.0](docs/release-notes/RELEASE_NOTES_v3.4.0.md)
 - [Release Notes v3.3.9](docs/release-notes/RELEASE_NOTES_v3.3.9.md)
 - [Release Notes v3.3.8](docs/release-notes/RELEASE_NOTES_v3.3.8.md)

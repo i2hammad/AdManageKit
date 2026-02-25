@@ -424,6 +424,17 @@ class AppPurchase {
     fun getPrice(productId: String): String
     fun getCurrency(productId: String, type: TYPE_IAP): String
     fun getPriceWithoutCurrency(productId: String, type: TYPE_IAP): Double
+
+    // Product Metadata (v3.4.1+)
+    fun getProductTitle(productId: String): String?        // Title with app name
+    fun getProductName(productId: String): String?         // Clean name without app name
+    fun getProductDescription(productId: String): String?  // Play Console description
+    fun getProductDetails(productId: String): ProductDetails?  // Raw ProductDetails object
+
+    // Free Trial & Billing Period (v3.4.1+)
+    fun hasFreeTrial(productId: String): Boolean           // Whether subscription has trial
+    fun getFreeTrialPeriod(productId: String): String?     // Trial period (e.g. "P7D")
+    fun getBillingPeriod(productId: String): String?       // Billing cycle (e.g. "P1M")
     
     // State
     val isBillingInitialized: Boolean
@@ -724,6 +735,11 @@ enum class TYPE_IAP {
 
 ## Changelog
 
+### v3.4.1
+- Added product metadata APIs to AppPurchase: `getProductTitle()`, `getProductName()`, `getProductDescription()`, `getProductDetails()`
+- Added free trial detection: `hasFreeTrial()`, `getFreeTrialPeriod()`
+- Added billing period query: `getBillingPeriod()`
+
 ### v2.5.0
 - Removed circuit breaker to maximize ad show rates
 - Added custom ad unit support to AppOpenManager
@@ -731,4 +747,4 @@ enum class TYPE_IAP {
 - Added performance metrics tracking
 - Improved thread safety across all components
 
-This API reference covers all major components of AdManageKit 2.5.0. For more detailed examples and usage patterns, refer to the main README and sample project.
+This API reference covers all major components of AdManageKit. For more detailed examples and usage patterns, refer to the main README and sample project.

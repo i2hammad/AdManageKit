@@ -1441,6 +1441,70 @@ public class AppPurchase {
         return 0.0;
     }
 
+    public String getProductTitle(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) details = inAppProductDetailsMap.get(productId);
+        return details != null ? details.getTitle() : null;
+    }
+
+    public String getProductName(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) details = inAppProductDetailsMap.get(productId);
+        return details != null ? details.getName() : null;
+    }
+
+    public String getProductDescription(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) details = inAppProductDetailsMap.get(productId);
+        return details != null ? details.getDescription() : null;
+    }
+
+    public ProductDetails getProductDetails(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) details = inAppProductDetailsMap.get(productId);
+        return details;
+    }
+
+    public boolean hasFreeTrial(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) return false;
+        List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
+        if (offers == null) return false;
+        for (ProductDetails.SubscriptionOfferDetails offer : offers) {
+            for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
+                if (phase.getPriceAmountMicros() == 0 && phase.getRecurrenceMode() == ProductDetails.RecurrenceMode.FINITE_RECURRING) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public String getFreeTrialPeriod(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) return null;
+        List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
+        if (offers == null) return null;
+        for (ProductDetails.SubscriptionOfferDetails offer : offers) {
+            for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
+                if (phase.getPriceAmountMicros() == 0 && phase.getRecurrenceMode() == ProductDetails.RecurrenceMode.FINITE_RECURRING) {
+                    return phase.getBillingPeriod();
+                }
+            }
+        }
+        return null;
+    }
+
+    public String getBillingPeriod(String productId) {
+        ProductDetails details = subProductDetailsMap.get(productId);
+        if (details == null) return null;
+        List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
+        if (offers == null || offers.isEmpty()) return null;
+        List<ProductDetails.PricingPhase> phases = offers.get(offers.size() - 1).getPricingPhases().getPricingPhaseList();
+        if (phases.isEmpty()) return null;
+        return phases.get(phases.size() - 1).getBillingPeriod();
+    }
+
     public void setDiscount(double discount) {
         this.discount = discount;
     }

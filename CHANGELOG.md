@@ -5,6 +5,19 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.1] - 2026-02-25
+
+### Added
+- **Product Metadata APIs**: New `AppPurchase` methods to retrieve Play Console product information:
+  - `getProductTitle(productId)` — Localized title with app name (e.g. "Monthly Premium (My App)")
+  - `getProductName(productId)` — Clean product name without app name (e.g. "Monthly Premium")
+  - `getProductDescription(productId)` — Product description from Play Console
+  - `getProductDetails(productId)` — Raw `ProductDetails` object for full access
+- **Free Trial Detection**: New methods to check trial offers on subscriptions:
+  - `hasFreeTrial(productId)` — Whether the subscription has a free trial offer
+  - `getFreeTrialPeriod(productId)` — Trial period in ISO 8601 format (e.g. "P3D", "P7D")
+- **Billing Period**: `getBillingPeriod(productId)` — Subscription billing period (e.g. "P1M", "P1Y")
+
 ## [3.4.0] - 2026-02-17
 
 ### Fixed
