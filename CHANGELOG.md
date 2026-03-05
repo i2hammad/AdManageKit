@@ -5,6 +5,19 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.2] - 2026-03-06
+
+### Fixed
+- **App Open Auto-Retry**: `AppOpenManager` now respects `AdManageKitConfig.autoRetryFailedAds` (was always retrying with hardcoded values, ignoring the config flag)
+- **App Open Retry Config**: `AppOpenManager` now uses `AdManageKitConfig.maxRetryAttempts` instead of a hardcoded retry limit, and delegates to `AdRetryManager` for consistent exponential backoff across all ad types
+- **Late-Loading Ad Preservation**: App open ads that load after the timeout has fired are now cached for later use instead of being silently discarded
+
+### Added
+- **Waterfall App Open Retry**: Background waterfall preload (`fetchViaWaterfall()`) now auto-retries on failure when `autoRetryFailedAds` is enabled
+
+### Deprecated
+- `AppOpenManager.updateRetryConfiguration()` — use `AdManageKitConfig` properties directly
+
 ## [3.4.1] - 2026-02-25
 
 ### Added

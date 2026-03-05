@@ -38,8 +38,6 @@ import com.i2hammad.admanagekit.waterfall.AppOpenWaterfall
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.math.min
-import kotlin.math.pow
 
 //import com.i2hammad.admanagekit.billing.AppPurchase
 
@@ -90,11 +88,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     private val useWaterfall: Boolean
         get() = AdProviderConfig.getAppOpenChain().isNotEmpty()
 
-    // Enhanced configuration
-    private var maxRetryAttempts = 3
-    private var baseRetryDelayMs = 1000L
-    private var maxRetryDelayMs = 30000L
-    private var retryMultiplier = 2.0
 
     init {
         myApplication.registerActivityLifecycleCallbacks(this)
@@ -773,9 +766,9 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             adManagerCallback.onNextAction()
             Log.d(LOG_TAG, "Cannot show ad.")
             // Only fetch in background if appOpenFetchFreshAd is false
-            if (AdManageKitConfig.appOpenAutoReload) {
-                fetchAd()
-            }
+//            if (AdManageKitConfig.appOpenAutoReload) {
+//                fetchAd()
+//            }
         }
 
         skipNextAd.set(false)
@@ -999,6 +992,17 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 appOpenWaterfall = null
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open waterfall failed: ${error.message}", false)
                 logFailedToLoadEvent(AdError(error.code, error.message, error.domain))
+
+                // Attempt automatic retry if enabled
+                if (AdManageKitConfig.autoRetryFailedAds && !AdRetryManager.getInstance().hasActiveRetry(adUnitId)) {
+                    AdRetryManager.getInstance().scheduleRetry(
+                        adUnitId = adUnitId,
+                        attempt = 0,
+                        maxAttempts = AdManageKitConfig.maxRetryAttempts
+                    ) {
+                        fetchViaWaterfall()
+                    }
+                }
             }
         })
     }
@@ -1348,7 +1352,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
-        if (retryCount >= maxRetryAttempts) {
+        if (retryCount >= AdManageKitConfig.maxRetryAttempts) {
             isLoading.set(false)  // Reset loading state
             AdDebugUtils.logEvent(adUnitId, "maxRetriesExceeded", "App open ad max retry attempts exceeded", false)
             return
@@ -1388,12 +1392,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
                     logFailedToLoadEvent(loadAdError)
 
-                    // Determine if we should retry based on error type
-                    if (shouldRetryForError(loadAdError) && retryCount < maxRetryAttempts) {
-                        val retryDelay = calculateRetryDelay(retryCount)
-                        AdDebugUtils.logEvent(adUnitId, "schedulingRetry", "Scheduling retry in ${retryDelay}ms", true)
-
-                        scheduleTimeout(retryDelay) {
+                    // Determine if we should retry based on error type and config
+                    if (AdManageKitConfig.autoRetryFailedAds && shouldRetryForError(loadAdError) && retryCount < AdManageKitConfig.maxRetryAttempts) {
+                        AdRetryManager.getInstance().scheduleRetry(
+                            adUnitId = adUnitId,
+                            attempt = retryCount,
+                            maxAttempts = AdManageKitConfig.maxRetryAttempts
+                        ) {
                             fetchAdWithRetry(retryCount + 1)
                         }
                     } else {
@@ -1401,14 +1406,6 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     }
                 }
             })
-    }
-
-    /**
-     * Calculate exponential backoff delay
-     */
-    private fun calculateRetryDelay(retryCount: Int): Long {
-        val delay = (baseRetryDelayMs * retryMultiplier.pow(retryCount)).toLong()
-        return min(delay, maxRetryDelayMs)
     }
 
     /**
@@ -1476,22 +1473,25 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             request,
             object : AppOpenAd.AppOpenAdLoadCallback() {
                 override fun onAdLoaded(ad: AppOpenAd) {
+                    // Always keep the ad for later use, even if timed out
+                    appOpenAd = ad
+                    adLoadTime = System.currentTimeMillis()
+
+                    // Track loading performance
+                    val loadTime = System.currentTimeMillis() - lastLoadStartTime
+                    synchronized(loadTimes) {
+                        loadTimes.add(loadTime)
+                        if (loadTimes.size > 100) { // Keep last 100 load times
+                            loadTimes.removeAt(0)
+                        }
+                    }
+
                     if (!hasTimedOut) {
                         cancelTimeout(timeoutRunnable)
-                        appOpenAd = ad
-                            adLoadTime = System.currentTimeMillis()
-
-                        // Track loading performance
-                        val loadTime = System.currentTimeMillis() - lastLoadStartTime
-                        synchronized(loadTimes) {
-                            loadTimes.add(loadTime)
-                            if (loadTimes.size > 100) { // Keep last 100 load times
-                                loadTimes.removeAt(0)
-                            }
-                        }
-
                         AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded with timeout (${loadTime}ms)", true)
                         adLoadCallback.onAdLoaded()
+                    } else {
+                        AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded after timeout (${loadTime}ms), cached for later use", true)
                     }
                 }
 
@@ -1562,20 +1562,20 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Thread-safe configuration updates
+     * Thread-safe configuration updates.
+     * @deprecated Use AdManageKitConfig directly to configure retry settings.
      */
+    @Deprecated(
+        message = "Use AdManageKitConfig.maxRetryAttempts and related properties instead",
+        level = DeprecationLevel.WARNING
+    )
     fun updateRetryConfiguration(
-        maxAttempts: Int = this.maxRetryAttempts,
-        baseDelay: Long = this.baseRetryDelayMs,
-        maxDelay: Long = this.maxRetryDelayMs,
-        multiplier: Double = this.retryMultiplier
+        maxAttempts: Int = AdManageKitConfig.maxRetryAttempts,
+        baseDelay: Long = AdManageKitConfig.baseRetryDelay.inWholeMilliseconds,
+        maxDelay: Long = AdManageKitConfig.maxRetryDelay.inWholeMilliseconds,
+        multiplier: Double = 2.0
     ) {
-        synchronized(this) {
-            this.maxRetryAttempts = maxAttempts.coerceIn(1, 10)
-            this.baseRetryDelayMs = baseDelay.coerceIn(100L, 10000L)
-            this.maxRetryDelayMs = maxDelay.coerceIn(1000L, 300000L)
-            this.retryMultiplier = multiplier.coerceIn(1.0, 5.0)
-        }
+        AdManageKitConfig.maxRetryAttempts = maxAttempts.coerceIn(1, 10)
     }
 
     /**

@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.1`** adds product metadata APIs, free trial detection, and billing period queries to `AppPurchase` — display Play Console localized product info directly in your UI.
+**Latest Version `3.4.2`** improves App Open ad reliability with `autoRetryFailedAds` support and late-loading ad preservation.
 
 ---
 
@@ -54,250 +54,29 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.1) |
+| Production apps (stable) | **Main branch** (v3.4.2) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.1
+## What's New in 3.4.2
 
-### Product Metadata APIs
-New `AppPurchase` methods expose Play Console localized product information — no need for local translations:
-
-```kotlin
-val billing = AppPurchase.getInstance()
-
-// Product info (auto-localized by Google)
-val name = billing.getProductName("premium_monthly")          // "Monthly Premium"
-val title = billing.getProductTitle("premium_monthly")         // "Monthly Premium (My App)"
-val description = billing.getProductDescription("premium_monthly")  // "Unlock all features"
-val details = billing.getProductDetails("premium_monthly")     // Raw ProductDetails
-
-// Free trial detection
-if (billing.hasFreeTrial("premium_monthly")) {
-    val trial = billing.getFreeTrialPeriod("premium_monthly")  // "P7D"
-}
-
-// Billing period
-val period = billing.getBillingPeriod("premium_monthly")       // "P1M"
-```
-
-| Method | Returns | Example |
-|--------|---------|---------|
-| `getProductTitle()` | `String?` | `"Monthly Premium (My App)"` |
-| `getProductName()` | `String?` | `"Monthly Premium"` |
-| `getProductDescription()` | `String?` | `"Unlock all premium features"` |
-| `getProductDetails()` | `ProductDetails?` | Raw object |
-| `hasFreeTrial()` | `boolean` | `true` / `false` |
-| `getFreeTrialPeriod()` | `String?` | `"P7D"` |
-| `getBillingPeriod()` | `String?` | `"P1M"` |
-
-## What's New in 3.4.0
-
-### App Open Splash Ad Show Rate Fix
-- **Fixed ~50% show-rate miss**: `forceShowAdIfAvailable()` now takes over an in-progress dialog fetch (started by `onStart()`'s `showAdIfAvailable()`) instead of triggering the dialog guard and firing `onNextAction()` prematurely
-- **`showAdIfAvailable()` guarded**: Lifecycle-driven auto-show now skips if a `forceShowAdIfAvailable()` fetch is already in progress (`isFetchingWithDialog` check)
-- No API changes required
-
-### Native Large Ad Tablet Layout Fix
-- **Fixed**: `layout_native_large.xml` (sw600dp) container changed from `LinearLayout` to `FrameLayout`, preventing layout rendering issues on tablet screens (600dp+)
-- **Stable release**: Consolidates all improvements from 3.3.8 and 3.3.9 including multi-provider waterfall, Yandex Ads, and app open ad callback improvements
-
----
-
-## What's New in 3.3.9
-
-### App Open Ad Callback Improvements
-- **New `onAdTimedOut()` callback**: Dedicated event when ad load exceeds timeout (separate from `onFailedToLoad`)
-- **`onFailedToLoad()` now fires**: Previously never called for app open ads with dialog; now fires correctly for both AdMob and waterfall paths
-- **Dialog-first guarantee**: Welcome dialog is always dismissed before any callback fires
-
-```kotlin
-appOpenManager.forceShowAdIfAvailable(activity, object : AdManagerCallback() {
-    override fun onAdTimedOut() { /* timeout-specific handling */ }
-    override fun onFailedToLoad(error: AdKitError?) { /* load failure handling */ }
-    override fun onNextAction() { navigateNext() }
-})
-```
-
-### Adaptive Full-Width Banner in Waterfall
-- **Fixed**: Banner ads via waterfall now use adaptive full-width sizing (was fixed 320x50dp)
-- **Collapsible support**: Collapsible banner settings now pass through waterfall to AdMob providers
-
-## What's New in 3.3.8
-
-### Multi-Provider Waterfall & Yandex Ads
-- **Multi-Ad-Provider Architecture**: New core interfaces (`InterstitialAdProvider`, `AppOpenAdProvider`, `BannerAdProvider`, `NativeAdProvider`, `RewardedAdProvider`) in `admanagekit-core` with zero external dependencies
-- **Waterfall Mediation**: Automatic fallback across ad networks for all ad types (interstitial, app open, banner, native, rewarded)
-- **Yandex Ads Module**: New `admanagekit-yandex` module with full Yandex Mobile Ads SDK integration
-- **Transparent Integration**: Configure provider chains once; all existing API calls use waterfall automatically
-- **Backward Compatible**: No changes required to existing AdMob-only code
-
-```kotlin
-// Register providers and configure waterfall chains
-AdProviderConfig.registerProvider(AdProvider.ADMOB, AdMobProviderRegistration())
-AdProviderConfig.registerProvider(AdProvider.YANDEX, YandexProviderRegistration())
-AdProviderConfig.setInterstitialChain(listOf(AdProvider.ADMOB, AdProvider.YANDEX))
-```
-
-See [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) and [Yandex Integration](docs/YANDEX_INTEGRATION.md) for the full guide.
-
-## What's New in 3.3.7
-
-### Welcome Dialog for Cached App Open Ads
-Cached app open ads now display the welcome back dialog before showing, providing a consistent transition across all display paths (ON_DEMAND, ONLY_CACHE, HYBRID).
-
-### Background Ad Prefetching
-`appOpenFetchFreshAd` repurposed to control when app open ads are fetched:
-- `false` (default): Prefetch on background (onStop) — ad ready instantly on return
-- `true`: Fetch fresh on foreground (onStart) — may show loading dialog
-
-```kotlin
-AdManageKitConfig.appOpenFetchFreshAd = false // Prefetch in background (default)
-```
-
-### Default Changes
-- **Native ad caching disabled by default**: `NativeAdManager.enableCachingNativeAds` now defaults to `false`
-- **Auto-retry disabled by default**: `AdManageKitConfig.autoRetryFailedAds` now defaults to `false`
-
-## What's New in 3.3.5
-
-### App Open Loading Strategies
-- **Proper Loading Strategy Support**: AppOpenManager now fully supports `AdLoadingStrategy` (ON_DEMAND, ONLY_CACHE, HYBRID)
-- **Ad Freshness Tracking**: Cached ads track load time to prevent showing stale ads
-- **Smart Cache Usage**: ON_DEMAND strategy uses cached ads if still fresh (within `appOpenAdFreshnessThreshold`)
-- **Auto-Reload Config**: New `appOpenAutoReload` setting to control automatic reloading after ad dismissal
+### App Open Ads: `autoRetryFailedAds` Support
+App open ads now respect `AdManageKitConfig.autoRetryFailedAds`, matching interstitial, rewarded, and native ads. Failed loads are automatically retried via `AdRetryManager` with exponential backoff.
 
 ```kotlin
 AdManageKitConfig.apply {
-    // Loading strategy (ON_DEMAND, ONLY_CACHE, HYBRID)
-    appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
-
-    // Freshness threshold for cached ads (default: 4 hours)
-    appOpenAdFreshnessThreshold = 4.hours
-
-    // Auto-reload after ad dismissal (default: true)
-    appOpenAutoReload = true
+    autoRetryFailedAds = true   // Now respected by app open ads
+    maxRetryAttempts = 3        // Used instead of hardcoded value
 }
 ```
 
-## What's New in 3.3.4
+### Late-Loading Ad Preservation
+App open ads that load after the timeout has fired are now cached for later use instead of being discarded. The next `showAdIfAvailable()` call will use the cached ad instantly.
 
-### Subscription Expiry Verification
-- **Server-Side Verification**: New API to verify subscriptions and get accurate expiry dates from your backend
-- **Expiry Methods**: `getExpiryTimeFormatted()`, `getRemainingDays()`, `isExpired()` on PurchaseResult
-- **AppPurchase Helpers**: `getSubscriptionExpiryTime()`, `getSubscriptionRemainingDays()`, `isSubscriptionExpired()`
-
-```kotlin
-// Set up verification callback
-AppPurchase.getInstance().setSubscriptionVerificationCallback { packageName, subscriptionId, purchaseToken, listener ->
-    yourApi.verifySubscription(purchaseToken) { expiryMillis ->
-        val details = SubscriptionVerificationCallback.SubscriptionDetails.Builder()
-            .setExpiryTimeMillis(expiryMillis)
-            .build()
-        listener.onVerified(details)
-    }
-}
-
-// Verify and get expiry
-AppPurchase.getInstance().verifySubscription("premium_monthly",
-    object : AppPurchase.SubscriptionVerificationListener {
-        override fun onVerified(subscription: PurchaseResult) {
-            val expiryDate = subscription.getExpiryTimeFormatted("dd MMM yyyy")
-            val daysLeft = subscription.getRemainingDays()
-        }
-        override fun onVerificationFailed(error: String?) { }
-    }
-)
-```
-
-## What's New in 3.3.3
-
-### SDK-Agnostic Type Aliases
-- **Migration Compatibility**: Callbacks use `AdKitError`, `AdKitLoadError`, `AdKitValue` type aliases
-- **Same Signatures**: Your callback implementations work across both SDK versions
-- **Easy Migration**: Switch between main (GMS SDK) and nextgen (Next-Gen SDK) branches without code changes
-
-```kotlin
-// Callbacks now use type aliases that resolve to the appropriate SDK types
-object : AdLoadCallback() {
-    override fun onFailedToLoad(error: AdKitError?) {  // Works on both branches
-        Log.e("Ads", "Failed: ${error?.message}")
-    }
-    override fun onPaidEvent(adValue: AdKitValue) {    // Works on both branches
-        trackRevenue(adValue.valueMicros)
-    }
-}
-```
-
-## What's New in 3.3.2
-
-### InterstitialAdBuilder Fixes
-- **Ad Unit Assignment**: Fixed ad unit not being assigned to AdManager on first HYBRID fetch
-- **Immediate Availability**: `adUnit()` now sets AdManager.adUnitId immediately for first-call reliability
-
-### everyNthTime Feature Fix
-- **Counter Persistence**: Call counter now persists across builder instances in AdManager
-- **Counter API**: New methods to manage counters: `getCallCount()`, `resetCallCount()`, `resetAllCallCounts()`
-
-```kotlin
-// everyNthTime now works correctly
-InterstitialAdBuilder.with(activity)
-    .adUnit(adUnitId)
-    .everyNthTime(3)  // Shows on 3rd, 6th, 9th calls, etc.
-    .show { navigateNext() }
-
-// Reset counters when user upgrades
-AdManager.getInstance().resetAllCallCounts()
-```
-
-### New Native Templates
-- **flexible**: Adaptive layout that adjusts to available space
-- **icon_left**: Icon on left side with MediaView at top for GridView display
-- **top_icon_media**: Icon at top, MediaView in middle, CTA at bottom
-
-```kotlin
-nativeTemplateView.setTemplate(NativeAdTemplate.FLEXIBLE)
-nativeTemplateView.setTemplate(NativeAdTemplate.ICON_LEFT)
-nativeTemplateView.setTemplate(NativeAdTemplate.TOP_ICON_MEDIA)
-```
-
-## What's New in 3.1.0
-
-### FRESH_WITH_CACHE_FALLBACK Strategy Fix
-- **Auto-Caching**: Successfully loaded ads are now properly cached for future fallback
-- **RecyclerView Optimized**: Fresh ads build up the cache over time for better fallback availability
-- **Complete Implementation**: Strategy now works as documented
-
-### New Native Template
-- **MEDIUM_HORIZONTAL**: 55% media (left) / 45% content (right) horizontal split layout
-- **27 Total Templates**: 21 standard + 6 video templates
-
-## What's New in 3.0.0
-
-### Ad Pool System
-- **Multiple Ad Units**: Load multiple interstitial ad units into a pool for maximum show rate
-- **Auto-Selection**: Shows ANY available ad from the pool when requested
-- **Duplicate Prevention**: Automatically skips duplicate load requests
-
-### Smart Splash Ads
-- **showOrWaitForAd()**: Single method handles all splash scenarios automatically
-- **Intelligent Behavior**: Shows cached ad immediately, waits if loading, or fetches fresh
-
-### App Open Ad Prefetching
-- **prefetchNextAd()**: Prefetch ads before external intents for instant display on return
-- **isAdLoading()**: Check if ad is currently being fetched
-
-### Enhanced Analytics
-- **Session Tracking**: Fill rate, show rate, and impression tracking
-- **getAdStats()**: Access session-level ad performance metrics
-
-### Technical Improvements
-- Modern `WindowInsetsController` API (replaces deprecated systemUiVisibility)
-- Thread-safe ad pool with `ConcurrentHashMap`
-- Cross-ad-unit fallback for native ads
+For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
 ## Screenshots
 
@@ -338,15 +117,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.2'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.2'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.2'
 ```
 
 </td>
@@ -474,7 +253,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.2'
 ```
 
 ```kotlin
@@ -824,6 +603,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.2](docs/release-notes/RELEASE_NOTES_v3.4.2.md)
 - [Release Notes v3.4.1](docs/release-notes/RELEASE_NOTES_v3.4.1.md)
 - [Release Notes v3.4.0](docs/release-notes/RELEASE_NOTES_v3.4.0.md)
 - [Release Notes v3.3.9](docs/release-notes/RELEASE_NOTES_v3.3.9.md)
