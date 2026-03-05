@@ -1,6 +1,7 @@
 package com.i2hammad.admanagekit.sample
 
 import android.app.Application
+import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
 import com.i2hammad.admanagekit.admob.AppOpenManager
@@ -63,8 +64,8 @@ class MyApplication : Application() {
             maxCachedAdsPerUnit = 3
             maxCacheMemoryMB = 50
             enableWelcomeBackDialog = true
-            appOpenFetchFreshAd = true
-            appOpenAutoReload = false
+            appOpenFetchFreshAd = false
+            appOpenAutoReload = true
             welcomeDialogAppIcon = R.mipmap.ic_launcher_round
             
             // =================== RELIABILITY FEATURES ===================
@@ -96,7 +97,7 @@ class MyApplication : Application() {
             // - Fetches fresh ad with loading dialog if cache is empty
             // - Good balance between UX and ad coverage
             interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
-            appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND
+            appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
 
             // Option 2: ONLY_CACHE - Best for smooth UX (gaming apps)
@@ -187,11 +188,17 @@ class MyApplication : Application() {
         ))
 
         // Configure provider chains: Yandex first, AdMob fallback
-        AdProviderConfig.setInterstitialChain(listOf(yandex.interstitialProvider, admob.interstitialProvider))
-        AdProviderConfig.setBannerChain(listOf(yandex.bannerProvider, admob.bannerProvider))
-        AdProviderConfig.setNativeChain(listOf(yandex.nativeProvider, admob.nativeProvider))
-        AdProviderConfig.setAppOpenChain(listOf(yandex.appOpenProvider, admob.appOpenProvider))
-        AdProviderConfig.setRewardedChain(listOf(yandex.rewardedProvider, admob.rewardedProvider))
+        AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
+        AdProviderConfig.setBannerChain(listOf(admob.bannerProvider, yandex.bannerProvider))
+        AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
+//        AdProviderConfig.setAppOpenChain(listOf(admob.appOpenProvider, yandex.appOpenProvider))
+        AdProviderConfig.setRewardedChain(listOf(admob.rewardedProvider, yandex.rewardedProvider))
+//       // Configure provider chains: Yandex first, AdMob fallback
+//        AdProviderConfig.setInterstitialChain(listOf(yandex.interstitialProvider, admob.interstitialProvider))
+//        AdProviderConfig.setBannerChain(listOf(yandex.bannerProvider, admob.bannerProvider))
+//        AdProviderConfig.setNativeChain(listOf(yandex.nativeProvider, admob.nativeProvider))
+//        AdProviderConfig.setAppOpenChain(listOf(yandex.appOpenProvider, admob.appOpenProvider))
+//        AdProviderConfig.setRewardedChain(listOf(yandex.rewardedProvider, admob.rewardedProvider))
     }
 
     private fun initBilling() {

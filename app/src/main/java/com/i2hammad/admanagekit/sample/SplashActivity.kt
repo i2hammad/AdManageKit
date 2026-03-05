@@ -75,7 +75,7 @@ class SplashActivity : AppCompatActivity() {
             statusTextView.text = "Consent Requested."
 
             adsConsentManager.requestUMP(
-                this@SplashActivity, true, "EC60C39375F6619F5C03850A0E440646", true
+                this@SplashActivity, false, "EC60C39375F6619F5C03850A0E440646", false
             ) { isUserAccepted ->
                 if (isUserAccepted) {
                     Log.d("SplashActivity", "requestUMP: Consent accepted by user")

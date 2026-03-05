@@ -5,6 +5,22 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.3] - 2026-03-06
+
+### Fixed
+- **Duplicate Ad Loads**: `fetchViaWaterfall(callback, timeout)` and `fetchAd(callback, timeout)` now check `isLoading` before starting, attaching to the in-progress fetch instead of creating a duplicate (both waterfall and non-waterfall paths)
+- **Splash Auto-Navigation**: Orphaned `pendingFetchTimeoutRunnable` no longer fires stale `onFailedToLoad` callbacks after the ad has already loaded and shown
+- **Resume Ad Show Blocked**: `showAdIfAvailable()` no longer skips when a background auto-reload preload is in progress (only skips for dialog-based fetches)
+- **ON_DEMAND Cold Start**: `onStart` no longer triggers automatic ad load for ON_DEMAND strategy on cold start; explicit `fetchAd`/`forceShow` handles it
+- **Hot-Start Duplicate Loads**: Fixed concurrent loads when returning to SplashActivity via hot start
+
+### Added
+- **Background Fetch Callback Attachment**: `pendingFetchCallback` mechanism allows splash `fetchAd` to receive results from an already-running background preload
+- **Cold Start Detection**: `hasBeenBackgrounded` flag distinguishes cold start from resume for ON_DEMAND strategy
+- **Load Start Logging**: `AdDebugUtils.logEvent` `loading` event added to all ad load start paths
+- **Cached Ad Logging**: `AdDebugUtils.logEvent` `showCachedAd` event when cached ads are shown
+- **Comprehensive Logging**: `AdDebugUtils.logEvent` added to all previously missing load/failure paths in `AppOpenManager`
+
 ## [3.4.2] - 2026-03-06
 
 ### Fixed

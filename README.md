@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.2`** improves App Open ad reliability with `autoRetryFailedAds` support and late-loading ad preservation.
+**Latest Version `3.4.3`** fixes race conditions in App Open ad waterfall loading — duplicate loads, splash auto-navigation, and resume ad show blocking.
 
 ---
 
@@ -54,27 +54,23 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.2) |
+| Production apps (stable) | **Main branch** (v3.4.3) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.2
+## What's New in 3.4.3
 
-### App Open Ads: `autoRetryFailedAds` Support
-App open ads now respect `AdManageKitConfig.autoRetryFailedAds`, matching interstitial, rewarded, and native ads. Failed loads are automatically retried via `AdRetryManager` with exponential backoff.
+### Duplicate Waterfall Load Prevention
+Concurrent waterfall loads from `onStart` preload and splash `fetchAd` are now deduplicated. The splash callback attaches to the in-progress fetch instead of starting a second one.
 
-```kotlin
-AdManageKitConfig.apply {
-    autoRetryFailedAds = true   // Now respected by app open ads
-    maxRetryAttempts = 3        // Used instead of hardcoded value
-}
-```
+### Splash Auto-Navigation Fix
+Orphaned timeouts no longer fire stale `onFailedToLoad` callbacks after the ad has already loaded — preventing the splash from navigating away while the ad is still displayed.
 
-### Late-Loading Ad Preservation
-App open ads that load after the timeout has fired are now cached for later use instead of being discarded. The next `showAdIfAvailable()` call will use the cached ad instantly.
+### Resume Ad Show After Auto-Reload
+`showAdIfAvailable()` no longer skips when a background auto-reload preload is running. App open ads now show correctly on resume after auto-reload.
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -117,15 +113,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.3'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.3'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.3'
 ```
 
 </td>
@@ -253,7 +249,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.3'
 ```
 
 ```kotlin
@@ -603,6 +599,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.3](docs/release-notes/RELEASE_NOTES_v3.4.3.md)
 - [Release Notes v3.4.2](docs/release-notes/RELEASE_NOTES_v3.4.2.md)
 - [Release Notes v3.4.1](docs/release-notes/RELEASE_NOTES_v3.4.1.md)
 - [Release Notes v3.4.0](docs/release-notes/RELEASE_NOTES_v3.4.0.md)
