@@ -61,7 +61,7 @@ object RewardedAdManager {
     private var rewardedAd: RewardedAd? = null
     private var isLoading: Boolean = false
     private var isShowingAd: Boolean = false
-    private lateinit var adUnitId: String
+    private var adUnitId: String = ""
     private const val TAG = "RewardedAdManager"
 
     private var firebaseAnalytics: FirebaseAnalytics? = null
@@ -166,6 +166,11 @@ object RewardedAdManager {
      * @param context The context
      */
     fun loadRewardedAd(context: Context) {
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
+            return
+        }
+
         if (useWaterfall) { loadViaWaterfall(context); return }
 
         // Guard: Skip loading for premium users
@@ -253,6 +258,14 @@ object RewardedAdManager {
      * @param callback Callback for load events
      */
     fun loadRewardedAd(context: Context, callback: OnRewardedAdLoadCallback) {
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
+            callback.onAdFailedToLoad(
+                LoadAdError(-1, "Ad unit ID not set. Call initialize() first.", "com.i2hammad.admanagekit", null, null)
+            )
+            return
+        }
+
         if (useWaterfall) { loadViaWaterfall(context, callback); return }
 
         // Guard: Skip loading for premium users
@@ -330,6 +343,14 @@ object RewardedAdManager {
         timeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
         callback: OnRewardedAdLoadCallback
     ) {
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
+            callback.onAdFailedToLoad(
+                LoadAdError(-1, "Ad unit ID not set. Call initialize() first.", "com.i2hammad.admanagekit", null, null)
+            )
+            return
+        }
+
         if (useWaterfall) { loadViaWaterfallWithTimeout(context, timeoutMillis, callback); return }
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -435,6 +456,12 @@ object RewardedAdManager {
         callback: RewardedAdCallback,
         autoReload: Boolean = AdManageKitConfig.rewardedAutoReload
     ) {
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
+            callback.onAdDismissed()
+            return
+        }
+
         if (useWaterfall) { showViaWaterfall(activity, callback, autoReload); return }
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -610,6 +637,10 @@ object RewardedAdManager {
      * @param context The context
      */
     fun preload(context: Context) {
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
+            return
+        }
         if (!isAdLoaded() && !isLoading) {
             AdDebugUtils.logEvent(adUnitId, "preload", "Preloading rewarded ad", true)
             if (useWaterfall) { loadViaWaterfall(context) } else { loadRewardedAd(context) }

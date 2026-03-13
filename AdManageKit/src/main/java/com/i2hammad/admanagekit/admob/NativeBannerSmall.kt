@@ -41,7 +41,7 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     private val TAG = "NativeAds"
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = ""
     var callback: AdLoadCallback? = null
 
     // Waterfall support
@@ -126,6 +126,9 @@ class NativeBannerSmall @JvmOverloads constructor(
         loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
+
+        // Reset root visibility in case a previous load failed and hid it
+        binding.root.visibility = VISIBLE
 
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
@@ -452,6 +455,7 @@ class NativeBannerSmall @JvmOverloads constructor(
 
         adPlaceholder.removeAllViews()
         adPlaceholder.addView(nativeAdView)
+        binding.root.visibility = VISIBLE
         adPlaceholder.visibility = VISIBLE
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
 

@@ -38,7 +38,7 @@ class NativeBannerMedium @JvmOverloads constructor(
 
     private val binding: LayoutNativeBannerMediumPreviewBinding =
         LayoutNativeBannerMediumPreviewBinding.inflate(LayoutInflater.from(context), this)
-    private var adUnitId: String = "unknown"
+    private var adUnitId: String = ""
     private var firebaseAnalytics: FirebaseAnalytics? = null
     var callback: AdLoadCallback? = null
 
@@ -124,6 +124,9 @@ class NativeBannerMedium @JvmOverloads constructor(
         loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
+
+        // Reset container visibility in case a previous load failed and hid it
+        binding.adContainer.visibility = View.VISIBLE
 
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
@@ -369,6 +372,7 @@ class NativeBannerMedium @JvmOverloads constructor(
                     val parent = adView.parent as? android.view.ViewGroup
                     parent?.removeView(adView)
                     adPlaceholder.addView(adView)
+                    binding.adContainer.visibility = View.VISIBLE
                     binding.root.visibility = View.VISIBLE
                     adPlaceholder.visibility = View.VISIBLE
                     shimmerFrameLayout.visibility = View.GONE
@@ -461,25 +465,8 @@ class NativeBannerMedium @JvmOverloads constructor(
             }
         }
 
-        // Set native ad and ensure visibility in next frame
         AdDebugUtils.logDebug("AdBind", "Setting native ad on NativeAdView")
-        nativeAdView.post {
-            try {
-                nativeAdView.setNativeAd(nativeAd)
-                AdDebugUtils.logEvent(adUnitId, "setNativeAd", "Successfully called setNativeAd()", true)
-
-                binding.shimmerContainerNative.visibility = View.GONE
-                binding.root.visibility = View.VISIBLE
-                binding.flAdplaceholder.visibility = View.VISIBLE
-
-                AdDebugUtils.logEvent(adUnitId, "adPopulated", "Native ad populated and displayed successfully", true)
-                AdDebugUtils.logDebug("FinalState", "Parent: ${nativeAdView.parent != null}, Headline: '${(nativeAdView.headlineView as? TextView)?.text}', Bounds: ${binding.root.width}x${binding.root.height}")
-
-            } catch (e: Exception) {
-                AdDebugUtils.logEvent(adUnitId, "setNativeAdError", "Error setting native ad: ${e.message}", false)
-                e.printStackTrace()
-            }
-        }
+        nativeAdView.setNativeAd(nativeAd)
     }
 
     fun displayAd(preloadedAd: NativeAd) {
@@ -529,7 +516,10 @@ class NativeBannerMedium @JvmOverloads constructor(
 
             // Add to container first
             adPlaceholder.addView(nativeAdView)
+            binding.root.visibility = View.VISIBLE
+            binding.adContainer.visibility = View.VISIBLE
             adPlaceholder.visibility = View.VISIBLE
+            binding.shimmerContainerNative.visibility = View.GONE
 
             // Setup paid event listener
             cachedAd.setOnPaidEventListener { adValue ->

@@ -5,6 +5,18 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.4] - 2026-03-13
+
+### Fixed
+- **Native Ad Show Rate**: Parent container visibility not restored after previous load failure — ads loaded but stayed invisible (NativeBannerSmall, NativeBannerMedium, NativeLarge, NativeTemplateView)
+- **NativeBannerMedium setNativeAd()**: `populateNativeAdView()` deferred `setNativeAd()` via `post {}` — changed to synchronous call for reliable impression registration
+- **NativeBannerMedium Shimmer Overlap**: Shimmer animation not hidden when displaying cached/waterfall ads via `displayCachedAdSafely()`
+- **RewardedAdManager Crash**: `lateinit var adUnitId` crashed with `UninitializedPropertyAccessException` when methods called before `initialize()` — changed to empty string default with guards
+- **Native Views lateinit Crash**: `NativeBannerSmall`, `NativeLarge`, `NativeTemplateView` `adUnitId` changed from `lateinit` to empty string default
+
+### Added
+- **Empty adUnitId Validation**: All native views and `RewardedAdManager` now validate against empty ad unit IDs with warning logs and appropriate callback responses
+
 ## [3.4.3] - 2026-03-06
 
 ### Fixed

@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.3`** fixes race conditions in App Open ad waterfall loading — duplicate loads, splash auto-navigation, and resume ad show blocking.
+**Latest Version `3.4.4`** fixes native ad show rate issues across all native views and adds null safety to RewardedAdManager.
 
 ---
 
@@ -54,23 +54,23 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.3) |
+| Production apps (stable) | **Main branch** (v3.4.4) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.3
+## What's New in 3.4.4
 
-### Duplicate Waterfall Load Prevention
-Concurrent waterfall loads from `onStart` preload and splash `fetchAd` are now deduplicated. The splash callback attaches to the in-progress fetch instead of starting a second one.
+### Native Ad Show Rate Fix
+Fixed low show rates across all native ad views (`NativeBannerSmall`, `NativeBannerMedium`, `NativeLarge`, `NativeTemplateView`). Parent container visibility was not restored after a previous load failure, causing ads to load but remain invisible.
 
-### Splash Auto-Navigation Fix
-Orphaned timeouts no longer fire stale `onFailedToLoad` callbacks after the ad has already loaded — preventing the splash from navigating away while the ad is still displayed.
+### NativeBannerMedium Impression Fix
+`setNativeAd()` was deferred via `post {}` which risked never executing. Changed to synchronous call for reliable impression registration. Also fixed shimmer overlay on cached/waterfall ads.
 
-### Resume Ad Show After Auto-Reload
-`showAdIfAvailable()` no longer skips when a background auto-reload preload is running. App open ads now show correctly on resume after auto-reload.
+### RewardedAdManager Null Safety
+`RewardedAdManager` no longer crashes when methods are called before `initialize()`. All 5 public entry points now validate the ad unit ID and return appropriate callbacks.
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -113,15 +113,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.4'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.4'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.4'
 ```
 
 </td>
@@ -249,7 +249,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.4'
 ```
 
 ```kotlin
@@ -599,6 +599,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.4](docs/release-notes/RELEASE_NOTES_v3.4.4.md)
 - [Release Notes v3.4.3](docs/release-notes/RELEASE_NOTES_v3.4.3.md)
 - [Release Notes v3.4.2](docs/release-notes/RELEASE_NOTES_v3.4.2.md)
 - [Release Notes v3.4.1](docs/release-notes/RELEASE_NOTES_v3.4.1.md)

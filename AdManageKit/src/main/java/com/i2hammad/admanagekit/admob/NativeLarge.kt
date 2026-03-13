@@ -42,7 +42,7 @@ class NativeLarge @JvmOverloads constructor(
     private val binding: LayoutNativeLargeBinding =
         LayoutNativeLargeBinding.inflate(LayoutInflater.from(context), this)
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = ""
 
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
@@ -126,6 +126,9 @@ class NativeLarge @JvmOverloads constructor(
         loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
+
+        // Reset container visibility in case a previous load failed and hid it
+        binding.adUnit.visibility = View.VISIBLE
 
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
@@ -355,6 +358,7 @@ class NativeLarge @JvmOverloads constructor(
         }
 
         populateNativeAdView(preloadedNativeAd, nativeAdView)
+        binding.root.visibility = View.VISIBLE
         viewGroup.visibility = View.VISIBLE
         nativeAdView.visibility = View.VISIBLE
         shimmerFrameLayout.visibility = View.GONE

@@ -77,7 +77,7 @@ class NativeTemplateView @JvmOverloads constructor(
 
     private val TAG = "NativeTemplateView"
     private var firebaseAnalytics: FirebaseAnalytics? = null
-    private lateinit var adUnitId: String
+    private var adUnitId: String = ""
     var callback: AdLoadCallback? = null
 
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
@@ -301,6 +301,17 @@ class NativeTemplateView @JvmOverloads constructor(
         loadingStrategy: AdLoadingStrategy? = null
     ) {
         this.adUnitId = adUnitId
+
+        if (adUnitId.isEmpty()) {
+            Log.w(TAG, "adUnitId is empty, cannot load ad")
+            callback?.onFailedToLoad(
+                AdError(AdManager.PURCHASED_APP_ERROR_CODE, "Ad unit ID is empty", "AdManageKit")
+            )
+            return
+        }
+
+        // Reset root visibility in case a previous error hid it
+        binding.root.visibility = VISIBLE
 
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
@@ -715,6 +726,7 @@ class NativeTemplateView @JvmOverloads constructor(
 
         adPlaceholder.removeAllViews()
         adPlaceholder.addView(nativeAdView)
+        binding.root.visibility = VISIBLE
         adPlaceholder.visibility = VISIBLE
         firebaseAnalytics = FirebaseAnalytics.getInstance(context)
 
