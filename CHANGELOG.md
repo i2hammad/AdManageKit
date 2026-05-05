@@ -5,6 +5,25 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.5] - 2026-05-05
+
+### Changed
+- **Yandex Mobile Ads SDK 8.0.0**: Upgraded `admanagekit-yandex` from SDK 7.18.1 to 8.0.0
+  - `MobileAds.initialize` → `YandexAds.initialize`
+  - `AdRequestConfiguration` / `NativeAdRequestConfiguration` → `AdRequest` (ad unit ID now passed to `AdRequest.Builder` constructor)
+  - Loader pattern: `setAdLoadListener` + `loadAd(config)` → `loadAd(request, listener)` for interstitial, rewarded, app open, and native
+  - `BannerAdSize.stickySize` → `BannerAdSize.sticky`; `BannerAdView.setAdUnitId()` removed — ID passed via `AdRequest.Builder`
+  - `onLeftApplication()` / `onReturnedToApplication()` removed from all ad event listeners
+  - `bindNativeAd(binder)` now returns `AdBindingResult` instead of throwing — throws `IllegalStateException` on failure to propagate through existing error paths
+
+### Fixed
+- **Yandex Large Native Ad Layout**: Ad was showing only the media image with title/body/CTA pushed off-screen
+  - Added required `price` view (required for app-type native ads) and `favicon` view
+  - Layout order changed to: header → body → CTA → MediaView → footer (CTA is always visible regardless of media height)
+  - `MediaView` starts as `GONE`; SDK manages visibility when content is available
+  - `MediaView` capped at 200dp height to prevent overflow
+  - Binding failure now propagates as `onNativeAdFailedToLoad` instead of silently showing a blank view
+
 ## [3.4.4] - 2026-03-13
 
 ### Fixed

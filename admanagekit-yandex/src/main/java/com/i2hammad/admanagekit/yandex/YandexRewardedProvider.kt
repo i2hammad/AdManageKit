@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.yandex.mobile.ads.common.AdError
-import com.yandex.mobile.ads.common.AdRequestConfiguration
+import com.yandex.mobile.ads.common.AdRequest
 import com.yandex.mobile.ads.common.AdRequestError
 import com.yandex.mobile.ads.common.ImpressionData
 import com.yandex.mobile.ads.rewarded.Reward
@@ -38,25 +38,22 @@ class YandexRewardedProvider : RewardedAdProvider {
         adUnitId: String,
         callback: RewardedAdProvider.RewardedAdCallback
     ) {
-        val loader = RewardedAdLoader(context).apply {
-            setAdLoadListener(object : RewardedAdLoadListener {
-                override fun onAdLoaded(ad: RewardedAd) {
-                    rewardedAd = ad
-                    Log.d(TAG, "Rewarded ad loaded: $adUnitId")
-                    callback.onAdLoaded()
-                }
+        val listener = object : RewardedAdLoadListener {
+            override fun onAdLoaded(ad: RewardedAd) {
+                rewardedAd = ad
+                Log.d(TAG, "Rewarded ad loaded: $adUnitId")
+                callback.onAdLoaded()
+            }
 
-                override fun onAdFailedToLoad(error: AdRequestError) {
-                    rewardedAd = null
-                    Log.e(TAG, "Rewarded ad failed to load: ${error.description}")
-                    callback.onAdFailedToLoad(error.toAdKitError())
-                }
-            })
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                rewardedAd = null
+                Log.e(TAG, "Rewarded ad failed to load: ${error.description}")
+                callback.onAdFailedToLoad(error.toAdKitError())
+            }
         }
+        val loader = RewardedAdLoader(context)
         rewardedAdLoader = loader
-
-        val adRequestConfiguration = AdRequestConfiguration.Builder(adUnitId).build()
-        loader.loadAd(adRequestConfiguration)
+        loader.loadAd(AdRequest.Builder(adUnitId).build(), listener)
     }
 
     override fun showAd(activity: Activity, callback: RewardedAdProvider.RewardedShowCallback) {
@@ -111,7 +108,6 @@ class YandexRewardedProvider : RewardedAdProvider {
     override fun isAdReady(): Boolean = rewardedAd != null
 
     override fun destroy() {
-        rewardedAdLoader?.setAdLoadListener(null)
         rewardedAdLoader = null
         rewardedAd?.setAdEventListener(null)
         rewardedAd = null

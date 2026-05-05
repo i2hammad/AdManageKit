@@ -8,7 +8,7 @@ import com.i2hammad.admanagekit.core.ad.BannerAdProvider
 import com.i2hammad.admanagekit.core.ad.InterstitialAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.RewardedAdProvider
-import com.yandex.mobile.ads.common.MobileAds
+import com.yandex.mobile.ads.common.YandexAds
 
 /**
  * Factory that bundles all Yandex Ads provider implementations.
@@ -36,7 +36,7 @@ class YandexProviderRegistration private constructor(
          */
         @JvmStatic
         fun initialize(context: Context, onComplete: (() -> Unit)? = null) {
-            MobileAds.initialize(context) { onComplete?.invoke() }
+            YandexAds.initialize(context) { onComplete?.invoke() }
         }
 
         /**

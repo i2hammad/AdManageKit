@@ -8,7 +8,7 @@ import com.yandex.mobile.ads.appopenad.AppOpenAdEventListener
 import com.yandex.mobile.ads.appopenad.AppOpenAdLoadListener
 import com.yandex.mobile.ads.appopenad.AppOpenAdLoader
 import com.yandex.mobile.ads.common.AdError
-import com.yandex.mobile.ads.common.AdRequestConfiguration
+import com.yandex.mobile.ads.common.AdRequest
 import com.yandex.mobile.ads.common.AdRequestError
 import com.yandex.mobile.ads.common.ImpressionData
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
@@ -37,25 +37,22 @@ class YandexAppOpenProvider : AppOpenAdProvider {
         adUnitId: String,
         callback: AppOpenAdProvider.AppOpenAdCallback
     ) {
-        val loader = AppOpenAdLoader(context).apply {
-            setAdLoadListener(object : AppOpenAdLoadListener {
-                override fun onAdLoaded(ad: AppOpenAd) {
-                    appOpenAd = ad
-                    Log.d(TAG, "App open ad loaded: $adUnitId")
-                    callback.onAdLoaded()
-                }
+        val listener = object : AppOpenAdLoadListener {
+            override fun onAdLoaded(ad: AppOpenAd) {
+                appOpenAd = ad
+                Log.d(TAG, "App open ad loaded: $adUnitId")
+                callback.onAdLoaded()
+            }
 
-                override fun onAdFailedToLoad(error: AdRequestError) {
-                    appOpenAd = null
-                    Log.e(TAG, "App open ad failed to load: ${error.description}")
-                    callback.onAdFailedToLoad(error.toAdKitError())
-                }
-            })
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                appOpenAd = null
+                Log.e(TAG, "App open ad failed to load: ${error.description}")
+                callback.onAdFailedToLoad(error.toAdKitError())
+            }
         }
+        val loader = AppOpenAdLoader(context)
         appOpenAdLoader = loader
-
-        val adRequestConfiguration = AdRequestConfiguration.Builder(adUnitId).build()
-        loader.loadAd(adRequestConfiguration)
+        loader.loadAd(AdRequest.Builder(adUnitId).build(), listener)
     }
 
     override fun showAd(activity: Activity, callback: AppOpenAdProvider.AppOpenShowCallback) {
@@ -105,7 +102,6 @@ class YandexAppOpenProvider : AppOpenAdProvider {
     override fun isAdReady(): Boolean = appOpenAd != null
 
     override fun destroy() {
-        appOpenAdLoader?.setAdLoadListener(null)
         appOpenAdLoader = null
         appOpenAd?.setAdEventListener(null)
         appOpenAd = null

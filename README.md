@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.4`** fixes native ad show rate issues across all native views and adds null safety to RewardedAdManager.
+**Latest Version `3.4.5`** upgrades the Yandex Ads module to SDK 8.0.0 and fixes the large native ad layout.
 
 ---
 
@@ -54,23 +54,24 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.4) |
+| Production apps (stable) | **Main branch** (v3.4.5) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.4
+## What's New in 3.4.5
 
-### Native Ad Show Rate Fix
-Fixed low show rates across all native ad views (`NativeBannerSmall`, `NativeBannerMedium`, `NativeLarge`, `NativeTemplateView`). Parent container visibility was not restored after a previous load failure, causing ads to load but remain invisible.
+### Yandex Mobile Ads SDK 8.0.0
+`admanagekit-yandex` now targets Yandex SDK 8.0.0. All API changes are handled internally — your existing `YandexProviderRegistration` code requires no changes.
 
-### NativeBannerMedium Impression Fix
-`setNativeAd()` was deferred via `post {}` which risked never executing. Changed to synchronous call for reliable impression registration. Also fixed shimmer overlay on cached/waterfall ads.
-
-### RewardedAdManager Null Safety
-`RewardedAdManager` no longer crashes when methods are called before `initialize()`. All 5 public entry points now validate the ad unit ID and return appropriate callbacks.
+### Large Native Ad Layout Fixed
+The Yandex large native ad now displays correctly: title, domain, price, body, CTA button, media image, and disclaimer are all visible. Previously the media image filled the entire card. Changes:
+- CTA button is placed above the media image so it is always visible
+- `price` and `favicon` assets are now included (required for app-type ads)
+- `MediaView` starts hidden and is revealed by the SDK only when content is available
+- Binding failure now reports as `onNativeAdFailedToLoad` instead of showing a blank view
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -113,15 +114,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.5'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.5'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.5'
 ```
 
 </td>
@@ -249,7 +250,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.5'
 ```
 
 ```kotlin
@@ -599,6 +600,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.4.5](docs/release-notes/RELEASE_NOTES_v3.4.5.md)
 - [Release Notes v3.4.4](docs/release-notes/RELEASE_NOTES_v3.4.4.md)
 - [Release Notes v3.4.3](docs/release-notes/RELEASE_NOTES_v3.4.3.md)
 - [Release Notes v3.4.2](docs/release-notes/RELEASE_NOTES_v3.4.2.md)

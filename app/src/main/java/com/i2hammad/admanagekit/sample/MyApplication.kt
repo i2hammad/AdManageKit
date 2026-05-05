@@ -188,17 +188,17 @@ class MyApplication : Application() {
         ))
 
         // Configure provider chains: Yandex first, AdMob fallback
-        AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
-        AdProviderConfig.setBannerChain(listOf(admob.bannerProvider, yandex.bannerProvider))
-        AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
+//        AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
+//        AdProviderConfig.setBannerChain(listOf(admob.bannerProvider, yandex.bannerProvider))
+//        AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
 //        AdProviderConfig.setAppOpenChain(listOf(admob.appOpenProvider, yandex.appOpenProvider))
-        AdProviderConfig.setRewardedChain(listOf(admob.rewardedProvider, yandex.rewardedProvider))
+//        AdProviderConfig.setRewardedChain(listOf(admob.rewardedProvider, yandex.rewardedProvider))
 //       // Configure provider chains: Yandex first, AdMob fallback
-//        AdProviderConfig.setInterstitialChain(listOf(yandex.interstitialProvider, admob.interstitialProvider))
-//        AdProviderConfig.setBannerChain(listOf(yandex.bannerProvider, admob.bannerProvider))
-//        AdProviderConfig.setNativeChain(listOf(yandex.nativeProvider, admob.nativeProvider))
-//        AdProviderConfig.setAppOpenChain(listOf(yandex.appOpenProvider, admob.appOpenProvider))
-//        AdProviderConfig.setRewardedChain(listOf(yandex.rewardedProvider, admob.rewardedProvider))
+        AdProviderConfig.setInterstitialChain(listOf(yandex.interstitialProvider, admob.interstitialProvider))
+        AdProviderConfig.setBannerChain(listOf(yandex.bannerProvider, admob.bannerProvider))
+        AdProviderConfig.setNativeChain(listOf(yandex.nativeProvider, admob.nativeProvider))
+        AdProviderConfig.setAppOpenChain(listOf(yandex.appOpenProvider, admob.appOpenProvider))
+        AdProviderConfig.setRewardedChain(listOf(yandex.rewardedProvider, admob.rewardedProvider))
     }
 
     private fun initBilling() {

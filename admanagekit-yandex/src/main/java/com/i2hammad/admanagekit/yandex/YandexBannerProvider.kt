@@ -40,13 +40,11 @@ class YandexBannerProvider(
         callback: BannerAdProvider.BannerAdCallback
     ) {
         val bannerView = BannerAdView(context).apply {
-            setAdUnitId(adUnitId)
-
             val width = if (maxAdWidth > 0) maxAdWidth else {
                 val displayMetrics = context.resources.displayMetrics
                 (displayMetrics.widthPixels / displayMetrics.density).toInt()
             }
-            setAdSize(BannerAdSize.stickySize(context, width))
+            setAdSize(BannerAdSize.sticky(context, width))
 
             setBannerAdEventListener(object : BannerAdEventListener {
                 override fun onAdLoaded() {
@@ -64,14 +62,6 @@ class YandexBannerProvider(
                     callback.onBannerClicked()
                 }
 
-                override fun onLeftApplication() {
-                    // No direct mapping in BannerAdCallback
-                }
-
-                override fun onReturnedToApplication() {
-                    // No direct mapping in BannerAdCallback
-                }
-
                 override fun onImpression(impressionData: ImpressionData?) {
                     callback.onBannerImpression()
                     callback.onPaidEvent(impressionData.toAdKitValue())
@@ -79,7 +69,7 @@ class YandexBannerProvider(
             })
         }
 
-        bannerView.loadAd(AdRequest.Builder().build())
+        bannerView.loadAd(AdRequest.Builder(adUnitId).build())
     }
 
     override fun pause() {

@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import com.yandex.mobile.ads.common.AdError
-import com.yandex.mobile.ads.common.AdRequestConfiguration
+import com.yandex.mobile.ads.common.AdRequest
 import com.yandex.mobile.ads.common.AdRequestError
 import com.yandex.mobile.ads.common.ImpressionData
 import com.yandex.mobile.ads.interstitial.InterstitialAd
@@ -37,25 +37,22 @@ class YandexInterstitialProvider : InterstitialAdProvider {
         adUnitId: String,
         callback: InterstitialAdProvider.InterstitialAdCallback
     ) {
-        val loader = InterstitialAdLoader(context).apply {
-            setAdLoadListener(object : InterstitialAdLoadListener {
-                override fun onAdLoaded(ad: InterstitialAd) {
-                    interstitialAd = ad
-                    Log.d(TAG, "Interstitial ad loaded: $adUnitId")
-                    callback.onAdLoaded()
-                }
+        val listener = object : InterstitialAdLoadListener {
+            override fun onAdLoaded(ad: InterstitialAd) {
+                interstitialAd = ad
+                Log.d(TAG, "Interstitial ad loaded: $adUnitId")
+                callback.onAdLoaded()
+            }
 
-                override fun onAdFailedToLoad(error: AdRequestError) {
-                    interstitialAd = null
-                    Log.e(TAG, "Interstitial ad failed to load: ${error.description}")
-                    callback.onAdFailedToLoad(error.toAdKitError())
-                }
-            })
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                interstitialAd = null
+                Log.e(TAG, "Interstitial ad failed to load: ${error.description}")
+                callback.onAdFailedToLoad(error.toAdKitError())
+            }
         }
+        val loader = InterstitialAdLoader(context)
         interstitialAdLoader = loader
-
-        val adRequestConfiguration = AdRequestConfiguration.Builder(adUnitId).build()
-        loader.loadAd(adRequestConfiguration)
+        loader.loadAd(AdRequest.Builder(adUnitId).build(), listener)
     }
 
     override fun showAd(activity: Activity, callback: InterstitialAdProvider.InterstitialShowCallback) {
@@ -105,7 +102,6 @@ class YandexInterstitialProvider : InterstitialAdProvider {
     override fun isAdReady(): Boolean = interstitialAd != null
 
     override fun destroy() {
-        interstitialAdLoader?.setAdLoadListener(null)
         interstitialAdLoader = null
         interstitialAd?.setAdEventListener(null)
         interstitialAd = null

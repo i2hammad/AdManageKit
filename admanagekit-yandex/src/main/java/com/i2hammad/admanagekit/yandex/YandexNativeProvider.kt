@@ -12,16 +12,17 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.yandex.mobile.ads.common.AdBindingResult
+import com.yandex.mobile.ads.common.AdRequest
 import com.yandex.mobile.ads.common.AdRequestError
 import com.yandex.mobile.ads.common.ImpressionData
+import com.yandex.mobile.ads.nativeads.MediaView
 import com.yandex.mobile.ads.nativeads.NativeAd
 import com.yandex.mobile.ads.nativeads.NativeAdEventListener
 import com.yandex.mobile.ads.nativeads.NativeAdLoadListener
 import com.yandex.mobile.ads.nativeads.NativeAdLoader
-import com.yandex.mobile.ads.nativeads.NativeAdRequestConfiguration
 import com.yandex.mobile.ads.nativeads.NativeAdView
 import com.yandex.mobile.ads.nativeads.NativeAdViewBinder
-import com.yandex.mobile.ads.nativeads.template.NativeBannerView
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdSize
@@ -32,7 +33,7 @@ import com.i2hammad.admanagekit.yandex.internal.toAdKitValue
  * Yandex Ads implementation of [NativeAdProvider].
  *
  * Renders different layouts based on [NativeAdSize]:
- * - [NativeAdSize.LARGE]: Uses [NativeBannerView] template (full layout with media)
+ * - [NativeAdSize.LARGE]: Custom layout with media + icon + title + body + CTA
  * - [NativeAdSize.MEDIUM]: Custom layout with icon + title + body + CTA (no media)
  * - [NativeAdSize.SMALL]: Custom compact layout with icon + title + CTA (no body, no media)
  *
@@ -57,54 +58,46 @@ class YandexNativeProvider : NativeAdProvider {
         callback: NativeAdProvider.NativeAdCallback,
         sizeHint: NativeAdSize
     ) {
-        val loader = NativeAdLoader(context).apply {
-            setNativeAdLoadListener(object : NativeAdLoadListener {
-                override fun onAdLoaded(nativeAd: NativeAd) {
-                    currentNativeAd = nativeAd
+        val listener = object : NativeAdLoadListener {
+            override fun onAdLoaded(nativeAd: NativeAd) {
+                currentNativeAd = nativeAd
 
-                    nativeAd.setNativeAdEventListener(object : NativeAdEventListener {
-                        override fun onAdClicked() {
-                            callback.onNativeAdClicked()
-                        }
-
-                        override fun onLeftApplication() {}
-
-                        override fun onReturnedToApplication() {}
-
-                        override fun onImpression(impressionData: ImpressionData?) {
-                            callback.onNativeAdImpression()
-                            callback.onPaidEvent(impressionData.toAdKitValue())
-                        }
-                    })
-
-                    try {
-                        val adView = createNativeAdView(context, nativeAd, sizeHint)
-                        Log.d(TAG, "Native ad loaded ($sizeHint): $adUnitId")
-                        callback.onNativeAdLoaded(adView, nativeAd)
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to create native ad view: ${e.message}", e)
-                        callback.onNativeAdFailedToLoad(
-                            com.i2hammad.admanagekit.core.ad.AdKitAdError(
-                                0, "Failed to bind native ad: ${e.message}", "yandex"
-                            )
-                        )
+                nativeAd.setNativeAdEventListener(object : NativeAdEventListener {
+                    override fun onAdClicked() {
+                        callback.onNativeAdClicked()
                     }
-                }
 
-                override fun onAdFailedToLoad(error: AdRequestError) {
-                    Log.e(TAG, "Native ad failed to load: ${error.description}")
-                    callback.onNativeAdFailedToLoad(error.toAdKitError())
+                    override fun onImpression(impressionData: ImpressionData?) {
+                        callback.onNativeAdImpression()
+                        callback.onPaidEvent(impressionData.toAdKitValue())
+                    }
+                })
+
+                try {
+                    val adView = createNativeAdView(context, nativeAd, sizeHint)
+                    Log.d(TAG, "Native ad loaded ($sizeHint): $adUnitId")
+                    callback.onNativeAdLoaded(adView, nativeAd)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to create native ad view: ${e.message}", e)
+                    callback.onNativeAdFailedToLoad(
+                        com.i2hammad.admanagekit.core.ad.AdKitAdError(
+                            0, "Failed to bind native ad: ${e.message}", "yandex"
+                        )
+                    )
                 }
-            })
+            }
+
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                Log.e(TAG, "Native ad failed to load: ${error.description}")
+                callback.onNativeAdFailedToLoad(error.toAdKitError())
+            }
         }
+        val loader = NativeAdLoader(context)
         nativeAdLoader = loader
-
-        val requestConfiguration = NativeAdRequestConfiguration.Builder(adUnitId).build()
-        loader.loadAd(requestConfiguration)
+        loader.loadAd(AdRequest.Builder(adUnitId).build(), listener)
     }
 
     override fun destroy() {
-        nativeAdLoader?.setNativeAdLoadListener(null)
         nativeAdLoader = null
         currentNativeAd?.setNativeAdEventListener(null)
         currentNativeAd = null
@@ -120,16 +113,201 @@ class YandexNativeProvider : NativeAdProvider {
         }
     }
 
-    /** LARGE: Full template via [NativeBannerView] — includes media, all assets. */
+    /** LARGE: MediaView + icon + title + body + CTA — full asset set for app-type ads. */
     private fun createLargeAdView(context: Context, nativeAd: NativeAd): View {
-        val nativeBannerView = NativeBannerView(context).apply {
+        val colors = resolveColors(context)
+        val dp4 = dpToPx(context, 4)
+        val dp8 = dpToPx(context, 8)
+        val dp12 = dpToPx(context, 12)
+        val dp16 = dpToPx(context, 16)
+        val dp48 = dpToPx(context, 48)
+
+        val nativeAdView = NativeAdView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         }
-        nativeBannerView.setAd(nativeAd)
-        return nativeBannerView
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(dp12, dp12, dp12, dp12)
+            background = createCardBackground(context, colors)
+            clipToOutline = true
+        }
+
+        // Header row: icon + text column (title / domain+favicon / price) + feedback
+        val headerRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val iconView = ImageView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(dp48, dp48).apply { marginEnd = dp8 }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        val textColumn = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+
+        val titleView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(colors.title)
+            maxLines = 2
+        }
+
+        // Favicon + domain on the same row
+        val domainRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val faviconView = ImageView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(dpToPx(context, 14), dpToPx(context, 14)).apply {
+                marginEnd = dp4
+            }
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
+
+        val domainView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(colors.secondary)
+            maxLines = 1
+        }
+
+        domainRow.addView(faviconView)
+        domainRow.addView(domainView)
+
+        // Price (required for app-type ads)
+        val priceView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setTextColor(colors.secondary)
+            maxLines = 1
+        }
+
+        textColumn.addView(titleView)
+        textColumn.addView(domainRow)
+        textColumn.addView(priceView)
+
+        val feedbackView = ImageView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(dpToPx(context, 24), dpToPx(context, 24)).apply {
+                marginStart = dp8
+            }
+        }
+
+        headerRow.addView(iconView)
+        headerRow.addView(textColumn)
+        headerRow.addView(feedbackView)
+        container.addView(headerRow)
+
+        // Body text
+        val bodyView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextColor(colors.body)
+            maxLines = 3
+            setPadding(0, dp8, 0, dp8)
+        }
+        container.addView(bodyView)
+
+        // CTA above media — always visible regardless of how tall the image is
+        val ctaView = TextView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp8 }
+            background = createCtaBackground(context, colors)
+            setTextColor(colors.ctaText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            setPadding(dp16, dp12, dp16, dp12)
+        }
+        container.addView(ctaView)
+
+        // Media view below CTA; starts GONE, SDK makes it visible when content is ready
+        val mediaView = MediaView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dpToPx(context, 200)
+            ).apply {
+                topMargin = dp8
+            }
+            visibility = View.GONE
+        }
+        container.addView(mediaView)
+
+        // Bottom row: warning + sponsored
+        val bottomRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp4 }
+            gravity = Gravity.CENTER_VERTICAL
+        }
+
+        val warningView = TextView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setTextColor(colors.secondary)
+            maxLines = 2
+        }
+
+        val sponsoredView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setTextColor(colors.secondary)
+        }
+
+        bottomRow.addView(warningView)
+        bottomRow.addView(sponsoredView)
+        container.addView(bottomRow)
+
+        nativeAdView.addView(container)
+
+        val binder = NativeAdViewBinder.Builder(nativeAdView)
+            .setTitleView(titleView)
+            .setBodyView(bodyView)
+            .setCallToActionView(ctaView)
+            .setIconView(iconView)
+            .setFaviconView(faviconView)
+            .setDomainView(domainView)
+            .setPriceView(priceView)
+            .setFeedbackView(feedbackView)
+            .setWarningView(warningView)
+            .setSponsoredView(sponsoredView)
+            .setMediaView(mediaView)
+            .build()
+
+        if (nativeAd.bindNativeAd(binder) is AdBindingResult.Failure) {
+            throw IllegalStateException("Native ad binding failed for LARGE")
+        }
+        return nativeAdView
     }
 
     /** MEDIUM: Icon + title + body + CTA. No media. */
@@ -274,7 +452,10 @@ class YandexNativeProvider : NativeAdProvider {
             .setSponsoredView(sponsoredView)
             .build()
 
-        nativeAd.bindNativeAd(binder)
+        val result = nativeAd.bindNativeAd(binder)
+        if (result is AdBindingResult.Failure) {
+            Log.w(TAG, "Native ad binding failed for MEDIUM")
+        }
         return nativeAdView
     }
 
@@ -409,7 +590,10 @@ class YandexNativeProvider : NativeAdProvider {
             .setSponsoredView(sponsoredView)
             .build()
 
-        nativeAd.bindNativeAd(binder)
+        val result = nativeAd.bindNativeAd(binder)
+        if (result is AdBindingResult.Failure) {
+            Log.w(TAG, "Native ad binding failed for SMALL")
+        }
         return nativeAdView
     }
 
