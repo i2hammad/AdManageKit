@@ -223,6 +223,18 @@ class NativeTemplateTestActivity : AppCompatActivity() {
             NativeAdTemplate.VIDEO_SQUARE -> "Square video format (1:1)"
             NativeAdTemplate.VIDEO_VERTICAL -> "Portrait video (9:16, Stories style)"
             NativeAdTemplate.VIDEO_FULLSCREEN -> "Edge-to-edge video experience"
+
+            // Flat Design Templates (v3.4.6+)
+            NativeAdTemplate.FLAT_INLINE_ROW -> "Flat list row with top/bottom hairlines"
+            NativeAdTemplate.FLAT_CARD_RATING -> "Flat card with rating row + Get pill"
+            NativeAdTemplate.FLAT_MEDIA_TOP -> "Flat card, media on top + app row"
+            NativeAdTemplate.FLAT_TEXT_MINIMAL -> "Text-only ad with left brand bar"
+            NativeAdTemplate.FLAT_COMPACT_PILL -> "Compact icon + headline + Install pill"
+            NativeAdTemplate.FLAT_CAROUSEL -> "Header + media + footer rating row"
+            NativeAdTemplate.FLAT_BANNER -> "Single-line wide flat banner"
+            NativeAdTemplate.FLAT_FEATURE_LIST -> "Title + 3 bullet benefits + Install"
+            NativeAdTemplate.FLAT_SPONSORED_STORY -> "Editorial-style headline + body + outline CTA"
+            NativeAdTemplate.FLAT_FOOTER_SLIM -> "Sticky-style slim footer ad"
         }
     }
 

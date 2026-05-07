@@ -341,6 +341,161 @@ fun NativeVideoLargeCompose(
     )
 }
 
+// ── Flat Design Templates (10 variants) ─────────────────────────────
+// Flat, minimal, no gradients/heavy shadows. Use theme attributes
+// (?attr/colorSurface, ?attr/colorPrimary, ?attr/colorOutlineVariant)
+// so the templates inherit Material 3 theming and dark-mode support.
+
+/** Flat list-row variant — slips into a feed (top/bottom hairlines, icon + headline + AD label + Install pill). */
+@Composable
+fun NativeFlatInlineRowCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_INLINE_ROW, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat card with rating row + Get pill. */
+@Composable
+fun NativeFlatCardRatingCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_CARD_RATING, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat card with media on top + app row below. */
+@Composable
+fun NativeFlatMediaTopCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_MEDIA_TOP, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat minimal text-only ad with left brand bar (no icon). */
+@Composable
+fun NativeFlatTextMinimalCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_TEXT_MINIMAL, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat compact ad — small icon + headline + small Install pill. */
+@Composable
+fun NativeFlatCompactPillCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_COMPACT_PILL, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat carousel-style ad with media preview + footer rating row. */
+@Composable
+fun NativeFlatCarouselCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_CAROUSEL, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat single-line wide banner. */
+@Composable
+fun NativeFlatBannerCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_BANNER, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat feature-list ad — title + 3 bullet benefits + Install. */
+@Composable
+fun NativeFlatFeatureListCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_FEATURE_LIST, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat editorial-style sponsored story (large headline + body + outline CTA). */
+@Composable
+fun NativeFlatSponsoredStoryCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_SPONSORED_STORY, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
+/** Flat slim footer-style ad — sticky-style row at the bottom. */
+@Composable
+fun NativeFlatFooterSlimCompose(
+    adUnitId: String,
+    modifier: Modifier = Modifier,
+    loadingStrategy: AdLoadingStrategy? = null,
+    onAdLoaded: (() -> Unit)? = null,
+    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdClicked: (() -> Unit)? = null,
+    onAdImpression: (() -> Unit)? = null
+) = NativeTemplateCompose(
+    adUnitId, NativeAdTemplate.FLAT_FOOTER_SLIM, modifier, loadingStrategy,
+    onAdLoaded, onAdFailedToLoad, onAdClicked, onAdImpression
+)
+
 /**
  * Video Square template - square format for social feeds
  */

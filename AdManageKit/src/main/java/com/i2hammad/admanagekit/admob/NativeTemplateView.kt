@@ -427,6 +427,22 @@ class NativeTemplateView @JvmOverloads constructor(
             NativeAdTemplate.VIDEO_LARGE,
             NativeAdTemplate.VIDEO_VERTICAL,
             NativeAdTemplate.VIDEO_FULLSCREEN -> NativeAdIntegrationManager.ScreenType.LARGE
+
+            // Flat-design small/banner templates
+            NativeAdTemplate.FLAT_INLINE_ROW,
+            NativeAdTemplate.FLAT_COMPACT_PILL,
+            NativeAdTemplate.FLAT_BANNER,
+            NativeAdTemplate.FLAT_FOOTER_SLIM -> NativeAdIntegrationManager.ScreenType.SMALL
+
+            // Flat-design medium templates
+            NativeAdTemplate.FLAT_CARD_RATING,
+            NativeAdTemplate.FLAT_TEXT_MINIMAL,
+            NativeAdTemplate.FLAT_FEATURE_LIST -> NativeAdIntegrationManager.ScreenType.MEDIUM
+
+            // Flat-design large/hero templates (have a media area or long content)
+            NativeAdTemplate.FLAT_MEDIA_TOP,
+            NativeAdTemplate.FLAT_CAROUSEL,
+            NativeAdTemplate.FLAT_SPONSORED_STORY -> NativeAdIntegrationManager.ScreenType.LARGE
         }
     }
 

@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.5`** upgrades the Yandex Ads module to SDK 8.0.0 and fixes the large native ad layout.
+**Latest Version `3.4.6`** adds 10 new flat-design native ad templates to `NativeTemplateView` (no gradients, subtle separators, theme-aware).
 
 ---
 
@@ -54,24 +54,47 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.5) |
+| Production apps (stable) | **Main branch** (v3.4.6) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.5
+## What's New in 3.4.6
 
-### Yandex Mobile Ads SDK 8.0.0
-`admanagekit-yandex` now targets Yandex SDK 8.0.0. All API changes are handled internally — your existing `YandexProviderRegistration` code requires no changes.
+### 10 Flat-Design Native Ad Templates
+`NativeTemplateView` now ships with 10 new templates designed to blend into modern app UIs without disrupting the user experience. **Flat design only** — no gradients, no heavy shadows, subtle 1dp separators, consistent `Ad`/`Sponsored` disclosure. All theme-driven via `?attr/colorSurface` / `?attr/colorPrimary` / `?attr/colorOutlineVariant`, so dark mode and Material 3 theming work out of the box.
 
-### Large Native Ad Layout Fixed
-The Yandex large native ad now displays correctly: title, domain, price, body, CTA button, media image, and disclaimer are all visible. Previously the media image filled the entire card. Changes:
-- CTA button is placed above the media image so it is always visible
-- `price` and `favicon` assets are now included (required for app-type ads)
-- `MediaView` starts hidden and is revealed by the SDK only when content is available
-- Binding failure now reports as `onNativeAdFailedToLoad` instead of showing a blank view
+| XML attr | Best for |
+|----------|----------|
+| `flat_inline_row` | List/feed rows (top + bottom hairlines) |
+| `flat_card_rating` | Card with rating + Get pill |
+| `flat_media_top` | Vertical card with media on top |
+| `flat_text_minimal` | Text-only ad with left brand bar |
+| `flat_compact_pill` | Small icon + headline + CTA |
+| `flat_carousel` | Header + media + footer rating row |
+| `flat_banner` | Single-line wide banner |
+| `flat_feature_list` | Title + 3 bullet benefits + Install |
+| `flat_sponsored_story` | Editorial-style headline + body |
+| `flat_footer_slim` | Sticky-style slim footer |
+
+```xml
+<com.i2hammad.admanagekit.admob.NativeTemplateView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:adTemplate="flat_card_rating" />
+```
+
+```kotlin
+// Compose
+NativeFlatCardRatingCompose(adUnitId = "ca-app-pub-…")
+
+// Programmatic
+nativeTemplateView.setTemplate(NativeAdTemplate.FLAT_MEDIA_TOP)
+```
+
+This brings the total `NativeTemplateView` template count to **37**.
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 

@@ -5,6 +5,21 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.6] - 2026-05-07
+
+### Added
+- **10 Flat-Design Native Ad Templates** for `NativeTemplateView` (total templates: 27 → 37)
+  - `FLAT_INLINE_ROW`, `FLAT_CARD_RATING`, `FLAT_MEDIA_TOP`, `FLAT_TEXT_MINIMAL`, `FLAT_COMPACT_PILL`, `FLAT_CAROUSEL`, `FLAT_BANNER`, `FLAT_FEATURE_LIST`, `FLAT_SPONSORED_STORY`, `FLAT_FOOTER_SLIM`
+  - Flat-design rules: no gradients, no heavy shadows, subtle separators, consistent `Ad` / `Sponsored` disclosure, pill-shaped CTAs
+  - Theme-driven via `?attr/colorSurface`, `?attr/colorPrimary`, `?attr/colorOnSurface`, `?attr/colorOnSurfaceVariant`, `?attr/colorOutlineVariant` — full Material 3 / dark-mode support
+- New `app:adTemplate` enum values (28–37) for XML usage: `flat_inline_row`, `flat_card_rating`, `flat_media_top`, `flat_text_minimal`, `flat_compact_pill`, `flat_carousel`, `flat_banner`, `flat_feature_list`, `flat_sponsored_story`, `flat_footer_slim`
+- 10 new Compose helpers in `admanagekit-compose`: `NativeFlatInlineRowCompose`, `NativeFlatCardRatingCompose`, `NativeFlatMediaTopCompose`, `NativeFlatTextMinimalCompose`, `NativeFlatCompactPillCompose`, `NativeFlatCarouselCompose`, `NativeFlatBannerCompose`, `NativeFlatFeatureListCompose`, `NativeFlatSponsoredStoryCompose`, `NativeFlatFooterSlimCompose`
+- New companion helper `NativeAdTemplate.flatTemplates(): List<NativeAdTemplate>`
+- 8 new supporting drawables (`ads_flat_pill`, `ads_flat_pill_outline`, `ads_flat_card`, `ads_flat_card_soft`, `ads_flat_label_outline`, `ads_flat_label_filled`, `ads_flat_app_icon_bg`, `ads_flat_media_bg`)
+
+### Changed
+- `NativeTemplateView.getScreenTypeForTemplate()` extended to bucket the new flat templates (SMALL / MEDIUM / LARGE) for size-aware ad requests and integration-manager bookkeeping
+
 ## [3.4.5] - 2026-05-05
 
 ### Changed

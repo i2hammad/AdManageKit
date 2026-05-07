@@ -35,6 +35,17 @@
             <enum name="video_fullscreen" value="25" />
             <enum name="top_icon_media" value="26" />
             <enum name="icon_left" value="27" />
+            <!-- Flat Design Templates (no gradients, subtle separators) -->
+            <enum name="flat_inline_row" value="28" />
+            <enum name="flat_card_rating" value="29" />
+            <enum name="flat_media_top" value="30" />
+            <enum name="flat_text_minimal" value="31" />
+            <enum name="flat_compact_pill" value="32" />
+            <enum name="flat_carousel" value="33" />
+            <enum name="flat_banner" value="34" />
+            <enum name="flat_feature_list" value="35" />
+            <enum name="flat_sponsored_story" value="36" />
+            <enum name="flat_footer_slim" value="37" />
         </attr>
 
         <!-- AdChoices icon placement position -->

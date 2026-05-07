@@ -183,6 +183,67 @@ enum class NativeAdTemplate(
         layoutResId = R.layout.layout_native_icon_left,
         shimmerResId = R.layout.layout_shimmer_icon_left,
         displayName = "Icon Left"
+    ),
+
+    // Flat Design Templates — minimal, no gradients/heavy shadows, subtle separators
+    FLAT_INLINE_ROW(
+        layoutResId = R.layout.layout_native_flat_inline_row,
+        shimmerResId = R.layout.layout_shimmer_flat_inline_row,
+        displayName = "Flat Inline Row"
+    ),
+
+    FLAT_CARD_RATING(
+        layoutResId = R.layout.layout_native_flat_card_rating,
+        shimmerResId = R.layout.layout_shimmer_flat_card_rating,
+        displayName = "Flat Card Rating"
+    ),
+
+    FLAT_MEDIA_TOP(
+        layoutResId = R.layout.layout_native_flat_media_top,
+        shimmerResId = R.layout.layout_shimmer_flat_media_top,
+        displayName = "Flat Media Top"
+    ),
+
+    FLAT_TEXT_MINIMAL(
+        layoutResId = R.layout.layout_native_flat_text_minimal,
+        shimmerResId = R.layout.layout_shimmer_flat_text_minimal,
+        displayName = "Flat Text Minimal"
+    ),
+
+    FLAT_COMPACT_PILL(
+        layoutResId = R.layout.layout_native_flat_compact_pill,
+        shimmerResId = R.layout.layout_shimmer_flat_compact_pill,
+        displayName = "Flat Compact Pill"
+    ),
+
+    FLAT_CAROUSEL(
+        layoutResId = R.layout.layout_native_flat_carousel,
+        shimmerResId = R.layout.layout_shimmer_flat_carousel,
+        displayName = "Flat Carousel"
+    ),
+
+    FLAT_BANNER(
+        layoutResId = R.layout.layout_native_flat_banner,
+        shimmerResId = R.layout.layout_shimmer_flat_banner,
+        displayName = "Flat Banner"
+    ),
+
+    FLAT_FEATURE_LIST(
+        layoutResId = R.layout.layout_native_flat_feature_list,
+        shimmerResId = R.layout.layout_shimmer_flat_feature_list,
+        displayName = "Flat Feature List"
+    ),
+
+    FLAT_SPONSORED_STORY(
+        layoutResId = R.layout.layout_native_flat_sponsored_story,
+        shimmerResId = R.layout.layout_shimmer_flat_sponsored_story,
+        displayName = "Flat Sponsored Story"
+    ),
+
+    FLAT_FOOTER_SLIM(
+        layoutResId = R.layout.layout_native_flat_footer_slim,
+        shimmerResId = R.layout.layout_shimmer_flat_footer_slim,
+        displayName = "Flat Footer Slim"
     );
 
     companion object {
@@ -218,6 +279,13 @@ enum class NativeAdTemplate(
          */
         fun standardTemplates(): List<NativeAdTemplate> {
             return entries.filter { !it.name.startsWith("VIDEO_") }
+        }
+
+        /**
+         * Get all flat-design templates (no gradients, subtle separators)
+         */
+        fun flatTemplates(): List<NativeAdTemplate> {
+            return entries.filter { it.name.startsWith("FLAT_") }
         }
     }
 }
