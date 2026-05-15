@@ -68,6 +68,22 @@ val hasTrial = billing.hasFreeTrial("premium_monthly")         // true/false
 val period = billing.getBillingPeriod("premium_monthly")       // "P1M"
 ```
 
+### 7. Structured Offers (v3.5.7+)
+
+For multi-offer subscriptions, use `OfferInfo` to read each offer's trial,
+introductory, and base phases without parsing `ProductDetails` manually:
+
+```kotlin
+val trial = billing.getTrialOffer("premium_yearly")
+trial?.let {
+    badge.text = "Free for ${it.trialPeriod}"        // "P7D"
+    price.text = "${it.basePrice} / ${it.billingPeriod}"
+}
+
+val base = billing.getBaseOffer("premium_yearly")    // non-promo offer
+val all  = billing.getOffers("premium_yearly")       // every offer
+```
+
 ## Pages
 
 - [[Purchase Categories]] - Product classification system

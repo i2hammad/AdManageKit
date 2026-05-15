@@ -172,6 +172,40 @@ val period = billing.getBillingPeriod("premium_monthly")  // "P1M", "P1Y", etc.
 | `hasFreeTrial(id)` | `boolean` | `true` / `false` |
 | `getFreeTrialPeriod(id)` | `String?` | `"P7D"` |
 | `getBillingPeriod(id)` | `String?` | `"P1M"` |
+| `getIntroductorySubPrice(id)` | `String` | `"$1.99"` |
+
+### Structured Offer API (v3.5.7+)
+
+For products with multiple offers (e.g. a base plan plus a trial offer plus an
+introductory offer), the flat helpers above only return one value per product.
+Use `OfferInfo` to enumerate every offer and read trial / intro / base phases
+without walking `ProductDetails` yourself.
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// All offers attached to a subscription
+for (offer in billing.getOffers("premium_yearly")) {
+    Log.d("IAP", "${offer.basePlanId}/${offer.offerId} " +
+            "trial=${offer.isFreeTrial} (${offer.trialPeriod}) " +
+            "intro=${offer.introPrice} base=${offer.basePrice}/${offer.billingPeriod}")
+}
+
+// Render a single offer (e.g. the trial one) in the paywall
+billing.getTrialOffer("premium_yearly")?.let { trial ->
+    trialBadge.text = "Free for ${trial.trialPeriod}"
+    priceAfterTrial.text = "${trial.basePrice} / ${trial.billingPeriod}"
+}
+
+// Fall back to the plain base offer when no trial is available
+val base = billing.getBaseOffer("premium_yearly")
+priceLabel.text = base?.basePrice.orEmpty()
+```
+
+`OfferInfo` classifies pricing phases by recurrence and price (free trial =
+`priceAmountMicros == 0` + `FINITE_RECURRING`; intro = paid `FINITE_RECURRING`;
+base = `INFINITE_RECURRING`), so it works correctly even when an offer has all
+three phases in a non-standard order.
 
 ---
 

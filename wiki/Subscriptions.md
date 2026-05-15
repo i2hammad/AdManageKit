@@ -168,6 +168,30 @@ PurchaseItem("premium_monthly", "free_trial_7d", TYPE_IAP.SUBSCRIPTION)
 
 The library automatically selects the matching offer when subscribing.
 
+### Reading Trial / Intro / Base Pricing (v3.5.7+)
+
+Use `OfferInfo` to inspect each offer's pricing phases for the paywall UI:
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+billing.getTrialOffer("premium_monthly")?.let { trial ->
+    badge.text = "Free for ${trial.trialPeriod}"          // "P7D"
+    afterTrial.text = "${trial.basePrice}/${trial.billingPeriod}"
+}
+
+billing.getBaseOffer("premium_monthly")?.let { base ->
+    price.text = base.basePrice                           // "$9.99"
+}
+
+// Iterate every offer (trial, intro, base, etc.)
+for (offer in billing.getOffers("premium_monthly")) {
+    // offer.isFreeTrial, offer.hasIntroPrice, offer.introPrice, offer.offerTags ...
+}
+```
+
+See [API Reference](../docs/API_REFERENCE.md#offerinfo-v347) for the full `OfferInfo` schema.
+
 ## Handling Subscription Changes
 
 See [[Subscription Upgrades]] for upgrade/downgrade handling.

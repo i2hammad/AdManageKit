@@ -1348,11 +1348,24 @@ public class AppPurchase {
         UNKNOWN
     }
 
+    /**
+     * @deprecated Use {@link #getPrice(String)} with an explicit product id.
+     */
     @Deprecated
     public String getPrice() {
         return getPrice(currentProductId);
     }
 
+    /**
+     * Returns the formatted price for any product (one-time purchase or subscription).
+     * <p>For subscriptions, this returns the <b>base</b> recurring price (post-trial,
+     * post-intro). For one-time products, the price from
+     * {@link ProductDetails.OneTimePurchaseOfferDetails#getFormattedPrice()}.
+     *
+     * @param productId Play product id previously passed to {@code queryProductDetails}.
+     * @return Locale-formatted price (e.g. {@code "$9.99"}), or empty string if details
+     *         have not been loaded yet for this product.
+     */
     public String getPrice(String productId) {
         ProductDetails productDetails = productDetailsMap.get(productId);
         if (productDetails == null) {
@@ -1366,47 +1379,62 @@ public class AppPurchase {
         }
     }
 
+    /**
+     * Returns the formatted base (post-trial / post-intro) price for a subscription.
+     * <p>Resolved via {@link #getBaseOffer(String)}, so multi-offer products return
+     * the {@code INFINITE_RECURRING} phase rather than whichever offer happens to
+     * be last in the list.
+     *
+     * @param productId Subscription product id.
+     * @return Locale-formatted price (e.g. {@code "$9.99"}), or empty string if no
+     *         subscription details are loaded.
+     */
     public String getPriceSub(String productId) {
-        ProductDetails productDetails = subProductDetailsMap.get(productId);
-        if (productDetails == null) {
-            return "";
-        }
-        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-        if (offers != null && !offers.isEmpty()) {
-            List<ProductDetails.PricingPhase> pricingPhases = offers.get(offers.size() - 1).getPricingPhases().getPricingPhaseList();
-            return pricingPhases.get(pricingPhases.size() - 1).getFormattedPrice();
-        }
-        return "";
+        OfferInfo base = getBaseOffer(productId);
+        return base != null ? base.getBasePrice() : "";
     }
 
+    /**
+     * Returns the full pricing-phase list of the resolved base offer — useful for
+     * paywalls that want to render every phase (trial → intro → recurring).
+     *
+     * @param productId Subscription product id.
+     * @return The base offer's {@link ProductDetails.PricingPhase} list, or an
+     *         empty list if the product has no loaded offers.
+     */
     public List<ProductDetails.PricingPhase> getPricePricingPhaseList(String productId) {
-        ProductDetails productDetails = subProductDetailsMap.get(productId);
-        if (productDetails == null) {
-            return new ArrayList<>();
-        }
-        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-        if (offers != null && !offers.isEmpty()) {
-            return offers.get(offers.size() - 1).getPricingPhases().getPricingPhaseList();
-        }
-        return new ArrayList<>();
+        OfferInfo base = getBaseOffer(productId);
+        return base != null ? base.getPricingPhases() : new ArrayList<>();
     }
 
+    /**
+     * Formatted introductory price (the discounted, finite-recurring phase) across
+     * all offers of a subscription.
+     * <p>Scans every offer attached to the product and returns the first one that
+     * exposes an introductory pricing phase. Returns empty string if no offer has
+     * an intro price or the product is not a subscription.
+     *
+     * @param productId Subscription product id.
+     * @return Locale-formatted intro price (e.g. {@code "$1.99"}), or empty string.
+     */
     public String getIntroductorySubPrice(String productId) {
-        ProductDetails productDetails = subProductDetailsMap.get(productId);
-        if (productDetails == null) {
-            return "";
-        }
-        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-        if (offers != null && !offers.isEmpty()) {
-            for (ProductDetails.PricingPhase phase : offers.get(0).getPricingPhases().getPricingPhaseList()) {
-                if (phase.getBillingCycleCount() > 0 && phase.getPriceAmountMicros() < offers.get(0).getPricingPhases().getPricingPhaseList().get(0).getPriceAmountMicros()) {
-                    return phase.getFormattedPrice();
-                }
+        for (OfferInfo info : getOffers(productId)) {
+            if (info.getHasIntroPrice() && info.getIntroPrice() != null) {
+                return info.getIntroPrice();
             }
         }
         return "";
     }
 
+    /**
+     * Returns the ISO-4217 currency code for a product's price.
+     *
+     * @param productId Play product id.
+     * @param typeIAP   {@link TYPE_IAP#PURCHASE} for one-time products,
+     *                  {@link TYPE_IAP#SUBSCRIPTION} for subscriptions.
+     * @return Currency code (e.g. {@code "USD"}), or empty string if details are
+     *         not loaded.
+     */
     public String getCurrency(String productId, int typeIAP) {
         ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? inAppProductDetailsMap.get(productId) : subProductDetailsMap.get(productId);
         if (productDetails == null) {
@@ -1424,6 +1452,15 @@ public class AppPurchase {
         return "";
     }
 
+    /**
+     * Raw numeric price (currency unit, not micros) — useful for analytics events
+     * that expect a {@code double} amount.
+     *
+     * @param productId Play product id.
+     * @param typeIAP   {@link TYPE_IAP#PURCHASE} or {@link TYPE_IAP#SUBSCRIPTION}.
+     * @return Price as a {@code double} (e.g. {@code 9.99}), or {@code 0.0} if
+     *         details have not been loaded.
+     */
     public double getPriceWithoutCurrency(String productId, int typeIAP) {
         ProductDetails productDetails = typeIAP == TYPE_IAP.PURCHASE ? inAppProductDetailsMap.get(productId) : subProductDetailsMap.get(productId);
         if (productDetails == null) {
@@ -1441,68 +1478,149 @@ public class AppPurchase {
         return 0.0;
     }
 
+    /**
+     * Play Console title (includes the app name suffix Play appends, e.g.
+     * {@code "Monthly Premium (My App)"}).
+     *
+     * @return Localized title, or {@code null} if the product is not loaded.
+     */
     public String getProductTitle(String productId) {
         ProductDetails details = subProductDetailsMap.get(productId);
         if (details == null) details = inAppProductDetailsMap.get(productId);
         return details != null ? details.getTitle() : null;
     }
 
+    /**
+     * Clean Play Console product name (without the app-name suffix).
+     *
+     * @return Localized name, or {@code null} if the product is not loaded.
+     */
     public String getProductName(String productId) {
         ProductDetails details = subProductDetailsMap.get(productId);
         if (details == null) details = inAppProductDetailsMap.get(productId);
         return details != null ? details.getName() : null;
     }
 
+    /**
+     * Localized Play Console product description.
+     *
+     * @return Description text, or {@code null} if the product is not loaded.
+     */
     public String getProductDescription(String productId) {
         ProductDetails details = subProductDetailsMap.get(productId);
         if (details == null) details = inAppProductDetailsMap.get(productId);
         return details != null ? details.getDescription() : null;
     }
 
+    /**
+     * Escape hatch: returns the raw {@link ProductDetails} for callers that need
+     * fields not surfaced by the typed helpers (e.g. one-time purchase metadata,
+     * full subscription offer list with all base plans).
+     *
+     * @return The cached {@code ProductDetails}, or {@code null} if not loaded.
+     */
     public ProductDetails getProductDetails(String productId) {
         ProductDetails details = subProductDetailsMap.get(productId);
         if (details == null) details = inAppProductDetailsMap.get(productId);
         return details;
     }
 
+    /**
+     * Whether any offer on this subscription includes a free-trial phase
+     * ({@code priceAmountMicros == 0} with {@code FINITE_RECURRING}).
+     *
+     * @param productId Subscription product id.
+     * @return {@code true} if at least one offer has a trial phase.
+     */
     public boolean hasFreeTrial(String productId) {
-        ProductDetails details = subProductDetailsMap.get(productId);
-        if (details == null) return false;
-        List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
-        if (offers == null) return false;
-        for (ProductDetails.SubscriptionOfferDetails offer : offers) {
-            for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
-                if (phase.getPriceAmountMicros() == 0 && phase.getRecurrenceMode() == ProductDetails.RecurrenceMode.FINITE_RECURRING) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return getTrialOffer(productId) != null;
     }
 
+    /**
+     * ISO-8601 trial duration (e.g. {@code "P7D"}, {@code "P1W"}, {@code "P1M"}).
+     *
+     * @param productId Subscription product id.
+     * @return Trial period string, or {@code null} if no offer has a trial phase.
+     */
     public String getFreeTrialPeriod(String productId) {
+        OfferInfo trial = getTrialOffer(productId);
+        return trial != null ? trial.getTrialPeriod() : null;
+    }
+
+    /**
+     * ISO-8601 base billing cycle (e.g. {@code "P1M"}, {@code "P1Y"}).
+     * <p>Resolved from the {@code INFINITE_RECURRING} phase of the base offer, so
+     * trial/intro phases do not skew the result.
+     *
+     * @param productId Subscription product id.
+     * @return Billing period string, or {@code null} if no base offer is loaded.
+     */
+    public String getBillingPeriod(String productId) {
+        OfferInfo base = getBaseOffer(productId);
+        return base != null ? base.getBillingPeriod() : null;
+    }
+
+    /**
+     * Returns every subscription offer attached to the given product, mapped to a
+     * typed {@link OfferInfo} (trial / intro / base phases classified by recurrence
+     * and price rather than list position).
+     * <p>Use this when a single subscription product has multiple offers — e.g. a
+     * base plan, a 7-day free-trial offer, and a 50%-off introductory offer — and
+     * the paywall needs to render each option.
+     *
+     * @param productId Subscription product id.
+     * @return Immutable {@link List} of offers (never {@code null}). Empty when the
+     *         product is not a subscription or its details have not been loaded.
+     * @since 3.5.7
+     */
+    @NonNull
+    public List<OfferInfo> getOffers(String productId) {
         ProductDetails details = subProductDetailsMap.get(productId);
-        if (details == null) return null;
+        if (details == null) return Collections.emptyList();
         List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
-        if (offers == null) return null;
+        if (offers == null || offers.isEmpty()) return Collections.emptyList();
+        List<OfferInfo> result = new ArrayList<>(offers.size());
         for (ProductDetails.SubscriptionOfferDetails offer : offers) {
-            for (ProductDetails.PricingPhase phase : offer.getPricingPhases().getPricingPhaseList()) {
-                if (phase.getPriceAmountMicros() == 0 && phase.getRecurrenceMode() == ProductDetails.RecurrenceMode.FINITE_RECURRING) {
-                    return phase.getBillingPeriod();
-                }
-            }
+            result.add(OfferInfo.Companion.from(productId, offer));
+        }
+        return result;
+    }
+
+    /**
+     * Returns the first offer on this subscription that contains a free-trial
+     * phase, or {@code null} if no offer has a trial.
+     * <p>Free-trial phase = {@code priceAmountMicros == 0} with
+     * {@code RecurrenceMode.FINITE_RECURRING}.
+     *
+     * @param productId Subscription product id.
+     * @return Trial offer, or {@code null}.
+     * @since 3.5.7
+     */
+    @Nullable
+    public OfferInfo getTrialOffer(String productId) {
+        for (OfferInfo info : getOffers(productId)) {
+            if (info.isFreeTrial()) return info;
         }
         return null;
     }
 
-    public String getBillingPeriod(String productId) {
-        ProductDetails details = subProductDetailsMap.get(productId);
-        if (details == null) return null;
-        List<ProductDetails.SubscriptionOfferDetails> offers = details.getSubscriptionOfferDetails();
-        if (offers == null || offers.isEmpty()) return null;
-        List<ProductDetails.PricingPhase> phases = offers.get(offers.size() - 1).getPricingPhases().getPricingPhaseList();
-        if (phases.isEmpty()) return null;
-        return phases.get(phases.size() - 1).getBillingPeriod();
+    /**
+     * Returns the "base" subscription offer — the one without trial or intro
+     * pricing phases. If every offer has a promo phase, falls back to the last
+     * offer in the list (Play's convention for the base plan).
+     *
+     * @param productId Subscription product id.
+     * @return Base offer, or {@code null} if no subscription details are loaded.
+     * @since 3.5.7
+     */
+    @Nullable
+    public OfferInfo getBaseOffer(String productId) {
+        List<OfferInfo> offers = getOffers(productId);
+        if (offers.isEmpty()) return null;
+        for (OfferInfo info : offers) {
+            if (!info.isFreeTrial() && !info.getHasIntroPrice()) return info;
+        }
+        return offers.get(offers.size() - 1);
     }
 
     public void setDiscount(double discount) {

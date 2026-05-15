@@ -435,7 +435,14 @@ class AppPurchase {
     fun hasFreeTrial(productId: String): Boolean           // Whether subscription has trial
     fun getFreeTrialPeriod(productId: String): String?     // Trial period (e.g. "P7D")
     fun getBillingPeriod(productId: String): String?       // Billing cycle (e.g. "P1M")
-    
+    fun getIntroductorySubPrice(productId: String): String // Formatted intro price (or "")
+    fun getPricePricingPhaseList(productId: String): List<ProductDetails.PricingPhase>
+
+    // Structured Offer API (v3.5.7+)
+    fun getOffers(productId: String): List<OfferInfo>      // All subscription offers
+    fun getTrialOffer(productId: String): OfferInfo?       // First offer with a free trial
+    fun getBaseOffer(productId: String): OfferInfo?        // Base (non-promo) offer
+
     // State
     val isBillingInitialized: Boolean
     
@@ -455,6 +462,62 @@ data class PurchaseItem(
     val offerToken: String = "",
     val type: AppPurchase.TYPE_IAP
 )
+```
+
+### OfferInfo (v3.5.7+)
+
+Typed view over a `SubscriptionOfferDetails`. Each Play subscription offer can
+expose up to three pricing phases — free trial, introductory, base — and
+`OfferInfo` classifies them by recurrence/price instead of list position, so
+multi-offer products (e.g. trial + intro + base) bind cleanly.
+
+```kotlin
+data class OfferInfo(
+    val productId: String,
+    val basePlanId: String?,
+    val offerId: String?,
+    val offerToken: String,
+    val offerTags: List<String>,
+    val pricingPhases: List<ProductDetails.PricingPhase>,
+
+    // Free trial
+    val isFreeTrial: Boolean,
+    val trialPeriod: String?,         // e.g. "P7D"
+    val trialPhase: ProductDetails.PricingPhase?,
+
+    // Introductory price
+    val hasIntroPrice: Boolean,
+    val introPrice: String?,          // formatted, e.g. "$1.99"
+    val introPriceMicros: Long,
+    val introPeriod: String?,         // e.g. "P1M"
+    val introCycleCount: Int,
+    val introPhase: ProductDetails.PricingPhase?,
+
+    // Base recurring price
+    val basePrice: String,            // formatted, e.g. "$9.99"
+    val basePriceMicros: Long,
+    val billingPeriod: String?,       // e.g. "P1M", "P1Y"
+    val currencyCode: String,
+    val basePhase: ProductDetails.PricingPhase?,
+)
+```
+
+Usage:
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// All offers attached to the product
+val offers = billing.getOffers("premium_yearly")
+
+// Direct accessors
+billing.getTrialOffer("premium_yearly")?.let { trial ->
+    showTrialBadge(trial.trialPeriod)        // "P7D"
+}
+billing.getBaseOffer("premium_yearly")?.let { base ->
+    priceLabel.text = base.basePrice         // "$59.99"
+    cycleLabel.text = base.billingPeriod     // "P1Y"
+}
 ```
 
 ## Retry Logic
@@ -734,6 +797,11 @@ enum class TYPE_IAP {
 - Use mock responses for unit testing
 
 ## Changelog
+
+### v3.5.7
+- Added structured offer API to `AppPurchase`: `getOffers()`, `getTrialOffer()`, `getBaseOffer()` returning typed `OfferInfo`
+- New `OfferInfo` data class classifies trial / intro / base pricing phases by recurrence and price (handles multi-offer products correctly)
+- Fixed `getIntroductorySubPrice()`, `getPriceSub()`, `getBillingPeriod()`, `getPricePricingPhaseList()` — now walk all offers and return the correct phase instead of relying on list position
 
 ### v3.4.1
 - Added product metadata APIs to AppPurchase: `getProductTitle()`, `getProductName()`, `getProductDescription()`, `getProductDetails()`

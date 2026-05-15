@@ -5,6 +5,20 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.7] - 2026-05-15
+
+### Added
+- **Structured subscription offer API** in `admanagekit-billing`
+  - New `OfferInfo` data class exposing trial / intro / base pricing phases of a Play subscription offer as flat fields (`isFreeTrial`, `trialPeriod`, `hasIntroPrice`, `introPrice`, `introPeriod`, `introCycleCount`, `basePrice`, `billingPeriod`, `currencyCode`, plus raw `pricingPhases`, `offerToken`, `offerTags`, `basePlanId`, `offerId`)
+  - `AppPurchase.getOffers(productId)` — every offer attached to a subscription product
+  - `AppPurchase.getTrialOffer(productId)` — first offer that contains a free-trial phase
+  - `AppPurchase.getBaseOffer(productId)` — non-promo offer (falls back to the last offer)
+
+### Fixed
+- `AppPurchase.getIntroductorySubPrice()` now correctly walks all offers and returns the discounted finite-recurring phase instead of comparing the first phase against itself
+- `AppPurchase.getPriceSub()` / `getBillingPeriod()` / `getPricePricingPhaseList()` now return the **base** (INFINITE_RECURRING) phase rather than relying on list position, so products with multiple offers report the correct base price/period
+- `AppPurchase.hasFreeTrial()` / `getFreeTrialPeriod()` route through the new offer classifier — same external behavior, single source of truth
+
 ## [3.4.6] - 2026-05-07
 
 ### Added
