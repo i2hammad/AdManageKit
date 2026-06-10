@@ -3,6 +3,7 @@ package com.i2hammad.admanagekit.utils
 import android.os.Handler
 import android.os.Looper
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -32,7 +33,7 @@ import kotlin.math.pow
 class AdRetryManager private constructor() {
     
     private val handler = Handler(Looper.getMainLooper())
-    private val activeRetries = mutableMapOf<String, RetryInfo>()
+    private val activeRetries = ConcurrentHashMap<String, RetryInfo>()
     
     companion object {
         @Volatile
@@ -89,33 +90,48 @@ class AdRetryManager private constructor() {
             true
         )
         
+        var retryInfo: RetryInfo? = null
+
         val runnable = Runnable {
             try {
-                // Remove from active retries when executing
-                activeRetries.remove(adUnitId)
-                
+                // Remove from active retries only if the entry still belongs to this retry
+                // (it may have been replaced by a newer scheduleRetry for the same ad unit)
+                if (activeRetries[adUnitId] === retryInfo) {
+                    activeRetries.remove(adUnitId)
+                }
+
                 AdDebugUtils.logEvent(
-                    adUnitId, 
-                    "retryExecuted", 
-                    "Executing retry attempt ${attempt + 1}/$maxAttempts", 
+                    adUnitId,
+                    "retryExecuted",
+                    "Executing retry attempt ${attempt + 1}/$maxAttempts",
                     true
                 )
-                
+
                 retryAction()
             } catch (e: Exception) {
                 AdDebugUtils.logEvent(
-                    adUnitId, 
-                    "retryException", 
-                    "Retry execution failed: ${e.message}", 
+                    adUnitId,
+                    "retryException",
+                    "Retry execution failed: ${e.message}",
                     false
                 )
             }
         }
-        
-        // Store retry info for tracking
-        val retryInfo = RetryInfo(adUnitId, attempt, maxAttempts, runnable, retryAction)
-        activeRetries[adUnitId] = retryInfo
-        
+
+        // Store retry info for tracking, cancelling any previously scheduled retry
+        // for the same ad unit so it doesn't execute as a duplicate
+        val newRetryInfo = RetryInfo(adUnitId, attempt, maxAttempts, runnable, retryAction)
+        retryInfo = newRetryInfo
+        activeRetries.put(adUnitId, newRetryInfo)?.let { previous ->
+            handler.removeCallbacks(previous.runnable)
+            AdDebugUtils.logEvent(
+                adUnitId,
+                "retryReplaced",
+                "Cancelled previously scheduled retry before scheduling a new one",
+                true
+            )
+        }
+
         // Schedule the retry
         handler.postDelayed(runnable, delay)
     }

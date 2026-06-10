@@ -83,9 +83,11 @@ public class AdsConsentManager {
      * @param umpResultListener The listener to receive the result of the consent request.
      */
     public void requestUMP(Activity activity, boolean enableDebug, String testDevice, boolean resetData, UMPResultListener umpResultListener) {
-        // Prevent concurrent consent requests
+        // Prevent concurrent consent requests, but never drop the caller silently:
+        // report the current consent result so the caller's flow can continue.
         if (isProcessingConsent.getAndSet(true)) {
-            Log.d(TAG, "requestUMP: Consent request already in progress, ignoring");
+            Log.d(TAG, "requestUMP: Consent request already in progress, notifying with current consent result");
+            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
             return;
         }
 
@@ -120,6 +122,9 @@ public class AdsConsentManager {
 
         ConsentRequestParameters params = paramsBuilder.setTagForUnderAgeOfConsent(false).build();
 
+        // Guard against double-notification within this single consent flow
+        final AtomicBoolean hasNotified = new AtomicBoolean(false);
+
         // Request consent information update
         consentInformation.requestConsentInfoUpdate(
                 activity,
@@ -135,8 +140,9 @@ public class AdsConsentManager {
                             Log.d(TAG, "requestUMP: Consent form loaded and shown or not required");
                         }
 
-                        // Update canRequestAds and notify listener
-                        if (!canRequestAds.getAndSet(consentInformation.canRequestAds())) {
+                        // Update canRequestAds and always notify listener (state update must not gate the callback)
+                        canRequestAds.set(consentInformation.canRequestAds());
+                        if (hasNotified.compareAndSet(false, true)) {
                             Log.d(TAG, "requestUMP: Notifying listener, canRequestAds=" + consentInformation.canRequestAds());
                             umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
                         }
@@ -145,8 +151,9 @@ public class AdsConsentManager {
                 requestConsentError -> {
                     isProcessingConsent.set(false);
                     Log.e(TAG, "requestUMP: Consent info update failed: " + requestConsentError.getMessage());
-                    // Update canRequestAds and notify listener
-                    if (!canRequestAds.getAndSet(consentInformation.canRequestAds())) {
+                    // Update canRequestAds and always notify listener (state update must not gate the callback)
+                    canRequestAds.set(consentInformation.canRequestAds());
+                    if (hasNotified.compareAndSet(false, true)) {
                         Log.d(TAG, "requestUMP: Notifying listener after error, canRequestAds=" + consentInformation.canRequestAds());
                         umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
                     }

@@ -265,17 +265,51 @@ class AdManager() {
 
         // Skip if already loading this ad unit
         if (loadingAdUnits.contains(adUnitId) || isAdLoading) {
-            Log.d("AdManager", "Ad unit $adUnitId already loading for splash, skipping duplicate request")
-            AdDebugUtils.logEvent(adUnitId, "skipDuplicateLoad", "Ad already loading for splash", true)
-            // Still set timeout to call callback if current load takes too long
+            Log.d("AdManager", "Ad unit $adUnitId already loading for splash, waiting for in-flight load")
+            AdDebugUtils.logEvent(adUnitId, "skipDuplicateLoad", "Ad already loading for splash, waiting", true)
+            // Poll the in-flight load so this caller is always notified exactly once:
+            // success -> onNextAction + onAdLoaded (same as the normal success path),
+            // failure/timeout -> onNextAction.
             this.adUnitId = adUnitId
             var callbackCalled = false
-            Handler(Looper.getMainLooper()).postDelayed({
-                if (!callbackCalled && !isReady()) {
-                    callbackCalled = true
-                    callback.onNextAction()
+            val checkIntervalMs = 100L
+            var elapsedMs = 0L
+            val handler = Handler(Looper.getMainLooper())
+            val checkRunnable = object : Runnable {
+                override fun run() {
+                    if (callbackCalled) return
+                    when {
+                        // In-flight load completed successfully
+                        isReady() -> {
+                            callbackCalled = true
+                            AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "In-flight splash load completed", true)
+                            callback.onNextAction()
+                            callback.onAdLoaded()
+                        }
+
+                        // Timeout reached - proceed without the ad
+                        elapsedMs >= timeoutMillis -> {
+                            callbackCalled = true
+                            AdDebugUtils.logEvent(adUnitId, "onTimeout", "In-flight splash load timed out", false)
+                            callback.onNextAction()
+                        }
+
+                        // In-flight load finished without an ad (failed) - proceed
+                        !loadingAdUnits.contains(adUnitId) && !isAdLoading -> {
+                            callbackCalled = true
+                            AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "In-flight splash load failed", false)
+                            callback.onNextAction()
+                        }
+
+                        // Still loading - check again
+                        else -> {
+                            elapsedMs += checkIntervalMs
+                            handler.postDelayed(this, checkIntervalMs)
+                        }
+                    }
                 }
-            }, timeoutMillis)
+            }
+            handler.post(checkRunnable)
             return
         }
 
@@ -327,13 +361,16 @@ class AdManager() {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
                     retryAttempts[adUnitId] = currentAttempt + 1
 
+                    // Use application context so the retry closure doesn't retain an Activity
+                    val appContext = context.applicationContext
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = currentAttempt,
                         maxAttempts = AdManageKitConfig.maxRetryAttempts
                     ) {
-                        // Retry loading the ad
-                        loadInterstitialAdForSplash(context, adUnitId, timeoutMillis, callback)
+                        // Retry purely to warm the cache for the next show.
+                        // Do NOT reuse the splash callback - it fires exactly once below.
+                        loadInterstitialAd(appContext, adUnitId)
                     }
                 } else {
                     mInterstitialAd = null
@@ -455,13 +492,15 @@ class AdManager() {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
                     retryAttempts[adUnitId] = currentAttempt + 1
 
+                    // Use application context so the retry closure doesn't retain an Activity
+                    val appContext = context.applicationContext
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = currentAttempt,
                         maxAttempts = AdManageKitConfig.maxRetryAttempts
                     ) {
                         // Retry loading the ad
-                        loadInterstitialAd(context, adUnitId)
+                        loadInterstitialAd(appContext, adUnitId)
                     }
                 }
 
@@ -568,6 +607,7 @@ class AdManager() {
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                isAdLoading = false
                 Log.e("AdManager", "Failed to load interstitial ad: ${loadAdError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Interstitial failed with callback: ${loadAdError.message}", false)
 
@@ -575,17 +615,19 @@ class AdManager() {
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry(adUnitId)) {
                     val currentAttempt = retryAttempts[adUnitId] ?: 0
                     retryAttempts[adUnitId] = currentAttempt + 1
-                    
+
+                    // Use application context so the retry closure doesn't retain an Activity
+                    val appContext = context.applicationContext
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = currentAttempt,
                         maxAttempts = AdManageKitConfig.maxRetryAttempts
                     ) {
-                        // Retry loading the ad with callback
-                        loadInterstitialAd(context, adUnitId, interstitialAdLoadCallback)
+                        // Retry purely to warm the cache.
+                        // Do NOT reuse the caller's callback - it is notified exactly once below.
+                        loadInterstitialAd(appContext, adUnitId)
                     }
                 } else {
-                    isAdLoading = false
                     mInterstitialAd = null
                 }
 
@@ -831,8 +873,13 @@ class AdManager() {
                 AdDebugUtils.logEvent(currentAdUnitId, "showingCachedFallback", "Fresh load failed, showing cached fallback", true)
                 mInterstitialAd = cachedAdFallback
                 val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
+                // The cached ad may have been loaded under a different ad unit - find its real
+                // pool key so showAd's consume/analytics logic removes and attributes it correctly
+                val fallbackAdUnitId = adPool.entries.firstOrNull { it.value === cachedAdFallback }?.key
+                    ?: currentAdUnitId
                 dismissDialogOnce {
-                    showAd(activity, callback, effectiveAutoReload) // Reload after showing fallback
+                    // Show the specific fallback ad (bypass arbitrary pool selection)
+                    showAd(activity, callback, effectiveAutoReload, fallbackAdUnitId to cachedAdFallback) // Reload after showing fallback
                 }
                 return true
             }
@@ -856,9 +903,10 @@ class AdManager() {
                 AdDebugUtils.logEvent(currentAdUnitId, "onAdLoaded", "Fresh interstitial loaded for force show", true)
 
                 val effectiveAutoReload = AdManageKitConfig.interstitialAutoReload
-                // Animate dialog dismissal and show fresh ad
+                // Animate dialog dismissal and show the freshly loaded ad
+                // (pass it explicitly so an unrelated pooled ad is never shown instead)
                 dismissDialogOnce {
-                    showAd(activity, callback, effectiveAutoReload)
+                    showAd(activity, callback, effectiveAutoReload, currentAdUnitId to interstitialAd)
                 }
             }
 
@@ -1191,16 +1239,29 @@ class AdManager() {
         return null
     }
 
-    private fun showAd(activity: Activity, callback: AdManagerCallback, reloadAd: Boolean) {
+    private fun showAd(
+        activity: Activity,
+        callback: AdManagerCallback,
+        reloadAd: Boolean,
+        specificAd: Pair<String, InterstitialAd>? = null
+    ) {
         if (useWaterfall) { showWaterfallAd(activity, callback, reloadAd); return }
 
-        if (!isReady()) {
+        // Guard: never call show() while another interstitial is on screen
+        if (isDisplayingAd) {
+            Log.d("AdManager", "Interstitial ad is already displaying, skipping duplicate show request")
+            AdDebugUtils.logEvent(adUnitId ?: "", "skipAlreadyDisplaying", "Interstitial already displaying", false)
             callback.onNextAction()
             return
         }
 
-        // Get any available ad from the pool
-        val adPair = getAnyAvailableAd()
+        if (specificAd == null && !isReady()) {
+            callback.onNextAction()
+            return
+        }
+
+        // Use the specific ad if provided (force/fresh path), otherwise any available ad from the pool
+        val adPair = specificAd ?: getAnyAvailableAd()
         if (adPair == null) {
             Log.w("AdManager", "No ad available in pool")
             callback.onNextAction()
@@ -1209,8 +1270,13 @@ class AdManager() {
 
         val (shownAdUnitId, interstitialAd) = adPair
 
-        // Remove from pool (it's being shown)
-        adPool.remove(shownAdUnitId)
+        // Remove from pool (it's being shown) - only if the pool entry is this exact ad
+        adPool.remove(shownAdUnitId, interstitialAd)
+
+        // Clear legacy mirror if it points at the consumed ad so it can't be shown twice
+        if (mInterstitialAd === interstitialAd) {
+            mInterstitialAd = null
+        }
 
         Log.d("AdManager", "Showing ad from unit: $shownAdUnitId (remaining in pool: ${adPool.size})")
         AdDebugUtils.logEvent(shownAdUnitId, "showingFromPool", "Pool size after: ${adPool.size}", true)
@@ -1218,7 +1284,10 @@ class AdManager() {
         interstitialAd.fullScreenContentCallback = object : FullScreenContentCallback() {
             override fun onAdDismissedFullScreenContent() {
                 isDisplayingAd = false
-                mInterstitialAd = null
+                // Only clear the mirror if it still points at this ad (a newer ad may have loaded meanwhile)
+                if (mInterstitialAd === interstitialAd) {
+                    mInterstitialAd = null
+                }
                 AdDebugUtils.logEvent(shownAdUnitId, "onAdDismissed", "Interstitial ad dismissed", true)
                 callback.onNextAction()
 
@@ -1238,7 +1307,10 @@ class AdManager() {
 
             override fun onAdFailedToShowFullScreenContent(adError: AdError) {
                 isDisplayingAd = false
-                mInterstitialAd = null
+                // Only clear the mirror if it still points at this ad (a newer ad may have loaded meanwhile)
+                if (mInterstitialAd === interstitialAd) {
+                    mInterstitialAd = null
+                }
                 Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
                 AdDebugUtils.logEvent(shownAdUnitId, "onFailedToShow", "Interstitial failed to show: ${adError.message}", false)
                 callback.onNextAction()

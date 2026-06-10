@@ -499,7 +499,7 @@ object AdManageKitConfig {
         interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
         appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
         nativeLoadingStrategy = AdLoadingStrategy.HYBRID
-        maxCacheMemoryMB = 50
+        maxCacheMemoryMB = 200
         enableLRUEviction = true
         cacheCleanupInterval = 30.seconds * 60
         enableExponentialBackoff = true
