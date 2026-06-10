@@ -33,7 +33,9 @@ object NativeAdManager {
     val cacheExpiryMs: Long get() = AdManageKitConfig.nativeCacheExpiry.inWholeMilliseconds
     val maxCachedAdsPerUnit: Int get() = AdManageKitConfig.maxCachedAdsPerUnit
     val enableBackgroundCleanup: Boolean get() = AdManageKitConfig.enableAutoCacheCleanup
-    val cleanupIntervalMinutes: Long get() = AdManageKitConfig.cacheCleanupInterval.inWholeMinutes
+    // Clamped to at least 1 minute: sub-minute cacheCleanupInterval values truncate to 0,
+    // and scheduleWithFixedDelay(..., 0, 0, MINUTES) throws inside the init block
+    val cleanupIntervalMinutes: Long get() = AdManageKitConfig.cacheCleanupInterval.inWholeMinutes.coerceAtLeast(1)
     val enableAnalytics: Boolean get() = AdManageKitConfig.enablePerformanceMetrics
     
     // Thread-safe cache storage
@@ -227,64 +229,67 @@ object NativeAdManager {
             return null
         }
 
-        synchronized(getLockForAdUnit(adUnitId)) {
+        // Primary lookup runs under this unit's lock. Fallback lookups acquire OTHER
+        // units' locks, so they MUST run after this lock is released — otherwise two
+        // threads falling back toward each other acquire locks in opposite order
+        // (A->B vs B->A) and deadlock.
+        val primaryAd: NativeAd? = synchronized(getLockForAdUnit(adUnitId)) {
             val adList = cachedAds[adUnitId]
             if (adList == null || adList.isEmpty()) {
                 logDebug("Cache miss for $adUnitId: no cached ads")
-
-                // Fallback: try to find any cached ad from other ad units
-                if (enableFallbackToAnyAd) {
-                    return getFallbackCachedAd(adUnitId)
-                }
-
-                cacheMisses.incrementAndGet()
-                return null
-            }
-
-            val currentTime = System.currentTimeMillis()
-
-            // Clean up expired ads
-            cleanupExpiredAds(adUnitId, adList, currentTime)
-
-            // Find the most recently cached valid ad (LIFO for freshest ad)
-            val validAd = adList.lastOrNull()
-
-            return if (validAd != null) {
-                // Update access statistics for LRU tracking
-                validAd.lastAccessTime = currentTime
-                validAd.accessCount++
-
-                // Remove from cache since it's being used
-                adList.remove(validAd)
-
-                // Update performance counters
-                cacheHits.incrementAndGet()
-                totalAdsServed.incrementAndGet()
-
-                val ageMs = validAd.getAgeMs(currentTime)
-                logDebug("Cache hit for $adUnitId: served ad aged ${ageMs}ms, access count: ${validAd.accessCount}")
-
-                // Track analytics
-                trackEvent("native_ad_served", mapOf(
-                    "ad_unit_id" to adUnitId,
-                    "age_ms" to ageMs,
-                    "access_count" to validAd.accessCount,
-                    "source" to "cache"
-                ))
-
-                validAd.ad
-            } else {
-                logDebug("Cache miss for $adUnitId: no valid ads after cleanup")
-
-                // Fallback: try to find any cached ad from other ad units
-                if (enableFallbackToAnyAd) {
-                    return getFallbackCachedAd(adUnitId)
-                }
-
-                cacheMisses.incrementAndGet()
                 null
+            } else {
+                val currentTime = System.currentTimeMillis()
+
+                // Clean up expired ads
+                cleanupExpiredAds(adUnitId, adList, currentTime)
+
+                // Find the most recently cached valid ad (LIFO for freshest ad)
+                val validAd = adList.lastOrNull()
+
+                if (validAd != null) {
+                    // Update access statistics for LRU tracking
+                    validAd.lastAccessTime = currentTime
+                    validAd.accessCount++
+
+                    // Remove from cache since it's being used
+                    adList.remove(validAd)
+
+                    // Update performance counters
+                    cacheHits.incrementAndGet()
+                    totalAdsServed.incrementAndGet()
+
+                    val ageMs = validAd.getAgeMs(currentTime)
+                    logDebug("Cache hit for $adUnitId: served ad aged ${ageMs}ms, access count: ${validAd.accessCount}")
+
+                    // Track analytics
+                    trackEvent("native_ad_served", mapOf(
+                        "ad_unit_id" to adUnitId,
+                        "age_ms" to ageMs,
+                        "access_count" to validAd.accessCount,
+                        "source" to "cache"
+                    ))
+
+                    validAd.ad
+                } else {
+                    logDebug("Cache miss for $adUnitId: no valid ads after cleanup")
+                    null
+                }
             }
         }
+
+        if (primaryAd != null) {
+            return primaryAd
+        }
+
+        // Fallback: try to find any cached ad from other ad units.
+        // Runs OUTSIDE the primary lock to preserve lock ordering (see above).
+        if (enableFallbackToAnyAd) {
+            return getFallbackCachedAd(adUnitId)
+        }
+
+        cacheMisses.incrementAndGet()
+        return null
     }
 
     /**
@@ -493,18 +498,19 @@ object NativeAdManager {
      * Clears all cached ads and resets the cache manager.
      */
     fun clearAllCachedAds() {
-        // Clear all cached ads
-        for ((adUnitId, _) in cachedAds) {
+        // Destroy and remove each unit's entry atomically under that unit's lock so a
+        // concurrent getCachedNativeAd can never observe an already-destroyed ad.
+        // NOTE: cacheLocks is intentionally NOT cleared — lock objects must remain
+        // stable for the lifetime of the process so every thread always synchronizes
+        // on the same object per ad unit. Clearing them would void all locking
+        // guarantees for threads still holding the old lock objects.
+        for (adUnitId in cachedAds.keys.toList()) {
             synchronized(getLockForAdUnit(adUnitId)) {
-                val adList = cachedAds[adUnitId]
-                adList?.forEach { cachedAd ->
+                cachedAds.remove(adUnitId)?.forEach { cachedAd ->
                     cachedAd.ad.destroy()
                 }
             }
         }
-        
-        cachedAds.clear()
-        cacheLocks.clear()
     }
     
     /**
@@ -512,25 +518,20 @@ object NativeAdManager {
      */
     fun performCleanup() {
         val currentTime = System.currentTimeMillis()
-        val adUnitsToRemove = mutableListOf<String>()
-        
-        for ((adUnitId, _) in cachedAds) {
+
+        for (adUnitId in cachedAds.keys.toList()) {
             synchronized(getLockForAdUnit(adUnitId)) {
                 val adList = cachedAds[adUnitId]
                 if (adList != null) {
                     cleanupExpiredAds(adUnitId, adList, currentTime)
-                    
-                    // Mark empty ad units for removal
+
+                    // Remove empty ad units inside the same lock that observed emptiness,
+                    // so a concurrent setCachedNativeAd can't add an ad to a list we then orphan
                     if (adList.isEmpty()) {
-                        adUnitsToRemove.add(adUnitId)
+                        cachedAds.remove(adUnitId)
                     }
                 }
             }
-        }
-        
-        // Remove empty ad units
-        adUnitsToRemove.forEach { adUnitId ->
-            cachedAds.remove(adUnitId)
         }
     }
     
@@ -662,30 +663,22 @@ object NativeAdManager {
 
         logDebug("🔄 Preloading native ad for $adUnitId (size: $size)")
 
-        // Use ProgrammaticNativeAdLoader to load the ad, then manually cache it
-        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
+        // Raw preload: load the NativeAd directly WITHOUT inflating/binding a throwaway
+        // NativeAdView. Binding at preload time would leave the cached ad registered to
+        // an orphaned, never-attached view for up to its whole cache lifetime.
+        // The ad is bound to a real view later when displayed.
+        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadRawNativeAd(
             activity = activity,
             adUnitId = adUnitId,
-            size = size,
-            useCachedAd = false, // Force fresh load
-            callback = object : com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback {
-                override fun onAdLoaded(nativeAdView: com.google.android.gms.ads.nativead.NativeAdView, nativeAd: com.google.android.gms.ads.nativead.NativeAd) {
-                    // Manually cache the ad for later retrieval (preloading purpose)
-                    setCachedNativeAd(adUnitId, nativeAd)
-                    logDebug("✅ Preloaded and cached native ad for $adUnitId (cache size: ${getCacheSize(adUnitId)})")
-                    onSuccess?.invoke()
-                }
-
-                override fun onAdFailedToLoad(error: com.google.android.gms.ads.AdError) {
-                    logDebug("❌ Failed to preload native ad for $adUnitId: ${error.message}")
-                    onFailure?.invoke(error.message)
-                }
-
-                override fun onAdClicked() {}
-                override fun onAdImpression() {}
-                override fun onAdOpened() {}
-                override fun onAdClosed() {}
-                override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {}
+            onLoaded = { nativeAd ->
+                // Manually cache the ad for later retrieval (preloading purpose)
+                setCachedNativeAd(adUnitId, nativeAd)
+                logDebug("✅ Preloaded and cached native ad for $adUnitId (cache size: ${getCacheSize(adUnitId)})")
+                onSuccess?.invoke()
+            },
+            onFailed = { error ->
+                logDebug("❌ Failed to preload native ad for $adUnitId: ${error.message}")
+                onFailure?.invoke(error.message)
             }
         )
     }

@@ -83,6 +83,9 @@ class NativeTemplateView @JvmOverloads constructor(
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
     private var shimmerInflated = false
 
+    // Currently displayed native ad, destroyed when replaced or via destroy()
+    private var currentNativeAd: NativeAd? = null
+
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
     private var waterfallNativeAdRef: Any? = null
@@ -336,7 +339,9 @@ class NativeTemplateView @JvmOverloads constructor(
         val screenType = getScreenTypeForTemplate()
 
         if (context is Activity) {
-            val screenKey = "${context.javaClass.simpleName}_${currentTemplate.name}"
+            // Must match the key used by NativeAdIntegrationManager.loadNativeAdWithCaching()
+            // (Activity_<ScreenType>), otherwise cached ads are stored and retrieved under different keys
+            val screenKey = "${context.javaClass.simpleName}_${screenType.name}"
 
             NativeAdIntegrationManager.loadNativeAdWithCaching(
                 activity = context,
@@ -464,7 +469,6 @@ class NativeTemplateView @JvmOverloads constructor(
     ) {
         val adPlaceholder: FrameLayout = binding.flAdPlaceholder
         val shimmerFrameLayout: ShimmerFrameLayout = binding.shimmerContainer
-        val effectiveStrategy = loadingStrategy ?: AdManageKitConfig.nativeLoadingStrategy
 
         // Build AdLoader on background thread as recommended by Google
         CoroutineScope(Dispatchers.IO).launch {
@@ -478,6 +482,8 @@ class NativeTemplateView @JvmOverloads constructor(
                 .forNativeAd { nativeAd ->
                     // UI operations on main thread
                     CoroutineScope(Dispatchers.Main).launch {
+                        trackDisplayedAd(nativeAd)
+
                         val nativeAdView = LayoutInflater.from(context)
                             .inflate(currentTemplate.layoutResId, null) as NativeAdView
 
@@ -489,14 +495,9 @@ class NativeTemplateView @JvmOverloads constructor(
                         binding.root.visibility = VISIBLE
                         adPlaceholder.visibility = VISIBLE
 
-                        // For FRESH_WITH_CACHE_FALLBACK strategy: cache successfully loaded ads
-                        // This builds up the cache for future fallback scenarios (e.g., RecyclerView)
-                        if (effectiveStrategy == AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK &&
-                            NativeAdManager.enableCachingNativeAds) {
-                            NativeAdManager.setCachedNativeAd(adUnitId, nativeAd)
-                            AdDebugUtils.logEvent(adUnitId, "cachedForFallback",
-                                "Cached fresh ad for future FRESH_WITH_CACHE_FALLBACK fallback", true)
-                        }
+                        // NOTE: Do NOT cache ad here - it's being displayed immediately
+                        // Caching is only for preloaded ads that will be shown later
+                        // Ads expire after 1 hour, so caching displayed ads wastes memory
 
                         populateNativeAdView(nativeAd, nativeAdView)
                         shimmerFrameLayout.visibility = GONE
@@ -734,6 +735,8 @@ class NativeTemplateView @JvmOverloads constructor(
             return
         }
 
+        trackDisplayedAd(preloadedAd)
+
         val nativeAdView = LayoutInflater.from(context)
             .inflate(currentTemplate.layoutResId, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdPlaceholder
@@ -802,7 +805,10 @@ class NativeTemplateView @JvmOverloads constructor(
                 if (nativeAdRef is NativeAd) {
                     displayAd(nativeAdRef)
                 } else {
-                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view
+                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view.
+                    // Destroy the previously displayed AdMob ad it replaces (if any).
+                    currentNativeAd?.destroy()
+                    currentNativeAd = null
                     adPlaceholder.removeAllViews()
                     val parent = adView.parent as? android.view.ViewGroup
                     parent?.removeView(adView)
@@ -860,6 +866,68 @@ class NativeTemplateView @JvmOverloads constructor(
      */
     fun showAd() {
         binding.root.visibility = VISIBLE
+    }
+
+    // =================== LIFECYCLE / CLEANUP ===================
+
+    /**
+     * Tracks the currently displayed NativeAd, destroying the previously displayed
+     * one when it is replaced. Never destroys the ad that was just handed to us
+     * (guards against re-displaying the same instance).
+     */
+    private fun trackDisplayedAd(newAd: NativeAd) {
+        val previous = currentNativeAd
+        if (previous !== newAd) {
+            previous?.destroy()
+        }
+        currentNativeAd = newAd
+    }
+
+    /**
+     * Destroys the currently displayed native ad and clears waterfall state.
+     *
+     * Call this from your screen's teardown (e.g. Activity.onDestroy / Fragment.onDestroyView)
+     * when the ad is no longer needed. It is also invoked automatically from
+     * [onDetachedFromWindow] when the host Activity is finishing or destroyed.
+     * It is intentionally NOT called on plain detach, so the view survives
+     * RecyclerView detach/reattach cycles with its ad intact.
+     */
+    fun destroy() {
+        val displayedAd = currentNativeAd
+        currentNativeAd = null
+        displayedAd?.destroy()
+
+        // Destroy the waterfall AdMob ad if it is distinct from the displayed one.
+        // Non-AdMob refs (e.g. Yandex) expose no destroy API; dropping the reference is enough.
+        val waterfallRef = waterfallNativeAdRef
+        waterfallNativeAdRef = null
+        if (waterfallRef is NativeAd && waterfallRef !== displayedAd) {
+            waterfallRef.destroy()
+        }
+
+        // Do NOT call nativeWaterfall?.destroy() here: its providers come from the
+        // global AdProviderConfig chain and are shared across views, so destroying
+        // them could tear down ads owned by other views. Dropping the reference is enough.
+        nativeWaterfall = null
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        // Auto-destroy only when the host Activity is going away. A plain detach
+        // (e.g. RecyclerView recycling) must keep the displayed ad alive.
+        val activity = findHostActivity()
+        if (activity != null && (activity.isFinishing || activity.isDestroyed)) {
+            destroy()
+        }
+    }
+
+    private fun findHostActivity(): Activity? {
+        var ctx: Context? = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is Activity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
     }
 
     companion object {

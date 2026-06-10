@@ -178,7 +178,13 @@ object ProgrammaticNativeAdLoader {
             LayoutInflater.from(context).inflate(layoutRes, parent, true)
 
             // Find the NativeAdView inside the merged content
-            parent.findViewById(R.id.native_ad_view) as NativeAdView
+            val largeAdView = parent.findViewById(R.id.native_ad_view) as NativeAdView
+            // Detach from the temporary inflation hierarchy, otherwise attaching the
+            // returned view elsewhere crashes with "specified child already has a parent"
+            (largeAdView.parent as? ViewGroup)?.removeView(largeAdView)
+            // The large layout declares the NativeAdView as gone until populated
+            largeAdView.visibility = android.view.View.VISIBLE
+            largeAdView
         } else {
             // SMALL and MEDIUM layouts have NativeAdView as root
             LayoutInflater.from(context).inflate(layoutRes, null) as NativeAdView
@@ -204,6 +210,81 @@ object ProgrammaticNativeAdLoader {
         }
 
         return nativeAdView
+    }
+
+    /**
+     * Loads a raw NativeAd WITHOUT inflating or binding any NativeAdView.
+     *
+     * Intended for preload/cache flows (e.g. [NativeAdManager.preloadNativeAd]) where the
+     * ad will be bound to a real view later when displayed. Binding a throwaway view at
+     * preload time would leave the ad registered to an orphaned, never-attached
+     * NativeAdView for its whole cache lifetime.
+     *
+     * Analytics events (ad_failed_to_load, ad_impression, ad_paid_event) are kept
+     * consistent with the regular loading path.
+     *
+     * @param activity The activity context
+     * @param adUnitId The ad unit ID
+     * @param onLoaded Called with the raw NativeAd when loaded
+     * @param onFailed Called when the load fails
+     */
+    fun loadRawNativeAd(
+        activity: Activity,
+        adUnitId: String,
+        onLoaded: (NativeAd) -> Unit,
+        onFailed: (AdError) -> Unit
+    ) {
+        // Check if user has purchased (ads should be disabled)
+        val purchaseProvider = BillingConfig.getPurchaseProvider()
+        if (purchaseProvider.isPurchased()) {
+            onFailed(
+                AdError(
+                    AdManager.PURCHASED_APP_ERROR_CODE,
+                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
+                    AdManager.PURCHASED_APP_ERROR_DOMAIN
+                )
+            )
+            return
+        }
+
+        val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
+
+        val builder = AdLoader.Builder(activity, adUnitId).forNativeAd { nativeAd ->
+            // No view inflation or setNativeAd() here — the ad is handed off raw
+            // and bound to a real NativeAdView when it is actually displayed
+            setupPaidEventListener(nativeAd, adUnitId, activity)
+            onLoaded(nativeAd)
+        }.withAdListener(object : AdListener() {
+            override fun onAdLoaded() {
+                super.onAdLoaded()
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Raw native ad loaded successfully", true)
+            }
+
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Raw native ad failed: ${adError.message}", false)
+
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", adError.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", adError.message)
+                    }
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                onFailed(adError)
+            }
+
+            override fun onAdImpression() {
+                super.onAdImpression()
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Raw native ad impression", true)
+            }
+        })
+
+        builder.build().loadAd(AdRequest.Builder().build())
     }
 
     private fun loadNewNativeAd(

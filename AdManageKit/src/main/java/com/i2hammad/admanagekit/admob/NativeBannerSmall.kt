@@ -44,6 +44,9 @@ class NativeBannerSmall @JvmOverloads constructor(
     private var adUnitId: String = ""
     var callback: AdLoadCallback? = null
 
+    // Currently displayed native ad, destroyed when replaced or via destroy()
+    private var currentNativeAd: NativeAd? = null
+
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
     private var waterfallNativeAdRef: Any? = null
@@ -228,6 +231,7 @@ class NativeBannerSmall @JvmOverloads constructor(
         nativeAdView.iconView = nativeAdView.findViewById(R.id.ad_app_icon)
 
         val builder = AdLoader.Builder(context, adUnitId).forNativeAd { nativeAd ->
+            trackDisplayedAd(nativeAd)
             adPlaceholder.removeAllViews()
             adPlaceholder.addView(nativeAdView)
             binding.root.visibility = VISIBLE
@@ -382,7 +386,10 @@ class NativeBannerSmall @JvmOverloads constructor(
                 if (nativeAdRef is NativeAd) {
                     displayAd(nativeAdRef)
                 } else {
-                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view
+                    // Non-AdMob provider (e.g. Yandex) returns a pre-built view.
+                    // Destroy the previously displayed AdMob ad it replaces (if any).
+                    currentNativeAd?.destroy()
+                    currentNativeAd = null
                     adPlaceholder.removeAllViews()
                     val parent = adView.parent as? android.view.ViewGroup
                     parent?.removeView(adView)
@@ -443,6 +450,8 @@ class NativeBannerSmall @JvmOverloads constructor(
             return
         }
 
+        trackDisplayedAd(preloadedAd)
+
         val nativeAdView = LayoutInflater.from(context)
             .inflate(R.layout.layout_native_banner_small, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdplaceholder
@@ -482,5 +491,67 @@ class NativeBannerSmall @JvmOverloads constructor(
 
     fun showAd() {
         binding.root.visibility = VISIBLE
+    }
+
+    // =================== LIFECYCLE / CLEANUP ===================
+
+    /**
+     * Tracks the currently displayed NativeAd, destroying the previously displayed
+     * one when it is replaced. Never destroys the ad that was just handed to us
+     * (guards against re-displaying the same instance).
+     */
+    private fun trackDisplayedAd(newAd: NativeAd) {
+        val previous = currentNativeAd
+        if (previous !== newAd) {
+            previous?.destroy()
+        }
+        currentNativeAd = newAd
+    }
+
+    /**
+     * Destroys the currently displayed native ad and clears waterfall state.
+     *
+     * Call this from your screen's teardown (e.g. Activity.onDestroy / Fragment.onDestroyView)
+     * when the ad is no longer needed. It is also invoked automatically from
+     * [onDetachedFromWindow] when the host Activity is finishing or destroyed.
+     * It is intentionally NOT called on plain detach, so the view survives
+     * RecyclerView detach/reattach cycles with its ad intact.
+     */
+    fun destroy() {
+        val displayedAd = currentNativeAd
+        currentNativeAd = null
+        displayedAd?.destroy()
+
+        // Destroy the waterfall AdMob ad if it is distinct from the displayed one.
+        // Non-AdMob refs (e.g. Yandex) expose no destroy API; dropping the reference is enough.
+        val waterfallRef = waterfallNativeAdRef
+        waterfallNativeAdRef = null
+        if (waterfallRef is NativeAd && waterfallRef !== displayedAd) {
+            waterfallRef.destroy()
+        }
+
+        // Do NOT call nativeWaterfall?.destroy() here: its providers come from the
+        // global AdProviderConfig chain and are shared across views, so destroying
+        // them could tear down ads owned by other views. Dropping the reference is enough.
+        nativeWaterfall = null
+    }
+
+    override fun onDetachedFromWindow() {
+        super.onDetachedFromWindow()
+        // Auto-destroy only when the host Activity is going away. A plain detach
+        // (e.g. RecyclerView recycling) must keep the displayed ad alive.
+        val activity = findHostActivity()
+        if (activity != null && (activity.isFinishing || activity.isDestroyed)) {
+            destroy()
+        }
+    }
+
+    private fun findHostActivity(): Activity? {
+        var ctx: Context? = context
+        while (ctx is android.content.ContextWrapper) {
+            if (ctx is Activity) return ctx
+            ctx = ctx.baseContext
+        }
+        return null
     }
 }

@@ -163,6 +163,7 @@ object NativeAdIntegrationManager {
                     if (cachedAd != null) {
                         logDebug("HYBRID strategy: cache hit for $screenKey, serving cached ad")
                         setTemporaryCachedAd(screenKey, cachedAd)
+                        callback?.onAdLoaded()
                         return // Let the caller handle displaying the cached ad
                     } else {
                         logDebug("HYBRID strategy: cache miss for $screenKey, loading new ad")
@@ -315,19 +316,15 @@ object NativeAdIntegrationManager {
             
             override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
                 logDebug("Ad failed to load for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
-                
-                // Try to use cached ad as fallback before attempting retry
-                if (NativeAdManager.enableCachingNativeAds) {
-                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
-                    if (cachedAd != null) {
-                        logDebug("Using cached ad as fallback for $screenKey after load failure")
-                        originalCallback?.onAdLoaded()
-                        return
-                    }
-                }
-                
+
+                // NOTE: Do NOT consume a cached ad as fallback here. This callback fires
+                // asynchronously, after the caller's single synchronous read of the temporary
+                // cache, so a cached ad taken at this point could never be displayed and
+                // would leak. The views already perform their own cache fallback (with
+                // display) in their AdListener before propagating the failure here.
+
                 // Check if we should retry (only for network errors, not for no fill or invalid requests)
-                val shouldRetry = when (error) {
+                val isRetryableError = when (error) {
                     is LoadAdError -> {
                         // Retry for network errors and internal errors, but not for no fill or invalid requests
                         // Error codes: 0=INTERNAL_ERROR, 2=NETWORK_ERROR
@@ -335,7 +332,13 @@ object NativeAdIntegrationManager {
                     }
                     else -> false
                 }
-                
+
+                // Mirror AdRetryManager's gating: if retries are disabled or attempts are
+                // exhausted, scheduleRetry() silently no-ops and the failure would be swallowed.
+                val shouldRetry = isRetryableError &&
+                        AdManageKitConfig.autoRetryFailedAds &&
+                        retryAttempt < AdManageKitConfig.maxRetryAttempts
+
                 if (shouldRetry) {
                     // Schedule retry using AdRetryManager
                     AdRetryManager.getInstance().scheduleRetry(
@@ -419,25 +422,26 @@ object NativeAdIntegrationManager {
             override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
                 logDebug("FRESH_WITH_CACHE_FALLBACK: Fresh load failed for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
 
-                // Fall back to cached ad
-                if (NativeAdManager.enableCachingNativeAds) {
-                    val cachedAd = tryGetCachedAd(enhancedAdUnitId, baseAdUnitId, screenType)
-                    if (cachedAd != null) {
-                        logDebug("FRESH_WITH_CACHE_FALLBACK: Using cached ad as fallback for $screenKey")
-                        setTemporaryCachedAd(screenKey, cachedAd)
-                        originalCallback?.onAdLoaded()
-                        return
-                    }
-                }
+                // NOTE: Do NOT consume a cached ad into the temporary cache here. This
+                // callback fires asynchronously, after the caller's single synchronous read
+                // of the temporary cache, so the ad would never be picked up and would leak.
+                // The views already perform the cache fallback (with display) in their
+                // AdListener before propagating the failure here.
 
-                // No cached ad available, check if we should retry
-                val shouldRetry = when (error) {
+                // Check if we should retry (only for network errors, not for no fill or invalid requests)
+                val isRetryableError = when (error) {
                     is LoadAdError -> {
                         // Retry for network errors and internal errors
                         error.code in listOf(0, 2)
                     }
                     else -> false
                 }
+
+                // Mirror AdRetryManager's gating: if retries are disabled or attempts are
+                // exhausted, scheduleRetry() silently no-ops and the failure would be swallowed.
+                val shouldRetry = isRetryableError &&
+                        AdManageKitConfig.autoRetryFailedAds &&
+                        retryAttempt < AdManageKitConfig.maxRetryAttempts
 
                 if (shouldRetry) {
                     AdRetryManager.getInstance().scheduleRetry(
