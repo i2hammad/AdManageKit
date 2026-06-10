@@ -12,7 +12,7 @@ import com.i2hammad.admanagekit.billing.R
 
 class PurchaseDevBottomSheet(
     private val typeIap: Int,
-    private val productDetails: ProductDetails,
+    private val productDetails: ProductDetails?,
     context: Context,
     private val purchaseListener: PurchaseListener?
 ) : BottomSheetDialog(context) {
