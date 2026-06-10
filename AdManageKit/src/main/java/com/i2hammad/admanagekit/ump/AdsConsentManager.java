@@ -9,6 +9,8 @@ import com.google.android.ump.ConsentInformation;
 import com.google.android.ump.ConsentRequestParameters;
 import com.google.android.ump.UserMessagingPlatform;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -21,6 +23,9 @@ public class AdsConsentManager {
     private final ConsentInformation consentInformation;
     private final AtomicBoolean canRequestAds = new AtomicBoolean(false);
     private final AtomicBoolean isProcessingConsent = new AtomicBoolean(false); // New flag to prevent concurrent requests
+    // Callers that arrived while a consent request was already in flight; notified when it completes.
+    // Guarded by synchronizing on the list itself (also guards isProcessingConsent transitions).
+    private final List<UMPResultListener> pendingListeners = new ArrayList<>();
     private static volatile AdsConsentManager instance;
 
     /**
@@ -84,11 +89,15 @@ public class AdsConsentManager {
      */
     public void requestUMP(Activity activity, boolean enableDebug, String testDevice, boolean resetData, UMPResultListener umpResultListener) {
         // Prevent concurrent consent requests, but never drop the caller silently:
-        // report the current consent result so the caller's flow can continue.
-        if (isProcessingConsent.getAndSet(true)) {
-            Log.d(TAG, "requestUMP: Consent request already in progress, notifying with current consent result");
-            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
-            return;
+        // queue the listener so it is notified when the in-flight request completes.
+        // The flag transition and the queue insertion happen under the same lock as
+        // finishConsentRequest(), so a caller can never be stranded between the two.
+        synchronized (pendingListeners) {
+            if (isProcessingConsent.getAndSet(true)) {
+                Log.d(TAG, "requestUMP: Consent request already in progress, queuing listener until it completes");
+                pendingListeners.add(umpResultListener);
+                return;
+            }
         }
 
         Log.d(TAG, "requestUMP: Starting consent request, canRequestAds=" + canRequestAds.get());
@@ -102,8 +111,9 @@ public class AdsConsentManager {
         // Check if ads can already be requested
         if (consentInformation.canRequestAds() && canRequestAds.get()) {
             Log.d(TAG, "requestUMP: Ads can already be requested, skipping consent form");
-            isProcessingConsent.set(false);
-            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
+            boolean consentResult = getConsentResult(activity);
+            finishConsentRequest(consentResult);
+            umpResultListener.onCheckUMPSuccess(consentResult);
             return;
         }
 
@@ -133,7 +143,6 @@ public class AdsConsentManager {
                     Log.d(TAG, "requestUMP: Consent info updated successfully");
                     // Load and show the consent form if required
                     UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity, formError -> {
-                        isProcessingConsent.set(false);
                         if (formError != null) {
                             Log.e(TAG, "requestUMP: Error loading consent form: " + formError.getMessage());
                         } else {
@@ -142,23 +151,47 @@ public class AdsConsentManager {
 
                         // Update canRequestAds and always notify listener (state update must not gate the callback)
                         canRequestAds.set(consentInformation.canRequestAds());
+                        boolean consentResult = getConsentResult(activity);
+                        finishConsentRequest(consentResult);
                         if (hasNotified.compareAndSet(false, true)) {
                             Log.d(TAG, "requestUMP: Notifying listener, canRequestAds=" + consentInformation.canRequestAds());
-                            umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
+                            umpResultListener.onCheckUMPSuccess(consentResult);
                         }
                     });
                 },
                 requestConsentError -> {
-                    isProcessingConsent.set(false);
                     Log.e(TAG, "requestUMP: Consent info update failed: " + requestConsentError.getMessage());
                     // Update canRequestAds and always notify listener (state update must not gate the callback)
                     canRequestAds.set(consentInformation.canRequestAds());
+                    boolean consentResult = getConsentResult(activity);
+                    finishConsentRequest(consentResult);
                     if (hasNotified.compareAndSet(false, true)) {
                         Log.d(TAG, "requestUMP: Notifying listener after error, canRequestAds=" + consentInformation.canRequestAds());
-                        umpResultListener.onCheckUMPSuccess(getConsentResult(activity));
+                        umpResultListener.onCheckUMPSuccess(consentResult);
                     }
                 }
         );
+    }
+
+    /**
+     * Completes the in-flight consent request: atomically clears the processing flag and
+     * drains any listeners that were queued while the request was running, then notifies
+     * each of them with the given result. The list is cleared before any listener is
+     * invoked, so reentrant calls cannot cause a double notification.
+     *
+     * @param consentResult The consent result to deliver to queued listeners.
+     */
+    private void finishConsentRequest(boolean consentResult) {
+        List<UMPResultListener> waiters;
+        synchronized (pendingListeners) {
+            isProcessingConsent.set(false);
+            waiters = new ArrayList<>(pendingListeners);
+            pendingListeners.clear();
+        }
+        for (UMPResultListener waiter : waiters) {
+            Log.d(TAG, "requestUMP: Notifying queued listener with consent result " + consentResult);
+            waiter.onCheckUMPSuccess(consentResult);
+        }
     }
 
     /**

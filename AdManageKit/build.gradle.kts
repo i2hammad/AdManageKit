@@ -42,6 +42,13 @@ android {
         }
     }
 
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
+
 }
 
 dependencies {
@@ -58,7 +65,10 @@ dependencies {
     api(project(":admanagekit-core"))
     implementation(libs.androidx.work.runtime)
 
-
+    testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.mockk)
+    testImplementation(libs.androidx.test.core)
 }
 
 afterEvaluate {

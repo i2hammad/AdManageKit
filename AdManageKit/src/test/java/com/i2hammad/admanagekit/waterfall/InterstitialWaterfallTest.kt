@@ -1,4 +1,4 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.waterfall
 
 import android.app.Activity
 import android.content.Context
@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
-import com.i2hammad.admanagekit.waterfall.InterstitialWaterfall
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,7 +17,6 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
@@ -29,7 +27,6 @@ import kotlin.time.Duration.Companion.seconds
  * both load and show.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = TestApplication::class)
 class InterstitialWaterfallTest {
 
     private lateinit var context: Context

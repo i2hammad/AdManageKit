@@ -32,6 +32,12 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    testOptions {
+        unitTests {
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -42,6 +48,9 @@ dependencies {
     implementation(libs.androidx.constraintlayout) // Use 'api' instead of 'implementation' to expose it
     api(libs.material)
 
+    // PurchaseResultTest is a pure JVM test (the tested PurchaseResult paths
+    // never touch android.* APIs), so JUnit is the only test dependency needed.
+    testImplementation(libs.junit)
 }
 
 afterEvaluate {

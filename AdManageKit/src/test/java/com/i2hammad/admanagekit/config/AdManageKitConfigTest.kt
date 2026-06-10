@@ -1,8 +1,5 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.config
 
-import com.i2hammad.admanagekit.config.AdLoadingStrategy
-import com.i2hammad.admanagekit.config.AdManageKitConfig
-import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

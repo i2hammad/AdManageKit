@@ -1,7 +1,5 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.core.ad
 
-import com.i2hammad.admanagekit.core.ad.AdProvider
-import com.i2hammad.admanagekit.core.ad.AdUnitMapping
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull

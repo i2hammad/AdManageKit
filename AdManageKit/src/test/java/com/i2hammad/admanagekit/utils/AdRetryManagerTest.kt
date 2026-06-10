@@ -1,9 +1,7 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.utils
 
-import android.app.Application
 import android.os.Looper
 import com.i2hammad.admanagekit.config.AdManageKitConfig
-import com.i2hammad.admanagekit.utils.AdRetryManager
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -22,11 +20,11 @@ import kotlin.time.Duration.Companion.seconds
  * Tests for [AdRetryManager] scheduling, cancellation, replacement and
  * exponential backoff behavior, driven via Robolectric's paused main looper.
  *
- * Uses a plain [Application] to bypass the sample app's MyApplication,
- * which initializes ad SDKs and mutates AdManageKitConfig.
+ * Runs against Robolectric's default Application, so no ad SDKs are
+ * initialized and AdManageKitConfig is never mutated outside the tests.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class, sdk = [35])
+@Config(sdk = [35])
 class AdRetryManagerTest {
 
     private val retryManager = AdRetryManager.getInstance()

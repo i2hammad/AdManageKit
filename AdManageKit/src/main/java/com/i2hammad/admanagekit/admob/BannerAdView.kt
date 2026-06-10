@@ -738,7 +738,9 @@ class BannerAdView @JvmOverloads constructor(
     fun refreshAd() {
         currentAdUnitId?.let { adUnitId ->
             AdDebugUtils.logEvent(adUnitId, "ManualRefresh", "Manual refresh triggered", true)
-            loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
+            // Reuse the original collapsible configuration so manual refreshes don't silently
+            // convert a collapsible banner into a regular one
+            loadBannerInternal(adUnitId, currentCollapsible, currentPlacement, callback)
         }
     }
     

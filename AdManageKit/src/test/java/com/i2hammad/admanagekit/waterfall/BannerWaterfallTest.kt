@@ -1,4 +1,4 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.waterfall
 
 import android.content.Context
 import android.os.Looper
@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
-import com.i2hammad.admanagekit.waterfall.BannerWaterfall
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertSame
@@ -16,14 +15,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
 
 /**
  * Pins down the [BannerWaterfall] contracts: provider fallthrough, the loaded
  * view being delivered as-is, and ownsProviders destroy semantics.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = TestApplication::class)
 class BannerWaterfallTest {
 
     private lateinit var context: Context

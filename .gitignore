@@ -32,3 +32,6 @@ google-services.json
 # Android Profiling
 *.hprof
 gma-next-gen-sdk-android-examples-main/
+
+# macOS
+.DS_Store
