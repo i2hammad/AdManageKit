@@ -1,7 +1,12 @@
 package com.i2hammad.admanagekit.core.ad
 
+import java.util.concurrent.ConcurrentHashMap
+
 /**
  * Maps logical ad placement names to provider-specific ad unit IDs.
+ *
+ * Thread-safe: registration commonly happens during background init while
+ * resolvers are invoked from SDK callbacks.
  *
  * Example:
  * ```kotlin
@@ -17,7 +22,7 @@ package com.i2hammad.admanagekit.core.ad
 object AdUnitMapping {
 
     // logicalName -> (providerName -> adUnitId)
-    private val mappings = mutableMapOf<String, MutableMap<String, String>>()
+    private val mappings = ConcurrentHashMap<String, ConcurrentHashMap<String, String>>()
 
     /**
      * Register ad unit IDs for a logical placement.
@@ -27,7 +32,8 @@ object AdUnitMapping {
      */
     @JvmStatic
     fun register(logicalName: String, providerAdUnits: Map<String, String>) {
-        mappings.getOrPut(logicalName) { mutableMapOf() }.putAll(providerAdUnits)
+        // ConcurrentMap.getOrPut uses putIfAbsent, so concurrent registration is safe.
+        mappings.getOrPut(logicalName) { ConcurrentHashMap() }.putAll(providerAdUnits)
     }
 
     /**
