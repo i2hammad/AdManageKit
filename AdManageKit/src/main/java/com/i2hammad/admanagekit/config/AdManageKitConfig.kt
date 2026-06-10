@@ -484,6 +484,7 @@ object AdManageKitConfig {
         enableCollapsibleBannersByDefault = false
         defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM
         appOpenAdTimeout = 4.seconds
+        appOpenAdFreshnessThreshold = 4.hours
         enableWelcomeBackDialog = false
         appOpenFetchFreshAd = false
         welcomeDialogAppIcon = 0
