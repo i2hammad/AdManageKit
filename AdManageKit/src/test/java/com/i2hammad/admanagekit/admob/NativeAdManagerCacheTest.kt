@@ -1,8 +1,6 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.admob
 
-import android.app.Application
 import com.google.android.gms.ads.nativead.NativeAd
-import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import io.mockk.mockk
 import io.mockk.verify
@@ -22,13 +20,13 @@ import org.robolectric.annotation.Config
  * Tests for [NativeAdManager] caching behavior: destructive reads, LRU eviction,
  * per-unit and global clearing, the enable flag, and fallback lookups.
  *
- * Uses a plain [Application] to bypass the sample app's MyApplication (which
- * initializes ad SDKs and mutates AdManageKitConfig). Firebase analytics is never
- * touched: NativeAdManager only logs analytics when initialize(analytics) was
- * called AND enablePerformanceMetrics is true — both stay off here.
+ * Runs against Robolectric's default Application, so no ad SDKs are initialized
+ * and AdManageKitConfig is never mutated outside the tests. Firebase analytics is
+ * never touched: NativeAdManager only logs analytics when initialize(analytics)
+ * was called AND enablePerformanceMetrics is true — both stay off here.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = Application::class, sdk = [35])
+@Config(sdk = [35])
 class NativeAdManagerCacheTest {
 
     private fun newAd(): NativeAd = mockk(relaxed = true)

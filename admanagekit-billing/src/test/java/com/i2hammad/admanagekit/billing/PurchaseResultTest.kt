@@ -1,7 +1,6 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.billing
 
 import com.android.billingclient.api.BillingClient
-import com.i2hammad.admanagekit.billing.PurchaseResult
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

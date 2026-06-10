@@ -30,11 +30,22 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    testOptions {
+        unitTests {
+            isIncludeAndroidResources = true
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
     api(project(":admanagekit-core"))
     implementation(libs.yandex.mobileads)
+
+    testImplementation(libs.junit)
+    // YandexValueMapperTest needs Robolectric for a real org.json implementation.
+    testImplementation(libs.robolectric)
 }
 
 afterEvaluate {

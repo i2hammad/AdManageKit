@@ -1,4 +1,4 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.waterfall
 
 import android.app.Activity
 import android.content.Context
@@ -7,7 +7,6 @@ import androidx.test.core.app.ApplicationProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
-import com.i2hammad.admanagekit.waterfall.RewardedWaterfall
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -16,14 +15,12 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
-import org.robolectric.annotation.Config
 
 /**
  * Pins down the [RewardedWaterfall] contracts: provider fallthrough,
  * reward forwarding, and single-terminal-callback on show.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(application = TestApplication::class)
 class RewardedWaterfallTest {
 
     private lateinit var context: Context

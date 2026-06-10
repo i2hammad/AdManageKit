@@ -34,6 +34,9 @@ android {
 
 dependencies {
 
+    // AdUnitMappingTest is a pure JVM test: no Android types are exercised,
+    // so JUnit is the only test dependency needed.
+    testImplementation(libs.junit)
 }
 
 

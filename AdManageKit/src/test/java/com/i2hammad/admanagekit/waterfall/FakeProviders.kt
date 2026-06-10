@@ -1,4 +1,4 @@
-package com.i2hammad.admanagekit.sample
+package com.i2hammad.admanagekit.waterfall
 
 import android.app.Activity
 import android.content.Context
