@@ -13,6 +13,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowMetrics
+import android.view.Gravity
 import android.widget.FrameLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -358,7 +359,7 @@ class BannerAdView @JvmOverloads constructor(
             adView?.let { adView ->
                 val parent = adView.parent as? ViewGroup
                 parent?.removeView(adView)
-                layBannerAd.addView(adView)
+                layBannerAd.addView(adView, centeredBannerLayoutParams())
             }
             shimmerFrameLayout.stopShimmer()
             shimmerFrameLayout.visibility = View.GONE
@@ -466,6 +467,17 @@ class BannerAdView @JvmOverloads constructor(
         callback?.onPaidEvent(adValue)
     }
 
+    /**
+     * The adaptive ad's width is computed in whole dp, so the rendered ad can
+     * be slightly narrower than the container — center it instead of letting
+     * it sit at the start edge.
+     */
+    private fun centeredBannerLayoutParams() = FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.WRAP_CONTENT,
+        FrameLayout.LayoutParams.WRAP_CONTENT,
+        Gravity.CENTER_HORIZONTAL
+    )
+
     private fun getAdSize(): AdSize {
         val displayMetrics = DisplayMetrics()
         
@@ -559,7 +571,7 @@ class BannerAdView @JvmOverloads constructor(
                     layBannerAd.removeAllViews()
                     val parent = bannerView.parent as? ViewGroup
                     parent?.removeView(bannerView)
-                    layBannerAd.addView(bannerView)
+                    layBannerAd.addView(bannerView, centeredBannerLayoutParams())
                     shimmerFrameLayout.stopShimmer()
                     shimmerFrameLayout.visibility = View.GONE
                     isAdLoading.set(false)
