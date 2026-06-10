@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.4.6`** adds 10 new flat-design native ad templates to `NativeTemplateView` (no gradients, subtle separators, theme-aware).
+**Latest Version `3.5.8`** is a stability release: it fixes the findings of a full-library code audit across billing, native ad caching, ad managers, the multi-provider waterfall, Yandex, and Compose — including two revenue-critical billing bugs — and ships the project's first unit test suite.
 
 ---
 
@@ -54,47 +54,40 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.4.6) |
+| Production apps (stable) | **Main branch** (v3.5.8) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.4.6
+## What's New in 3.5.8
 
-### 10 Flat-Design Native Ad Templates
-`NativeTemplateView` now ships with 10 new templates designed to blend into modern app UIs without disrupting the user experience. **Flat design only** — no gradients, no heavy shadows, subtle 1dp separators, consistent `Ad`/`Sponsored` disclosure. All theme-driven via `?attr/colorSurface` / `?attr/colorPrimary` / `?attr/colorOutlineVariant`, so dark mode and Material 3 theming work out of the box.
+Stability release fixing the findings of a full-library code audit (issues #2–#35). Highlights:
 
-| XML attr | Best for |
-|----------|----------|
-| `flat_inline_row` | List/feed rows (top + bottom hairlines) |
-| `flat_card_rating` | Card with rating + Get pill |
-| `flat_media_top` | Vertical card with media on top |
-| `flat_text_minimal` | Text-only ad with left brand bar |
-| `flat_compact_pill` | Small icon + headline + CTA |
-| `flat_carousel` | Header + media + footer rating row |
-| `flat_banner` | Single-line wide banner |
-| `flat_feature_list` | Title + 3 bullet benefits + Install |
-| `flat_sponsored_story` | Editorial-style headline + body |
-| `flat_footer_slim` | Sticky-style slim footer |
+### Revenue-critical billing fixes
+- **Restored purchases are now acknowledged** — previously a purchase whose acknowledgment was interrupted was never acknowledged again, and Google Play silently auto-refunded it after 3 days
+- **PENDING (unpaid) purchases no longer grant entitlement** — ads were being removed for users who never completed payment
+- Refunds and expiry now clear `isPurchased()` within the session; subscription state APIs (`getSubscriptionState()` etc.) actually work; billing callbacks fire exactly once, on the main thread
+- New `AppPurchase.setDebugMode(boolean)` — the dev purchase sheet and test product now work in debug builds (a wrong `BuildConfig` import had left every debug branch permanently dead)
 
-```xml
-<com.i2hammad.admanagekit.admob.NativeTemplateView
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    app:adTemplate="flat_card_rating" />
-```
+### Native ad caching repaired
+- `NativeTemplateView` cache hits are displayed again (a key mismatch caused every cached ad to be consumed, never shown, and leaked)
+- Load failures are no longer silently swallowed with default config — `onFailedToLoad` always fires; HYBRID cache hits now fire `onAdLoaded`
+- Displayed `NativeAd`s are destroyed when replaced; new `destroy()` on all native ad views
 
-```kotlin
-// Compose
-NativeFlatCardRatingCompose(adUnitId = "ca-app-pub-…")
+### Reliability across the board
+- Splash interstitial flow notifies exactly once — no more hung splash screens or double navigation
+- UMP consent listener fires on every request (previously never after the first success)
+- `BannerAdView` no longer leaks one WebView per auto-refresh cycle; `enableAutoRefresh(intervalSeconds)` honors its parameter
+- Waterfall: per-ad-unit ownership (no cross-placement clobbering), watchdog timeouts for hung providers, `destroy()` no longer tears down shared providers, exactly one terminal callback per load/show
+- Yandex: error codes correctly mapped (NETWORK was reported as NO_FILL), impression revenue paired with the right currency
+- Compose: `InterstitialAdEffect` actually shows the loaded ad, banners stop refreshing after disposal, `rememberPurchaseStatus()` reacts to mid-session purchases
 
-// Programmatic
-nativeTemplateView.setTemplate(NativeAdTemplate.FLAT_MEDIA_TOP)
-```
+### First unit test suite
+83 JVM tests (`./gradlew :app:testDebugUnitTest`) pinning the waterfall contracts, retry management, cache semantics, config defaults, and subscription state.
 
-This brings the total `NativeTemplateView` template count to **37**.
+See [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md) for the full list, including two intentional behavior changes (single terminal show event in waterfalls; live billing entitlement).
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -137,15 +130,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.8'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.5.8'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.8'
 ```
 
 </td>
@@ -273,7 +266,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.8'
 ```
 
 ```kotlin
@@ -623,6 +616,9 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md)
+- [Release Notes v3.5.7](docs/release-notes/RELEASE_NOTES_v3.5.7.md)
+- [Release Notes v3.4.6](docs/release-notes/RELEASE_NOTES_v3.4.6.md)
 - [Release Notes v3.4.5](docs/release-notes/RELEASE_NOTES_v3.4.5.md)
 - [Release Notes v3.4.4](docs/release-notes/RELEASE_NOTES_v3.4.4.md)
 - [Release Notes v3.4.3](docs/release-notes/RELEASE_NOTES_v3.4.3.md)
