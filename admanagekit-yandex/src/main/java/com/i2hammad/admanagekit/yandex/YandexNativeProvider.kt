@@ -47,6 +47,7 @@ class YandexNativeProvider : NativeAdProvider {
 
     private var currentNativeAd: NativeAd? = null
     private var nativeAdLoader: NativeAdLoader? = null
+    private var isDestroyed = false
 
     companion object {
         private const val TAG = "YandexNative"
@@ -60,6 +61,12 @@ class YandexNativeProvider : NativeAdProvider {
     ) {
         val listener = object : NativeAdLoadListener {
             override fun onAdLoaded(nativeAd: NativeAd) {
+                if (isDestroyed) {
+                    Log.d(TAG, "Native ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
+                // Detach the previous ad's listener before replacing it
+                currentNativeAd?.setNativeAdEventListener(null)
                 currentNativeAd = nativeAd
 
                 nativeAd.setNativeAdEventListener(object : NativeAdEventListener {
@@ -79,6 +86,8 @@ class YandexNativeProvider : NativeAdProvider {
                     callback.onNativeAdLoaded(adView, nativeAd)
                 } catch (e: Exception) {
                     Log.e(TAG, "Failed to create native ad view: ${e.message}", e)
+                    nativeAd.setNativeAdEventListener(null)
+                    if (currentNativeAd === nativeAd) currentNativeAd = null
                     callback.onNativeAdFailedToLoad(
                         com.i2hammad.admanagekit.core.ad.AdKitAdError(
                             0, "Failed to bind native ad: ${e.message}", "yandex"
@@ -98,6 +107,8 @@ class YandexNativeProvider : NativeAdProvider {
     }
 
     override fun destroy() {
+        isDestroyed = true
+        nativeAdLoader?.cancelLoading()
         nativeAdLoader = null
         currentNativeAd?.setNativeAdEventListener(null)
         currentNativeAd = null
@@ -452,9 +463,8 @@ class YandexNativeProvider : NativeAdProvider {
             .setSponsoredView(sponsoredView)
             .build()
 
-        val result = nativeAd.bindNativeAd(binder)
-        if (result is AdBindingResult.Failure) {
-            Log.w(TAG, "Native ad binding failed for MEDIUM")
+        if (nativeAd.bindNativeAd(binder) is AdBindingResult.Failure) {
+            throw IllegalStateException("Native ad binding failed for MEDIUM")
         }
         return nativeAdView
     }
@@ -590,9 +600,8 @@ class YandexNativeProvider : NativeAdProvider {
             .setSponsoredView(sponsoredView)
             .build()
 
-        val result = nativeAd.bindNativeAd(binder)
-        if (result is AdBindingResult.Failure) {
-            Log.w(TAG, "Native ad binding failed for SMALL")
+        if (nativeAd.bindNativeAd(binder) is AdBindingResult.Failure) {
+            throw IllegalStateException("Native ad binding failed for SMALL")
         }
         return nativeAdView
     }

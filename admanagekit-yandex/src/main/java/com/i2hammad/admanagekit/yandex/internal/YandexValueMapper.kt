@@ -19,9 +19,19 @@ internal fun ImpressionData?.toAdKitValue(): AdKitAdValue {
 
     return try {
         val json = JSONObject(rawData)
-        val revenue = json.optDouble("revenueUSD", 0.0)
+        // Prefer the native-currency pair (revenue + currency); fall back to the
+        // USD-converted value, which must be labeled as USD.
+        val nativeRevenue = json.optDouble("revenue", Double.NaN)
+        val revenue: Double
+        val currency: String
+        if (!nativeRevenue.isNaN()) {
+            revenue = nativeRevenue
+            currency = json.optString("currency", "USD")
+        } else {
+            revenue = json.optDouble("revenueUSD", 0.0)
+            currency = "USD"
+        }
         val valueMicros = (revenue * 1_000_000).toLong()
-        val currency = json.optString("currency", "USD")
 
         AdKitAdValue(
             valueMicros = valueMicros,

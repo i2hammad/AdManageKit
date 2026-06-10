@@ -20,6 +20,10 @@ shimmer = "0.5.0"
 workRuntime = "2.11.2"
 composeCompiler = "1.5.8"
 yandexMobileads = "8.0.0"
+junit = "4.13.2"
+robolectric = "4.16"
+mockk = "1.14.2"
+androidxTestCore = "1.7.0"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
@@ -48,6 +52,10 @@ user-messaging-platform = { module = "com.google.android.ump:user-messaging-plat
 shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workRuntime" }
 yandex-mobileads = { module = "com.yandex.android:mobileads", version.ref = "yandexMobileads" }
+junit = { module = "junit:junit", version.ref = "junit" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

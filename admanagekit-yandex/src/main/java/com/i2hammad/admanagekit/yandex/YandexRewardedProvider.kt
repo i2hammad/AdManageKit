@@ -28,6 +28,7 @@ class YandexRewardedProvider : RewardedAdProvider {
 
     private var rewardedAd: RewardedAd? = null
     private var rewardedAdLoader: RewardedAdLoader? = null
+    private var isDestroyed = false
 
     companion object {
         private const val TAG = "YandexRewarded"
@@ -40,6 +41,10 @@ class YandexRewardedProvider : RewardedAdProvider {
     ) {
         val listener = object : RewardedAdLoadListener {
             override fun onAdLoaded(ad: RewardedAd) {
+                if (isDestroyed) {
+                    Log.d(TAG, "Rewarded ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
                 rewardedAd = ad
                 Log.d(TAG, "Rewarded ad loaded: $adUnitId")
                 callback.onAdLoaded()
@@ -74,16 +79,16 @@ class YandexRewardedProvider : RewardedAdProvider {
 
             override fun onAdFailedToShow(adError: AdError) {
                 Log.e(TAG, "Rewarded ad failed to show: ${adError.description}")
-                rewardedAd?.setAdEventListener(null)
-                rewardedAd = null
+                ad.setAdEventListener(null)
+                if (rewardedAd === ad) rewardedAd = null
                 callback.onAdFailedToShow(adError.toAdKitError())
                 callback.onAdDismissed()
             }
 
             override fun onAdDismissed() {
                 Log.d(TAG, "Rewarded ad dismissed")
-                rewardedAd?.setAdEventListener(null)
-                rewardedAd = null
+                ad.setAdEventListener(null)
+                if (rewardedAd === ad) rewardedAd = null
                 callback.onAdDismissed()
             }
 
@@ -108,6 +113,8 @@ class YandexRewardedProvider : RewardedAdProvider {
     override fun isAdReady(): Boolean = rewardedAd != null
 
     override fun destroy() {
+        isDestroyed = true
+        rewardedAdLoader?.cancelLoading()
         rewardedAdLoader = null
         rewardedAd?.setAdEventListener(null)
         rewardedAd = null

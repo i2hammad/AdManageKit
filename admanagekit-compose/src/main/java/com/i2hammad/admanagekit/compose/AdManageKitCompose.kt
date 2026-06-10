@@ -2,6 +2,9 @@ package com.i2hammad.admanagekit.compose
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -42,13 +45,44 @@ fun AdManageKitInitEffect(
  *
  * This can be used to conditionally show or hide ads based on user purchase status.
  *
+ * The status is not frozen at first composition: it is re-read from
+ * [BillingConfig.getPurchaseProvider] whenever the lifecycle reaches ON_RESUME
+ * (e.g. returning from a purchase flow) and on every recomposition, so a
+ * mid-session purchase is picked up without recreating the composition.
+ *
  * @return true if the user has purchased the app (ads should be disabled), false otherwise
  */
 @Composable
 fun rememberPurchaseStatus(): Boolean {
-    return remember {
-        BillingConfig.getPurchaseProvider().isPurchased()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isPurchased by remember {
+        mutableStateOf(BillingConfig.getPurchaseProvider().isPurchased())
     }
+
+    // Re-read the purchase status whenever the lifecycle resumes
+    // (e.g. after the user completes a purchase flow)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                isPurchased = BillingConfig.getPurchaseProvider().isPurchased()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // Also re-read on every recomposition so in-session purchases that trigger
+    // recomposition are reflected without waiting for the next ON_RESUME
+    SideEffect {
+        val latest = BillingConfig.getPurchaseProvider().isPurchased()
+        if (latest != isPurchased) {
+            isPurchased = latest
+        }
+    }
+
+    return isPurchased
 }
 
 /**

@@ -55,8 +55,18 @@ fun ProgrammaticNativeAdCompose(
 ) {
     val context = LocalContext.current
     var nativeAdView by remember { mutableStateOf<NativeAdView?>(null) }
+    var nativeAd by remember { mutableStateOf<NativeAd?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var hasError by remember { mutableStateOf(false) }
+
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
     // Load the ad when the composable is first composed
     LaunchedEffect(adUnitId, size, useCachedAd) {
@@ -70,37 +80,40 @@ fun ProgrammaticNativeAdCompose(
                 size = size,
                 useCachedAd = useCachedAd,
                 callback = object : ProgrammaticNativeAdLoader.ProgrammaticAdCallback {
-                    override fun onAdLoaded(loadedNativeAdView: NativeAdView, nativeAd: NativeAd) {
+                    override fun onAdLoaded(loadedNativeAdView: NativeAdView, loadedNativeAd: NativeAd) {
+                        // Destroy the previously held ad before replacing it
+                        nativeAd?.destroy()
+                        nativeAd = loadedNativeAd
                         nativeAdView = loadedNativeAdView
                         isLoading = false
                         hasError = false
-                        onAdLoaded?.invoke(loadedNativeAdView, nativeAd)
+                        currentOnAdLoaded?.invoke(loadedNativeAdView, loadedNativeAd)
                     }
 
                     override fun onAdFailedToLoad(error: AdError) {
                         isLoading = false
                         hasError = true
-                        onAdFailedToLoad?.invoke(error)
+                        currentOnAdFailedToLoad?.invoke(error)
                     }
 
                     override fun onAdClicked() {
-                        onAdClicked?.invoke()
+                        currentOnAdClicked?.invoke()
                     }
 
                     override fun onAdImpression() {
-                        onAdImpression?.invoke()
+                        currentOnAdImpression?.invoke()
                     }
 
                     override fun onAdOpened() {
-                        onAdOpened?.invoke()
+                        currentOnAdOpened?.invoke()
                     }
 
                     override fun onAdClosed() {
-                        onAdClosed?.invoke()
+                        currentOnAdClosed?.invoke()
                     }
 
                     override fun onPaidEvent(adValue: AdValue) {
-                        onPaidEvent?.invoke(adValue)
+                        currentOnPaidEvent?.invoke(adValue)
                     }
                 }
             )
@@ -131,10 +144,14 @@ fun ProgrammaticNativeAdCompose(
             }
 
             nativeAdView != null -> {
-                AndroidView(
-                    factory = { nativeAdView!! },
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // key() ensures the AndroidView node is recreated when a new
+                // view replaces the old one, so the new view actually gets attached
+                key(nativeAdView) {
+                    AndroidView(
+                        factory = { nativeAdView!! },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         }
     }
@@ -142,6 +159,9 @@ fun ProgrammaticNativeAdCompose(
     // Clean up when the composable is disposed
     DisposableEffect(adUnitId) {
         onDispose {
+            // Destroy the displayed NativeAd to release its media/assets
+            nativeAd?.destroy()
+            nativeAd = null
             nativeAdView = null
         }
     }

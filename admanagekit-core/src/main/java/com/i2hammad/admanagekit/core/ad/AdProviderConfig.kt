@@ -12,10 +12,19 @@ package com.i2hammad.admanagekit.core.ad
  */
 object AdProviderConfig {
 
+    @Volatile
     private var interstitialChain: List<InterstitialAdProvider> = emptyList()
+
+    @Volatile
     private var bannerChain: List<BannerAdProvider> = emptyList()
+
+    @Volatile
     private var nativeChain: List<NativeAdProvider> = emptyList()
+
+    @Volatile
     private var appOpenChain: List<AppOpenAdProvider> = emptyList()
+
+    @Volatile
     private var rewardedChain: List<RewardedAdProvider> = emptyList()
 
     // --- Interstitial ---

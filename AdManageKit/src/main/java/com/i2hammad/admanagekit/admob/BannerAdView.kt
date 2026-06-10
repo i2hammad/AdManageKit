@@ -64,12 +64,17 @@ class BannerAdView @JvmOverloads constructor(
     
     // Enhanced features
     private var currentAdUnitId: String? = null
+    // Original load configuration, preserved so auto-refresh reloads keep the same behavior
+    private var currentCollapsible: Boolean = false
+    private var currentPlacement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM
     private var isAdLoading = AtomicBoolean(false)
     private var loadAttempt = AtomicInteger(0)
     private var refreshHandler: Handler? = null
     private var refreshRunnable: Runnable? = null
     private var autoRefreshEnabled = false
-    private val refreshIntervalSeconds get() = AdManageKitConfig.defaultBannerRefreshInterval.inWholeSeconds.toInt()
+    private var customRefreshIntervalSeconds: Int? = null // Per-view interval set via enableAutoRefresh()
+    private val refreshIntervalSeconds get() = customRefreshIntervalSeconds
+        ?: AdManageKitConfig.defaultBannerRefreshInterval.inWholeSeconds.toInt()
     
     // Waterfall support
     private var bannerWaterfall: BannerWaterfall? = null
@@ -171,6 +176,8 @@ class BannerAdView @JvmOverloads constructor(
         // Enhanced memory management
         this.activityRef = WeakReference(context)
         this.currentAdUnitId = adUnitId
+        this.currentCollapsible = collapsible
+        this.currentPlacement = placement
         this.callback = callback
 
         // Register lifecycle observer if possible
@@ -235,6 +242,10 @@ class BannerAdView @JvmOverloads constructor(
             shimmerFrameLayout.visibility = View.VISIBLE
             shimmerFrameLayout.startShimmer()
             
+            // Destroy the previous AdView (if any) before replacing it to avoid
+            // leaking a WebView-backed view on every reload/auto-refresh
+            adView?.destroy()
+
             // Create and configure AdView
             val calculatedAdSize = getAdSize()
             adView = AdView(activity).apply {
@@ -402,7 +413,14 @@ class BannerAdView @JvmOverloads constructor(
             firebaseAnalytics?.logEvent("ad_failed_to_load", params)
             
             AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "$reason (attempt $attempt)", false)
-            
+
+            // Purchase-blocked loads should fail fast - retrying can never succeed for premium users
+            if (error.code == AdManager.PURCHASED_APP_ERROR_CODE) {
+                visibility = View.GONE
+                callback?.onFailedToLoad(error)
+                return@ensureMainThread
+            }
+
             // Retry logic based on configuration
             if (attempt <= maxRetryAttempts && AdManageKitConfig.autoRetryFailedAds) {
                 val retryDelay = if (AdManageKitConfig.enableExponentialBackoff) {
@@ -606,7 +624,8 @@ class BannerAdView @JvmOverloads constructor(
     fun enableAutoRefresh(intervalSeconds: Int = 30) {
         this.autoRefreshEnabled = true
         val configuredInterval = maxOf(intervalSeconds, 30) // Minimum 30 seconds per AdMob policy
-        
+        this.customRefreshIntervalSeconds = configuredInterval
+
         AdDebugUtils.logDebug("BannerAdView", "Auto-refresh enabled with ${configuredInterval}s interval")
         scheduleNextRefresh()
     }
@@ -642,7 +661,9 @@ class BannerAdView @JvmOverloads constructor(
         refreshRunnable = Runnable {
             currentAdUnitId?.let { adUnitId ->
                 AdDebugUtils.logEvent(adUnitId, "AutoRefresh", "Auto-refreshing banner ad", true)
-                loadBannerInternal(adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
+                // Reuse the original collapsible configuration so refreshes don't silently
+                // convert a collapsible banner into a regular one
+                loadBannerInternal(adUnitId, currentCollapsible, currentPlacement, callback)
             }
         }
         

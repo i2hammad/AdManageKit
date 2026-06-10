@@ -29,6 +29,7 @@ class YandexBannerProvider(
     override val provider: AdProvider = AdProvider.YANDEX
 
     private var bannerAdView: BannerAdView? = null
+    private var isDestroyed = false
 
     companion object {
         private const val TAG = "YandexBanner"
@@ -39,6 +40,8 @@ class YandexBannerProvider(
         adUnitId: String,
         callback: BannerAdProvider.BannerAdCallback
     ) {
+        // Replace any previous banner so sequential loads don't leak the first view
+        bannerAdView?.destroy()
         val bannerView = BannerAdView(context).apply {
             val width = if (maxAdWidth > 0) maxAdWidth else {
                 val displayMetrics = context.resources.displayMetrics
@@ -48,12 +51,16 @@ class YandexBannerProvider(
 
             setBannerAdEventListener(object : BannerAdEventListener {
                 override fun onAdLoaded() {
+                    if (isDestroyed) {
+                        Log.d(TAG, "Banner ad loaded after destroy, discarding: $adUnitId")
+                        return
+                    }
                     Log.d(TAG, "Banner ad loaded: $adUnitId")
-                    bannerAdView = this@apply
                     callback.onBannerLoaded(this@apply)
                 }
 
                 override fun onAdFailedToLoad(error: AdRequestError) {
+                    if (isDestroyed) return
                     Log.e(TAG, "Banner ad failed to load: ${error.description}")
                     callback.onBannerFailedToLoad(error.toAdKitError())
                 }
@@ -69,6 +76,8 @@ class YandexBannerProvider(
             })
         }
 
+        // Track the view from creation so destroy() during an in-flight load destroys it
+        bannerAdView = bannerView
         bannerView.loadAd(AdRequest.Builder(adUnitId).build())
     }
 
@@ -81,6 +90,7 @@ class YandexBannerProvider(
     }
 
     override fun destroy() {
+        isDestroyed = true
         bannerAdView?.destroy()
         bannerAdView = null
     }

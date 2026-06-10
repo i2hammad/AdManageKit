@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -50,35 +53,44 @@ fun NativeTemplateCompose(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
+
     // Create callback
     val callback = remember(adUnitId, template) {
         object : AdLoadCallback() {
             override fun onAdLoaded() {
-                onAdLoaded?.invoke()
+                currentOnAdLoaded?.invoke()
             }
 
             override fun onFailedToLoad(error: AdError?) {
-                onAdFailedToLoad?.invoke(error)
+                currentOnAdFailedToLoad?.invoke(error)
             }
 
             override fun onAdClicked() {
-                onAdClicked?.invoke()
+                currentOnAdClicked?.invoke()
             }
 
             override fun onAdImpression() {
-                onAdImpression?.invoke()
+                currentOnAdImpression?.invoke()
             }
 
             override fun onAdOpened() {
-                onAdOpened?.invoke()
+                currentOnAdOpened?.invoke()
             }
 
             override fun onAdClosed() {
-                onAdClosed?.invoke()
+                currentOnAdClosed?.invoke()
             }
 
             override fun onPaidEvent(adValue: AdValue) {
-                onPaidEvent?.invoke(adValue)
+                currentOnPaidEvent?.invoke(adValue)
             }
         }
     }
@@ -101,19 +113,24 @@ fun NativeTemplateCompose(
         }
 
         onDispose {
-            // Cleanup handled by view
+            // Release the displayed NativeAd when the composable leaves composition
+            nativeTemplateView.destroy()
         }
     }
 
-    AndroidView(
-        factory = { nativeTemplateView },
-        modifier = modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        update = { view ->
-            view.visibility = android.view.View.VISIBLE
-        }
-    )
+    // key() ensures the AndroidView node is recreated when a new view instance
+    // is created for new keys, so the new view actually gets attached
+    key(adUnitId, template) {
+        AndroidView(
+            factory = { nativeTemplateView },
+            modifier = modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+            update = { view ->
+                view.visibility = android.view.View.VISIBLE
+            }
+        )
+    }
 }
 
 /**

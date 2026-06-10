@@ -27,6 +27,7 @@ class YandexInterstitialProvider : InterstitialAdProvider {
 
     private var interstitialAd: InterstitialAd? = null
     private var interstitialAdLoader: InterstitialAdLoader? = null
+    private var isDestroyed = false
 
     companion object {
         private const val TAG = "YandexInterstitial"
@@ -39,6 +40,10 @@ class YandexInterstitialProvider : InterstitialAdProvider {
     ) {
         val listener = object : InterstitialAdLoadListener {
             override fun onAdLoaded(ad: InterstitialAd) {
+                if (isDestroyed) {
+                    Log.d(TAG, "Interstitial ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
                 interstitialAd = ad
                 Log.d(TAG, "Interstitial ad loaded: $adUnitId")
                 callback.onAdLoaded()
@@ -73,16 +78,16 @@ class YandexInterstitialProvider : InterstitialAdProvider {
 
             override fun onAdFailedToShow(adError: AdError) {
                 Log.e(TAG, "Interstitial ad failed to show: ${adError.description}")
-                interstitialAd?.setAdEventListener(null)
-                interstitialAd = null
+                ad.setAdEventListener(null)
+                if (interstitialAd === ad) interstitialAd = null
                 callback.onAdFailedToShow(adError.toAdKitError())
                 callback.onAdDismissed()
             }
 
             override fun onAdDismissed() {
                 Log.d(TAG, "Interstitial ad dismissed")
-                interstitialAd?.setAdEventListener(null)
-                interstitialAd = null
+                ad.setAdEventListener(null)
+                if (interstitialAd === ad) interstitialAd = null
                 callback.onAdDismissed()
             }
 
@@ -102,6 +107,8 @@ class YandexInterstitialProvider : InterstitialAdProvider {
     override fun isAdReady(): Boolean = interstitialAd != null
 
     override fun destroy() {
+        isDestroyed = true
+        interstitialAdLoader?.cancelLoading()
         interstitialAdLoader = null
         interstitialAd?.setAdEventListener(null)
         interstitialAd = null

@@ -27,6 +27,7 @@ class YandexAppOpenProvider : AppOpenAdProvider {
 
     private var appOpenAd: AppOpenAd? = null
     private var appOpenAdLoader: AppOpenAdLoader? = null
+    private var isDestroyed = false
 
     companion object {
         private const val TAG = "YandexAppOpen"
@@ -39,6 +40,10 @@ class YandexAppOpenProvider : AppOpenAdProvider {
     ) {
         val listener = object : AppOpenAdLoadListener {
             override fun onAdLoaded(ad: AppOpenAd) {
+                if (isDestroyed) {
+                    Log.d(TAG, "App open ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
                 appOpenAd = ad
                 Log.d(TAG, "App open ad loaded: $adUnitId")
                 callback.onAdLoaded()
@@ -73,16 +78,16 @@ class YandexAppOpenProvider : AppOpenAdProvider {
 
             override fun onAdFailedToShow(adError: AdError) {
                 Log.e(TAG, "App open ad failed to show: ${adError.description}")
-                appOpenAd?.setAdEventListener(null)
-                appOpenAd = null
+                ad.setAdEventListener(null)
+                if (appOpenAd === ad) appOpenAd = null
                 callback.onAdFailedToShow(adError.toAdKitError())
                 callback.onAdDismissed()
             }
 
             override fun onAdDismissed() {
                 Log.d(TAG, "App open ad dismissed")
-                appOpenAd?.setAdEventListener(null)
-                appOpenAd = null
+                ad.setAdEventListener(null)
+                if (appOpenAd === ad) appOpenAd = null
                 callback.onAdDismissed()
             }
 
@@ -102,6 +107,8 @@ class YandexAppOpenProvider : AppOpenAdProvider {
     override fun isAdReady(): Boolean = appOpenAd != null
 
     override fun destroy() {
+        isDestroyed = true
+        appOpenAdLoader?.cancelLoading()
         appOpenAdLoader = null
         appOpenAd?.setAdEventListener(null)
         appOpenAd = null

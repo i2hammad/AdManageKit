@@ -24,6 +24,14 @@ import com.i2hammad.admanagekit.core.ad.BannerAdProvider
  * AdMob implementation of [BannerAdProvider].
  * Wraps Google AdMob AdView behind the provider interface.
  *
+ * Ownership: a successfully loaded AdView is handed to the caller via
+ * [BannerAdProvider.BannerAdCallback.onBannerLoaded]; from that point the caller
+ * owns the view (and its destruction). The provider keeps a reference to the most
+ * recently loaded view only to service [pause]/[resume], and never destroys
+ * handed-out views (they may be attached in another screen). Views whose load
+ * fails — or that are still in flight when [destroy] is called — were never
+ * handed out and are destroyed by the provider.
+ *
  * @param adSize Explicit ad size, or null to use adaptive full-width banner (default).
  * @param collapsible Whether to load collapsible banners.
  * @param collapsiblePlacement Collapsible direction (TOP or BOTTOM).
@@ -36,7 +44,12 @@ class AdMobBannerProvider(
 
     override val provider: AdProvider = AdProvider.ADMOB
 
+    /** Most recently handed-out view; kept only for pause/resume. */
+    @Volatile
     private var adView: AdView? = null
+
+    /** Views created for in-flight loads, not yet handed out. */
+    private val pendingViews = java.util.Collections.synchronizedSet(mutableSetOf<AdView>())
 
     companion object {
         private const val TAG = "AdMobBanner"
@@ -72,16 +85,29 @@ class AdMobBannerProvider(
             this.adUnitId = adUnitId
             setAdSize(resolvedAdSize)
         }
+        pendingViews.add(bannerView)
 
         bannerView.adListener = object : AdListener() {
             override fun onAdLoaded() {
+                if (!pendingViews.remove(bannerView)) {
+                    // destroy() already destroyed this in-flight view; do not hand it out.
+                    Log.d(TAG, "Banner ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
                 Log.d(TAG, "Banner ad loaded: $adUnitId")
+                // Do NOT destroy the previously stored view: it was handed to a
+                // consumer on its own onBannerLoaded and the consumer owns it.
                 adView = bannerView
                 callback.onBannerLoaded(bannerView)
             }
 
             override fun onAdFailedToLoad(error: LoadAdError) {
                 Log.e(TAG, "Banner ad failed to load: ${error.message}")
+                // The view was never handed out — destroy it to release the
+                // underlying WebView and the captured context.
+                if (pendingViews.remove(bannerView)) {
+                    bannerView.destroy()
+                }
                 callback.onBannerFailedToLoad(error.toAdKitError())
             }
 
@@ -116,7 +142,12 @@ class AdMobBannerProvider(
     }
 
     override fun destroy() {
-        adView?.destroy()
+        // Destroy only views that were never handed to a consumer (in-flight loads).
+        // Handed-out views are owned by their consumers and may still be displayed.
+        synchronized(pendingViews) {
+            pendingViews.forEach { it.destroy() }
+            pendingViews.clear()
+        }
         adView = null
     }
 }

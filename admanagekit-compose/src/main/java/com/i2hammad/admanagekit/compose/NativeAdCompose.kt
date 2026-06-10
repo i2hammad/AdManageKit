@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -66,35 +69,44 @@ fun NativeAdCompose(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
+
     // Create callback once
     val callback = remember(adUnitId) {
         object : AdLoadCallback() {
             override fun onAdLoaded() {
-                onAdLoaded?.invoke()
+                currentOnAdLoaded?.invoke()
             }
 
             override fun onFailedToLoad(error: AdError?) {
-                onAdFailedToLoad?.invoke(error)
+                currentOnAdFailedToLoad?.invoke(error)
             }
 
             override fun onAdClicked() {
-                onAdClicked?.invoke()
+                currentOnAdClicked?.invoke()
             }
 
             override fun onAdImpression() {
-                onAdImpression?.invoke()
+                currentOnAdImpression?.invoke()
             }
 
             override fun onAdOpened() {
-                onAdOpened?.invoke()
+                currentOnAdOpened?.invoke()
             }
 
             override fun onAdClosed() {
-                onAdClosed?.invoke()
+                currentOnAdClosed?.invoke()
             }
 
             override fun onPaidEvent(adValue: AdValue) {
-                onPaidEvent?.invoke(adValue)
+                currentOnPaidEvent?.invoke(adValue)
             }
         }
     }
@@ -142,8 +154,12 @@ fun NativeAdCompose(
         }
 
         onDispose {
-            // Clean up when composable is disposed
-            // Note: Native ad views handle their own cleanup in onDetachedFromWindow
+            // Clean up when composable is disposed - release the displayed NativeAd
+            when (val view = nativeAdView) {
+                is NativeBannerSmall -> view.destroy()
+                is NativeBannerMedium -> view.destroy()
+                is NativeLarge -> view.destroy()
+            }
         }
     }
 
@@ -154,16 +170,20 @@ fun NativeAdCompose(
         NativeAdSize.LARGE -> 300.dp
     }
 
-    AndroidView(
-        factory = { nativeAdView },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(adHeight),
-        update = { view ->
-            // Update view if needed when recomposed
-            view.visibility = android.view.View.VISIBLE
-        }
-    )
+    // key() ensures the AndroidView node is recreated when a new view instance
+    // is created for new keys, so the new view actually gets attached
+    key(adUnitId, size) {
+        AndroidView(
+            factory = { nativeAdView },
+            modifier = modifier
+                .fillMaxWidth()
+                .height(adHeight),
+            update = { view ->
+                // Update view if needed when recomposed
+                view.visibility = android.view.View.VISIBLE
+            }
+        )
+    }
 }
 
 /**

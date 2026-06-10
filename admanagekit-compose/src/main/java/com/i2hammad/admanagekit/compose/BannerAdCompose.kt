@@ -4,7 +4,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -47,6 +50,15 @@ fun BannerAdCompose(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
+
     // Remember the BannerAdView to prevent recreation on recomposition
     val bannerAdView = remember(adUnitId) {
         BannerAdView(context)
@@ -57,53 +69,57 @@ fun BannerAdCompose(
         if (context is androidx.activity.ComponentActivity) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
-                    onAdLoaded?.invoke()
+                    currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: AdError?) {
-                    onAdFailedToLoad?.invoke(error)
+                    currentOnAdFailedToLoad?.invoke(error)
                 }
 
                 override fun onAdClicked() {
-                    onAdClicked?.invoke()
+                    currentOnAdClicked?.invoke()
                 }
 
                 override fun onAdImpression() {
-                    onAdImpression?.invoke()
+                    currentOnAdImpression?.invoke()
                 }
 
                 override fun onAdOpened() {
-                    onAdOpened?.invoke()
+                    currentOnAdOpened?.invoke()
                 }
 
                 override fun onAdClosed() {
-                    onAdClosed?.invoke()
+                    currentOnAdClosed?.invoke()
                 }
 
                 override fun onPaidEvent(adValue: AdValue) {
-                    onPaidEvent?.invoke(adValue)
+                    currentOnPaidEvent?.invoke(adValue)
                 }
             }
             bannerAdView.loadBanner(context, adUnitId, callback)
         }
         onDispose {
-            // Clean up when the composable is removed
-            bannerAdView.hideAd()
+            // Destroy the underlying AdView and stop auto-refresh when removed
+            bannerAdView.destroyAd()
         }
     }
 
-    AndroidView(
-        factory = { bannerAdView },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(50.dp), // Standard banner height
-        update = { view ->
-            // Update the view if needed when recomposed
-            if (view.visibility != android.view.View.VISIBLE) {
-                view.showAd()
+    // key() ensures the AndroidView node is recreated when a new view instance
+    // is created for a new adUnitId, so the new view actually gets attached
+    key(adUnitId) {
+        AndroidView(
+            factory = { bannerAdView },
+            modifier = modifier
+                .fillMaxWidth()
+                .height(50.dp), // Standard banner height
+            update = { view ->
+                // Update the view if needed when recomposed
+                if (view.visibility != android.view.View.VISIBLE) {
+                    view.showAd()
+                }
             }
-        }
-    )
+        )
+    }
 }
 
 /**
@@ -137,6 +153,15 @@ fun BannerAdCompose(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
+
     val bannerAdView = remember(adUnitId) {
         BannerAdView(context)
     }
@@ -145,51 +170,55 @@ fun BannerAdCompose(
         if (context is androidx.activity.ComponentActivity) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
-                    onAdLoaded?.invoke()
+                    currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: AdError?) {
-                    onAdFailedToLoad?.invoke(error)
+                    currentOnAdFailedToLoad?.invoke(error)
                 }
 
                 override fun onAdClicked() {
-                    onAdClicked?.invoke()
+                    currentOnAdClicked?.invoke()
                 }
 
                 override fun onAdImpression() {
-                    onAdImpression?.invoke()
+                    currentOnAdImpression?.invoke()
                 }
 
                 override fun onAdOpened() {
-                    onAdOpened?.invoke()
+                    currentOnAdOpened?.invoke()
                 }
 
                 override fun onAdClosed() {
-                    onAdClosed?.invoke()
+                    currentOnAdClosed?.invoke()
                 }
 
                 override fun onPaidEvent(adValue: AdValue) {
-                    onPaidEvent?.invoke(adValue)
+                    currentOnPaidEvent?.invoke(adValue)
                 }
             }
             bannerAdView.loadBanner(context, adUnitId, callback)
         }
         onDispose {
-            bannerAdView.hideAd()
+            // Destroy the underlying AdView and stop auto-refresh when removed
+            bannerAdView.destroyAd()
         }
     }
 
-    AndroidView(
-        factory = { bannerAdView },
-        modifier = modifier
-            .fillMaxWidth()
-            .height(height),
-        update = { view ->
-            if (view.visibility != android.view.View.VISIBLE) {
-                view.showAd()
+    // Recreate the AndroidView node when a new view is created for a new adUnitId
+    key(adUnitId) {
+        AndroidView(
+            factory = { bannerAdView },
+            modifier = modifier
+                .fillMaxWidth()
+                .height(height),
+            update = { view ->
+                if (view.visibility != android.view.View.VISIBLE) {
+                    view.showAd()
+                }
             }
-        }
-    )
+        )
+    }
 }
 
 /**
@@ -243,6 +272,15 @@ fun CollapsibleBannerAdCompose(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+    val currentOnAdClicked by rememberUpdatedState(onAdClicked)
+    val currentOnAdImpression by rememberUpdatedState(onAdImpression)
+    val currentOnAdOpened by rememberUpdatedState(onAdOpened)
+    val currentOnAdClosed by rememberUpdatedState(onAdClosed)
+    val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
+
     val bannerAdView = remember(adUnitId, placement) {
         BannerAdView(context)
     }
@@ -251,31 +289,31 @@ fun CollapsibleBannerAdCompose(
         if (context is androidx.activity.ComponentActivity) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
-                    onAdLoaded?.invoke()
+                    currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: AdError?) {
-                    onAdFailedToLoad?.invoke(error)
+                    currentOnAdFailedToLoad?.invoke(error)
                 }
 
                 override fun onAdClicked() {
-                    onAdClicked?.invoke()
+                    currentOnAdClicked?.invoke()
                 }
 
                 override fun onAdImpression() {
-                    onAdImpression?.invoke()
+                    currentOnAdImpression?.invoke()
                 }
 
                 override fun onAdOpened() {
-                    onAdOpened?.invoke()
+                    currentOnAdOpened?.invoke()
                 }
 
                 override fun onAdClosed() {
-                    onAdClosed?.invoke()
+                    currentOnAdClosed?.invoke()
                 }
 
                 override fun onPaidEvent(adValue: AdValue) {
-                    onPaidEvent?.invoke(adValue)
+                    currentOnPaidEvent?.invoke(adValue)
                 }
             }
             bannerAdView.loadCollapsibleBanner(
@@ -287,17 +325,21 @@ fun CollapsibleBannerAdCompose(
             )
         }
         onDispose {
-            bannerAdView.hideAd()
+            // Destroy the underlying AdView and stop auto-refresh when removed
+            bannerAdView.destroyAd()
         }
     }
 
-    AndroidView(
-        factory = { bannerAdView },
-        modifier = modifier.fillMaxWidth(),
-        update = { view ->
-            if (view.visibility != android.view.View.VISIBLE) {
-                view.showAd()
+    // Recreate the AndroidView node when a new view is created for new keys
+    key(adUnitId, placement) {
+        AndroidView(
+            factory = { bannerAdView },
+            modifier = modifier.fillMaxWidth(),
+            update = { view ->
+                if (view.visibility != android.view.View.VISIBLE) {
+                    view.showAd()
+                }
             }
-        }
-    )
+        )
+    }
 }

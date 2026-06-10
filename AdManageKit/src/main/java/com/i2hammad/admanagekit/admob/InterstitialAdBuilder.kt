@@ -444,6 +444,11 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         // Create callback for showing the ad
         val showCallback = object : AdManagerCallback() {
             override fun onAdLoaded() {
+                if (debugMode) android.util.Log.d("InterstitialBuilder", "Ad loaded")
+                onAdLoadedCallback?.invoke()
+            }
+
+            override fun onAdShowed() {
                 if (debugMode) android.util.Log.d("InterstitialBuilder", "Ad shown successfully")
                 onAdShownCallback?.invoke()
             }

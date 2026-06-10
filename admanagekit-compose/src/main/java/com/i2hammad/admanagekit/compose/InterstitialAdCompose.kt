@@ -5,6 +5,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 
@@ -35,13 +38,20 @@ fun rememberInterstitialAd(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // Keep the latest parameter values available to long-lived callbacks/observers
+    val currentAdUnitId by rememberUpdatedState(adUnitId)
+    val currentPreloadAd by rememberUpdatedState(preloadAd)
+    val currentOnAdShown by rememberUpdatedState(onAdShown)
+    val currentOnAdDismissed by rememberUpdatedState(onAdDismissed)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+
     // Preload the ad when the composable is first created
     LaunchedEffect(adUnitId, preloadAd) {
         if (preloadAd && context is androidx.activity.ComponentActivity) {
             try {
                 AdManager.getInstance().loadInterstitialAd(context, adUnitId)
             } catch (e: Exception) {
-                onAdFailedToLoad?.invoke("Failed to load ad: ${e.message}")
+                currentOnAdFailedToLoad?.invoke("Failed to load ad: ${e.message}")
             }
         }
     }
@@ -49,14 +59,14 @@ fun rememberInterstitialAd(
     // Handle lifecycle events for reloading ads
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && preloadAd) {
+            if (event == Lifecycle.Event.ON_RESUME && currentPreloadAd) {
                 if (context is androidx.activity.ComponentActivity) {
                     // Reload ad if it's not ready when resuming
                     if (!AdManager.getInstance().isReady()) {
                         try {
-                            AdManager.getInstance().loadInterstitialAd(context, adUnitId)
+                            AdManager.getInstance().loadInterstitialAd(context, currentAdUnitId)
                         } catch (e: Exception) {
-                            onAdFailedToLoad?.invoke("Failed to reload ad: ${e.message}")
+                            currentOnAdFailedToLoad?.invoke("Failed to reload ad: ${e.message}")
                         }
                     }
                 }
@@ -73,25 +83,26 @@ fun rememberInterstitialAd(
         {
             if (context is androidx.activity.ComponentActivity) {
                 val callback = object : AdManagerCallback() {
+                    override fun onAdShowed() {
+                        currentOnAdShown?.invoke()
+                    }
+
                     override fun onNextAction() {
-                        onAdDismissed?.invoke()
+                        currentOnAdDismissed?.invoke()
                     }
                 }
 
                 try {
-                    // Show ad based on time interval (respects AdManager's built-in logic)
-                    if (AdManager.getInstance().isReady()) {
-                        onAdShown?.invoke()
-                        AdManager.getInstance().showInterstitialAdByTime(context, callback)
-                    } else {
-                        onAdDismissed?.invoke()
-                    }
+                    // Show ad based on time interval (respects AdManager's built-in logic).
+                    // AdManager invokes onNextAction when no ad is ready or the time gate skips,
+                    // and onAdShowed only when the ad is actually displayed.
+                    AdManager.getInstance().showInterstitialAdByTime(context, callback)
                 } catch (e: Exception) {
-                    onAdFailedToLoad?.invoke("Failed to show ad: ${e.message}")
-                    onAdDismissed?.invoke()
+                    currentOnAdFailedToLoad?.invoke("Failed to show ad: ${e.message}")
+                    currentOnAdDismissed?.invoke()
                 }
             } else {
-                onAdDismissed?.invoke()
+                currentOnAdDismissed?.invoke()
             }
         }
     }
@@ -121,52 +132,67 @@ fun InterstitialAdEffect(
 ) {
     val context = LocalContext.current
 
+    // Keep the latest callbacks available to long-lived async ad events
+    val currentOnAdShown by rememberUpdatedState(onAdShown)
+    val currentOnAdDismissed by rememberUpdatedState(onAdDismissed)
+    val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
+
     LaunchedEffect(adUnitId, showMode, maxDisplayCount) {
         if (context is androidx.activity.ComponentActivity) {
             val callback = object : AdManagerCallback() {
+                override fun onAdShowed() {
+                    currentOnAdShown?.invoke()
+                }
+
                 override fun onNextAction() {
-                    onAdDismissed?.invoke()
+                    currentOnAdDismissed?.invoke()
+                }
+            }
+
+            // Shows the ad through the mode's gate. AdManager invokes onNextAction
+            // when the gate skips or no ad is available, and onAdShowed on actual display.
+            fun showAd() {
+                when (showMode) {
+                    InterstitialShowMode.TIME ->
+                        AdManager.getInstance().showInterstitialAdByTime(context, callback)
+                    InterstitialShowMode.COUNT ->
+                        AdManager.getInstance().showInterstitialAdByCount(context, callback, maxDisplayCount)
+                    InterstitialShowMode.FORCE ->
+                        AdManager.getInstance().forceShowInterstitial(context, callback)
+                    InterstitialShowMode.FORCE_WITH_DIALOG ->
+                        AdManager.getInstance().forceShowInterstitialWithDialog(context, callback)
                 }
             }
 
             try {
-                // Load the ad first
-                AdManager.getInstance().loadInterstitialAd(context, adUnitId)
+                if (showMode == InterstitialShowMode.FORCE_WITH_DIALOG || AdManager.getInstance().isReady()) {
+                    // Either an ad is already available, or the mode waits for one internally
+                    showAd()
+                } else {
+                    // Load first, then drive the show from the load result
+                    var completed = false
+                    AdManager.getInstance().loadInterstitialAd(
+                        context,
+                        adUnitId,
+                        object : InterstitialAdLoadCallback() {
+                            override fun onAdLoaded(interstitialAd: InterstitialAd) {
+                                if (completed) return
+                                completed = true
+                                showAd()
+                            }
 
-                // Show based on the specified mode
-                when (showMode) {
-                    InterstitialShowMode.TIME -> {
-                        if (AdManager.getInstance().isReady()) {
-                            onAdShown?.invoke()
-                            AdManager.getInstance().showInterstitialAdByTime(context, callback)
-                        } else {
-                            onAdDismissed?.invoke()
+                            override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                                if (completed) return
+                                completed = true
+                                currentOnAdFailedToLoad?.invoke("Ad failed to load: ${loadAdError.message}")
+                                currentOnAdDismissed?.invoke()
+                            }
                         }
-                    }
-                    InterstitialShowMode.COUNT -> {
-                        if (AdManager.getInstance().isReady()) {
-                            onAdShown?.invoke()
-                            AdManager.getInstance().showInterstitialAdByCount(context, callback, maxDisplayCount)
-                        } else {
-                            onAdDismissed?.invoke()
-                        }
-                    }
-                    InterstitialShowMode.FORCE -> {
-                        if (AdManager.getInstance().isReady()) {
-                            onAdShown?.invoke()
-                            AdManager.getInstance().forceShowInterstitial(context, callback)
-                        } else {
-                            onAdDismissed?.invoke()
-                        }
-                    }
-                    InterstitialShowMode.FORCE_WITH_DIALOG -> {
-                        onAdShown?.invoke()
-                        AdManager.getInstance().forceShowInterstitialWithDialog(context, callback)
-                    }
+                    )
                 }
             } catch (e: Exception) {
-                onAdFailedToLoad?.invoke("Ad operation failed: ${e.message}")
-                onAdDismissed?.invoke()
+                currentOnAdFailedToLoad?.invoke("Ad operation failed: ${e.message}")
+                currentOnAdDismissed?.invoke()
             }
         }
     }
@@ -285,6 +311,12 @@ class InterstitialAdState(
         maxCount: Int = 3
     ) {
         val callback = object : AdManagerCallback() {
+            override fun onAdShowed() {
+                // Only mark as displaying once the SDK confirms the ad is on screen
+                isDisplaying = true
+                onShown?.invoke()
+            }
+
             override fun onNextAction() {
                 isDisplaying = false
                 checkAdStatus()
@@ -298,8 +330,6 @@ class InterstitialAdState(
             when (mode) {
                 InterstitialShowMode.TIME -> {
                     if (isLoaded) {
-                        isDisplaying = true
-                        onShown?.invoke()
                         AdManager.getInstance().showInterstitialAdByTime(context, callback)
                     } else {
                         onDismissed?.invoke()
@@ -307,8 +337,6 @@ class InterstitialAdState(
                 }
                 InterstitialShowMode.COUNT -> {
                     if (isLoaded) {
-                        isDisplaying = true
-                        onShown?.invoke()
                         AdManager.getInstance().showInterstitialAdByCount(context, callback, maxCount)
                     } else {
                         onDismissed?.invoke()
@@ -316,16 +344,12 @@ class InterstitialAdState(
                 }
                 InterstitialShowMode.FORCE -> {
                     if (isLoaded) {
-                        isDisplaying = true
-                        onShown?.invoke()
                         AdManager.getInstance().forceShowInterstitial(context, callback)
                     } else {
                         onDismissed?.invoke()
                     }
                 }
                 InterstitialShowMode.FORCE_WITH_DIALOG -> {
-                    isDisplaying = true
-                    onShown?.invoke()
                     AdManager.getInstance().forceShowInterstitialWithDialog(context, callback)
                 }
             }

@@ -69,6 +69,9 @@ object RewardedAdManager {
     // Retry tracking
     private var retryAttempts: Int = 0
 
+    // Callbacks attached to an in-flight load; drained when that load completes
+    private val pendingLoadCallbacks = mutableListOf<OnRewardedAdLoadCallback>()
+
     // Waterfall support
     private var rewardedWaterfall: RewardedWaterfall? = null
     private val useWaterfall: Boolean
@@ -225,6 +228,9 @@ object RewardedAdManager {
                 }
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
 
+                // Notify callbacks that attached to this in-flight load
+                notifyPendingLoadFailure(adError)
+
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
                     retryAttempts++
@@ -247,6 +253,9 @@ object RewardedAdManager {
 
                 // Log ad fill for analytics
                 logAdFill()
+
+                // Notify callbacks that attached to this in-flight load
+                notifyPendingLoadSuccess()
             }
         })
     }
@@ -283,15 +292,17 @@ object RewardedAdManager {
             return
         }
 
-        // Guard: Prevent duplicate concurrent load requests
-        if (isLoading) {
-            Log.d(TAG, "Ad already loading, skipping duplicate request")
-            return
-        }
-
         // Guard: If already loaded, return success immediately
         if (rewardedAd != null) {
             callback.onAdLoaded()
+            return
+        }
+
+        // Guard: Prevent duplicate concurrent load requests, but don't drop the callback -
+        // queue it so it fires when the in-flight load completes
+        if (isLoading) {
+            Log.d(TAG, "Ad already loading, queueing callback for in-flight load")
+            synchronized(pendingLoadCallbacks) { pendingLoadCallbacks.add(callback) }
             return
         }
 
@@ -315,6 +326,7 @@ object RewardedAdManager {
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
 
                 callback.onAdFailedToLoad(adError)
+                notifyPendingLoadFailure(adError)
             }
 
             override fun onAdLoaded(ad: RewardedAd) {
@@ -326,6 +338,7 @@ object RewardedAdManager {
                 logAdFill()
 
                 callback.onAdLoaded()
+                notifyPendingLoadSuccess()
             }
         })
     }
@@ -373,8 +386,39 @@ object RewardedAdManager {
             return
         }
 
+        // If already loading, attach to the in-flight load instead of starting a duplicate one
         if (isLoading) {
-            Log.d(TAG, "Ad already loading, waiting for result")
+            Log.d(TAG, "Ad already loading, attaching to in-flight load")
+            var pendingCallbackCalled = false
+            val pendingCallback = object : OnRewardedAdLoadCallback {
+                override fun onAdLoaded() {
+                    if (!pendingCallbackCalled) {
+                        pendingCallbackCalled = true
+                        callback.onAdLoaded()
+                    }
+                }
+
+                override fun onAdFailedToLoad(error: LoadAdError) {
+                    if (!pendingCallbackCalled) {
+                        pendingCallbackCalled = true
+                        callback.onAdFailedToLoad(error)
+                    }
+                }
+            }
+            synchronized(pendingLoadCallbacks) { pendingLoadCallbacks.add(pendingCallback) }
+
+            // Honor the timeout for the attached caller as well
+            Handler(Looper.getMainLooper()).postDelayed({
+                if (!pendingCallbackCalled) {
+                    pendingCallbackCalled = true
+                    synchronized(pendingLoadCallbacks) { pendingLoadCallbacks.remove(pendingCallback) }
+                    Log.d(TAG, "In-flight ad load timed out for attached caller")
+                    callback.onAdFailedToLoad(
+                        LoadAdError(-1, "Ad loading timed out", "com.i2hammad.admanagekit", null, null)
+                    )
+                }
+            }, timeoutMillis)
+            return
         }
 
         isLoading = true
@@ -389,6 +433,9 @@ object RewardedAdManager {
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 isLoading = false
                 rewardedAd = null
+
+                // Notify callbacks that attached to this in-flight load
+                notifyPendingLoadFailure(adError)
 
                 if (!callbackCalled) {
                     callbackCalled = true
@@ -409,6 +456,9 @@ object RewardedAdManager {
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0
+
+                // Notify callbacks that attached to this in-flight load
+                notifyPendingLoadSuccess()
 
                 if (!callbackCalled) {
                     callbackCalled = true
@@ -462,6 +512,15 @@ object RewardedAdManager {
             return
         }
 
+        // Guard: An ad is already on screen - don't call show() on the same ad again.
+        // The callback is intentionally not invoked to avoid double-triggering the
+        // post-ad flow of what is typically a duplicate request (e.g. double-tap).
+        if (isShowingAd) {
+            Log.w(TAG, "Ad is already showing, ignoring duplicate show request")
+            AdDebugUtils.logEvent(adUnitId, "skipShow", "Ad already showing", false)
+            return
+        }
+
         if (useWaterfall) { showViaWaterfall(activity, callback, autoReload); return }
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
@@ -507,8 +566,11 @@ object RewardedAdManager {
             override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
                 Log.e(TAG, "Ad failed to show fullscreen content: ${adError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "Rewarded ad failed to show: ${adError.message}", false)
-                isShowingAd = false
-                rewardedAd = null
+                // Only reset state owned by this ad - don't clobber a different ad that is showing
+                if (rewardedAd === ad) {
+                    isShowingAd = false
+                    rewardedAd = null
+                }
 
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
@@ -557,6 +619,8 @@ object RewardedAdManager {
             firebaseAnalytics?.logEvent("ad_paid_event", params)
         }
 
+        // Claim the showing slot before show() so a concurrent showAd call is rejected
+        isShowingAd = true
         ad.show(activity) { rewardItem ->
             Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
             AdDebugUtils.logEvent(adUnitId, "onRewardEarned", "Reward: ${rewardItem.amount} ${rewardItem.type}", true)
@@ -718,6 +782,7 @@ object RewardedAdManager {
                 retryAttempts = 0
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded", true)
                 logAdFill()
+                notifyPendingLoadSuccess()
             }
 
             override fun onAdFailedToLoad(error: AdKitAdError) {
@@ -733,6 +798,10 @@ object RewardedAdManager {
                     }
                 }
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+
+                notifyPendingLoadFailure(
+                    LoadAdError(error.code, error.message, error.domain, null, null)
+                )
 
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
                     retryAttempts++
@@ -756,8 +825,13 @@ object RewardedAdManager {
             )
             return
         }
-        if (isLoading) return
         if (rewardedWaterfall?.isAdReady() == true) { callback.onAdLoaded(); return }
+        if (isLoading) {
+            // Queue the callback so it fires when the in-flight load completes
+            Log.d(TAG, "Waterfall ad already loading, queueing callback for in-flight load")
+            synchronized(pendingLoadCallbacks) { pendingLoadCallbacks.add(callback) }
+            return
+        }
 
         isLoading = true
         initializeFirebase(context)
@@ -773,6 +847,7 @@ object RewardedAdManager {
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded with callback", true)
                 logAdFill()
                 callback.onAdLoaded()
+                notifyPendingLoadSuccess()
             }
 
             override fun onAdFailedToLoad(error: AdKitAdError) {
@@ -786,9 +861,9 @@ object RewardedAdManager {
                 }
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
 
-                callback.onAdFailedToLoad(
-                    LoadAdError(error.code, error.message, error.domain, null, null)
-                )
+                val loadAdError = LoadAdError(error.code, error.message, error.domain, null, null)
+                callback.onAdFailedToLoad(loadAdError)
+                notifyPendingLoadFailure(loadAdError)
             }
         })
     }
@@ -820,6 +895,7 @@ object RewardedAdManager {
             override fun onAdLoaded() {
                 isLoading = false
                 retryAttempts = 0
+                notifyPendingLoadSuccess()
                 if (!callbackCalled) {
                     callbackCalled = true
                     logAdFill()
@@ -830,11 +906,11 @@ object RewardedAdManager {
             override fun onAdFailedToLoad(error: AdKitAdError) {
                 isLoading = false
                 rewardedWaterfall = null
+                val loadAdError = LoadAdError(error.code, error.message, error.domain, null, null)
+                notifyPendingLoadFailure(loadAdError)
                 if (!callbackCalled) {
                     callbackCalled = true
-                    callback.onAdFailedToLoad(
-                        LoadAdError(error.code, error.message, error.domain, null, null)
-                    )
+                    callback.onAdFailedToLoad(loadAdError)
                 }
             }
         })
@@ -941,6 +1017,30 @@ object RewardedAdManager {
     }
 
     // =================== PRIVATE HELPERS ===================
+
+    /**
+     * Drain callbacks attached to the in-flight load and notify them of success.
+     */
+    private fun notifyPendingLoadSuccess() {
+        val callbacks = synchronized(pendingLoadCallbacks) {
+            val copy = pendingLoadCallbacks.toList()
+            pendingLoadCallbacks.clear()
+            copy
+        }
+        callbacks.forEach { it.onAdLoaded() }
+    }
+
+    /**
+     * Drain callbacks attached to the in-flight load and notify them of failure.
+     */
+    private fun notifyPendingLoadFailure(error: LoadAdError) {
+        val callbacks = synchronized(pendingLoadCallbacks) {
+            val copy = pendingLoadCallbacks.toList()
+            pendingLoadCallbacks.clear()
+            copy
+        }
+        callbacks.forEach { it.onAdFailedToLoad(error) }
+    }
 
     private fun shouldAttemptRetry(): Boolean {
         return retryAttempts < AdManageKitConfig.maxRetryAttempts &&
