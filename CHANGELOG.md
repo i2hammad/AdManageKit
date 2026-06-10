@@ -5,6 +5,71 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.8] - 2026-06-10
+
+Stability release: fixes the findings of a full-library code audit (issues #2–#35) across all six modules, and adds the project's first unit test suite.
+
+### Fixed
+
+#### Billing (`admanagekit-billing`)
+- **Restored purchases are now acknowledged** in `verifyPurchased()` / `updatePurchaseStatus()` / `refreshPurchases()` — previously a purchase whose acknowledgment was interrupted was never acknowledged again and Google Play auto-refunded it after 3 days
+- **PENDING purchases no longer grant entitlement** — all restore paths now require `PurchaseState.PURCHASED`
+- Ownership state is rebuilt from each billing query, so refunds, cancellations, and expiry now clear `isPurchased()` within the session; consumables no longer flip the global purchased flag
+- `onInitBillingFinished` fires exactly once per init (was up to 3×) and all billing listener callbacks are delivered on the main thread; shared purchase state is thread-safe
+- `PurchaseResult.productType` is set on every stored result, fixing `getSubscriptionState()` / `isSubscriptionActive()` / `isSubscriptionCancelled()` (always returned `NOT_SUBSCRIPTION` before)
+- Removed wrong `com.google.android.datatransport.BuildConfig` import that left every debug branch permanently dead; debug behavior is now injected via `AppPurchase.setDebugMode(boolean)`
+- Removed obfuscated `Product.zza()` usage; subscription price/currency analytics resolve via the base offer instead of the trial phase; `endConnection()` is called on re-init; the caller's purchase list is no longer mutated
+
+#### Native ads (`AdManageKit`)
+- `NativeTemplateView` cache key now matches `NativeAdIntegrationManager` storage — cached ads were previously consumed but never displayed (or shown in the wrong view)
+- Native ad load failures are no longer silently swallowed with default config: `onFailedToLoad` fires whenever no retry is actually scheduled
+- HYBRID strategy cache hits now fire `onAdLoaded` (previously only ONLY_CACHE did)
+- The ad being displayed is no longer also placed in the cache (destroy-while-displayed / double-bind risk)
+- `NativeAdManager`: fixed lock-ordering deadlock in fallback lookups, non-atomic `clearAllCachedAds()` / `performCleanup()`, and an init crash when `cacheCleanupInterval` was under 1 minute
+- Displayed `NativeAd` objects are now destroyed when replaced; preloading no longer binds throwaway `NativeAdView`s; LARGE programmatic native ads no longer crash with "child already has a parent"
+
+#### Ad managers (`AdManageKit`)
+- `loadInterstitialAdForSplash`: the caller is always notified exactly once — previously a duplicate in-flight load could leave the splash screen hanging forever, and auto-retry could fire `onNextAction()` twice (double navigation)
+- `showAd` guards against double-show, clears the legacy ad mirror when consumed, and force/fresh flows show the exact requested ad instead of an arbitrary pooled unit
+- `InterstitialAdBuilder.onAdShown` now actually fires (was wired to the load callback)
+- `AppOpenManager`: destroyed activities are no longer retained; pending fetch/show callbacks are never stranded; concurrent loads no longer clobber each other; closed the 500 ms double-show window
+- `AdsConsentManager`: the UMP listener now fires on every consent request (previously never after the first success — hung consent-gated startups); concurrent requesters are answered instead of dropped
+- `BannerAdView`: the replaced `AdView` is destroyed on reload/auto-refresh (one WebView leaked per refresh cycle before); `enableAutoRefresh(intervalSeconds)` honors its parameter; purchase-blocked loads skip the retry loop; collapsible config survives auto-refresh
+- `RewardedAdManager`: load callbacks are queued against in-flight loads instead of silently dropped; no duplicate concurrent loads; double-show guard
+- `AdRetryManager`: rescheduling a retry cancels the superseded runnable (previously both ran)
+- `AdManageKitConfig.resetToDefaults()` now restores `maxCacheMemoryMB` (200) and `appOpenAdFreshnessThreshold` (4h) to their documented defaults
+
+#### Waterfall (`AdManageKit`, `admanagekit-core`)
+- AdMob full-screen providers store ads **per ad unit**; waterfalls show exactly the ad they loaded — cross-placement clobbering and wrong-revenue attribution fixed
+- A failed load no longer discards a previously loaded, still-valid ad
+- `waterfall.destroy()` no longer destroys globally shared providers (see `ownsProviders` below)
+- Generation tokens + per-attempt watchdog timeout (`AdManageKitConfig.defaultAdTimeout`): a hung provider can no longer stall the chain, and exactly one terminal callback is delivered per `load()` and per `show()`
+- `AdMobNativeProvider` returns a real populated template instead of an empty `NativeAdView` with tracking activated, and no longer destroys ads handed to consumers; `AdMobBannerProvider` destroys failed/undelivered AdViews; `AdMobAppOpenProvider` enforces the 4-hour freshness rule; `AdUnitMapping` / `AdProviderConfig` are thread-safe
+
+#### Yandex (`admanagekit-yandex`)
+- Yandex error codes are translated to `AdKitAdError` constants (previously passed through raw — `NETWORK_ERROR` was reported as `NO_FILL`, etc.)
+- Impression revenue is paired with its correct currency (previously USD values were tagged with the account currency — off by the full exchange rate for non-USD accounts)
+- `destroy()` cancels in-flight loads; a preloaded next ad survives dismissal of the current one; banner views are tracked from creation; native bind failures are reported as load failures on all sizes
+
+#### Compose (`admanagekit-compose`)
+- `InterstitialAdEffect` shows the ad from the load result instead of checking `isReady()` immediately after an async load (previously it effectively never showed the requested ad)
+- `onAdShown` fires from the real show callback, not before paths that may skip the show
+- Ad views are recreated and attached when composable parameters change (`key()`-wrapped `AndroidView`); banner disposal destroys the underlying `AdView` (stops invisible background refreshes); caller lambdas are no longer captured stale
+- `rememberPurchaseStatus()` re-reads purchase state on resume and recomposition instead of freezing at first composition
+- Native/template composables destroy their views and `NativeAd`s on dispose
+
+### Added
+- **Unit test suite** (83 tests) in `app/src/test` covering the waterfall contracts, `AdRetryManager`, `NativeAdManager` cache semantics, `AdManageKitConfig`, `AdUnitMapping`, and `PurchaseResult` subscription state
+- `AppPurchase.setDebugMode(boolean)` — inject the host app's debug state (replaces the broken `BuildConfig.DEBUG` check)
+- `destroy()` on `NativeBannerSmall` / `NativeBannerMedium` / `NativeLarge` / `NativeTemplateView` — destroys the displayed ad; called automatically when the view is detached while its Activity is finishing
+- `ownsProviders` constructor parameter (default `false`) on all five waterfalls — providers are only destroyed by waterfalls that own them
+- Default per-ad-unit `isAdReady(adUnitId)` / `showAd(activity, adUnitId, callback)` methods on the full-screen provider interfaces (source-compatible; existing implementations are unaffected)
+- Per-attempt waterfall timeout, configurable via the `attemptTimeoutMillis` constructor parameter (defaults to `AdManageKitConfig.defaultAdTimeout`)
+
+### Changed
+- Waterfall show failures now deliver a **single terminal event**: `onAdFailedToShow` on failure XOR `onAdDismissed` after a successful show (previously both could fire, running navigation twice)
+- `PurchaseDevBottomSheet` accepts a nullable `ProductDetails`, so the dev purchase sheet works for products not yet configured in Play
+
 ## [3.5.7] - 2026-05-15
 
 ### Added
