@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="install">Install</string>
+    <!-- Placeholder CTA text for native ad layouts; always replaced at runtime
+         with the ad's own callToAction text, so it is never shown to users. -->
+    <string name="install" translatable="false">Install</string>
 
     <!-- Ad Loading Dialog -->
     <string name="ad_loading_title">Loading Ad</string>
