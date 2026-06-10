@@ -106,7 +106,7 @@ class AdManager() {
         get() = AdProviderConfig.getInterstitialChain().isNotEmpty()
 
     companion object {
-        const val PURCHASED_APP_ERROR_CODE = 1001
+        const val PURCHASED_APP_ERROR_CODE = AdKitAdError.ERROR_CODE_PURCHASE_BLOCKED
         const val PURCHASED_APP_ERROR_DOMAIN = "com.i2hammad.admanagekit"
         const val PURCHASED_APP_ERROR_MESSAGE =
             "Ads are not shown because the app has been purchased."

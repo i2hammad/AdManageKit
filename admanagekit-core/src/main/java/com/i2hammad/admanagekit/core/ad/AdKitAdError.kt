@@ -19,6 +19,14 @@ data class AdKitAdError(
         const val ERROR_CODE_NETWORK = 2
         const val ERROR_CODE_NO_FILL = 3
         const val ERROR_CODE_TIMEOUT = -1
-        const val ERROR_CODE_PURCHASED = 1001
+
+        /**
+         * The ad request was rejected because the user owns a purchase that disables ads
+         * (e.g., a premium/ad-free upgrade). This code originates from AdManageKit itself,
+         * not from any ad network SDK, and is therefore distinct from network SDK codes.
+         */
+        const val ERROR_CODE_PURCHASE_BLOCKED = 1001
+
+        const val ERROR_CODE_PURCHASED = ERROR_CODE_PURCHASE_BLOCKED
     }
 }
