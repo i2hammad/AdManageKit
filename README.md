@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.5.8`** is a stability release: it fixes the findings of a full-library code audit across billing, native ad caching, ad managers, the multi-provider waterfall, Yandex, and Compose — including two revenue-critical billing bugs — and ships the project's first unit test suite.
+**Latest Version `3.5.9`** fixes Compose adaptive banner clipping/misalignment (banners were clamped to 50dp and sized to the window instead of their slot) and adds CI, broader test coverage, and lint health on top of the 3.5.8 stability release.
 
 ---
 
@@ -54,40 +54,34 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.5.8) |
+| Production apps (stable) | **Main branch** (v3.5.9) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.5.8
+## What's New in 3.5.9
 
-Stability release fixing the findings of a full-library code audit (issues #2–#35). Highlights:
+### Compose adaptive banner fix (#39)
+`BannerAdCompose` previously clamped every banner to a fixed 50dp — but adaptive banners are 50–90dp tall depending on the device — and loaded before the slot was measured, sizing the ad to the full window. Both are fixed:
 
-### Revenue-critical billing fixes
-- **Restored purchases are now acknowledged** — previously a purchase whose acknowledgment was interrupted was never acknowledged again, and Google Play silently auto-refunded it after 3 days
-- **PENDING (unpaid) purchases no longer grant entitlement** — ads were being removed for users who never completed payment
-- Refunds and expiry now clear `isPurchased()` within the session; subscription state APIs (`getSubscriptionState()` etc.) actually work; billing callbacks fire exactly once, on the main thread
-- New `AppPurchase.setDebugMode(boolean)` — the dev purchase sheet and test product now work in debug builds (a wrong `BuildConfig` import had left every debug branch permanently dead)
+- The composable reserves the **real anchored-adaptive height** for the available width
+- The load waits until the slot is measured, so the ad matches your layout (padding included)
+- The ad is centered in its container (adaptive widths are floored to whole dp)
+- `CollapsibleBannerAdCompose` gets the same height reservation — no more layout jump on load
 
-### Native ad caching repaired
-- `NativeTemplateView` cache hits are displayed again (a key mismatch caused every cached ad to be consumed, never shown, and leaked)
-- Load failures are no longer silently swallowed with default config — `onFailedToLoad` always fires; HYBRID cache hits now fire `onAdLoaded`
-- Displayed `NativeAd`s are destroyed when replaced; new `destroy()` on all native ad views
+### Project health
+- **CI**: every push/PR to main now builds all modules and runs the test suite (GitHub Actions)
+- Tests moved into their owning library modules; 15 new tests for the Yandex error/value mappers — 98 tests total
+- `MissingTranslation` lint error fixed; plain `./gradlew build` passes again
+- `AdKitAdError.ERROR_CODE_PURCHASE_BLOCKED` names the purchase-blocked error code (1001)
+- `AdsConsentManager` queues concurrent consent requesters; `refreshAd()` preserves collapsible config
+- `docs/V4_API_PLAN.md` outlines the planned v4 API improvements
 
-### Reliability across the board
-- Splash interstitial flow notifies exactly once — no more hung splash screens or double navigation
-- UMP consent listener fires on every request (previously never after the first success)
-- `BannerAdView` no longer leaks one WebView per auto-refresh cycle; `enableAutoRefresh(intervalSeconds)` honors its parameter
-- Waterfall: per-ad-unit ownership (no cross-placement clobbering), watchdog timeouts for hung providers, `destroy()` no longer tears down shared providers, exactly one terminal callback per load/show
-- Yandex: error codes correctly mapped (NETWORK was reported as NO_FILL), impression revenue paired with the right currency
-- Compose: `InterstitialAdEffect` actually shows the loaded ad, banners stop refreshing after disposal, `rememberPurchaseStatus()` reacts to mid-session purchases
+See [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md) for details.
 
-### First unit test suite
-83 JVM tests (`./gradlew :app:testDebugUnitTest`) pinning the waterfall contracts, retry management, cache semantics, config defaults, and subscription state.
-
-See [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md) for the full list, including two intentional behavior changes (single terminal show event in waterfalls; live billing entitlement).
+For the 3.5.8 stability release (full-library audit fixes, including two revenue-critical billing bugs), see [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md).
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -130,15 +124,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.5.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.5.9'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.9'
 ```
 
 </td>
@@ -266,7 +260,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.9'
 ```
 
 ```kotlin
@@ -616,6 +610,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md)
 - [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md)
 - [Release Notes v3.5.7](docs/release-notes/RELEASE_NOTES_v3.5.7.md)
 - [Release Notes v3.4.6](docs/release-notes/RELEASE_NOTES_v3.4.6.md)

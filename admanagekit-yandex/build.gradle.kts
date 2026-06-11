@@ -55,7 +55,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-yandex"
-                version = "3.5.8"
+                version = "3.5.9"
             }
         }
     }

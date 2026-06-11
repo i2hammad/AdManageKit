@@ -5,6 +5,32 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.9] - 2026-06-11
+
+### Fixed
+
+#### Compose adaptive banner sizing and alignment (#39)
+- `BannerAdCompose` no longer clips anchored-adaptive banners to a fixed 50dp box — it reserves the **real adaptive height** for the available width (adaptive banners are 50–90dp tall depending on the device)
+- The banner load is deferred until the Compose slot is measured, so the ad is sized to the **actual slot width** (parent padding included) instead of the full window width
+- `CollapsibleBannerAdCompose` reserves the same anchored-adaptive height (its collapsed state is an anchored adaptive banner), eliminating the layout jump on load
+- `BannerAdView` centers the `AdView` horizontally in its container — the adaptive width is floored to whole dp, which left the ad visibly start-aligned
+- The explicit-`height` `BannerAdCompose` overload is unchanged (caller-controlled)
+
+#### Other
+- Fixed the long-standing `MissingTranslation` lint error (the `install` layout-preview placeholder, missing from all 41 locales, is now `translatable="false"` — it is always overwritten at runtime with `nativeAd.callToAction`); plain `./gradlew build` passes again
+- `BannerAdView.refreshAd()` (manual refresh) now preserves the collapsible/placement configuration, matching auto-refresh
+- `AdsConsentManager` queues concurrent `requestUMP` callers and notifies them all when the in-flight consent flow completes, instead of answering early with possibly-stale state
+
+### Added
+- **Continuous integration**: GitHub Actions workflow running `assembleDebug` + `testDebugUnitTest` on every push/PR to main
+- `AdKitAdError.ERROR_CODE_PURCHASE_BLOCKED` — named constant for the purchase-blocked error code 1001 (`AdManager.PURCHASED_APP_ERROR_CODE` now references it; value unchanged)
+- 15 new unit tests for the Yandex module's internal error/value mappers (SDK-8 error-code translation, revenue/currency pairing)
+- `docs/V4_API_PLAN.md` — design document for the planned v4 breaking improvements
+
+### Changed
+- Unit tests moved from the sample app into their owning library modules (AdManageKit, core, billing, yandex); 98 tests total
+- Repository hygiene: `.DS_Store` ignored and untracked; `CLAUDE.md` refreshed
+
 ## [3.5.8] - 2026-06-10
 
 Stability release: fixes the findings of a full-library code audit (issues #2–#35) across all six modules, and adds the project's first unit test suite.
