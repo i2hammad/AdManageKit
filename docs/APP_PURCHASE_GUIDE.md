@@ -22,8 +22,8 @@
 ### 1. Add Dependencies
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
 ```
 
 ### 2. Initialize in Application Class
@@ -49,11 +49,34 @@ class MyApp : Application() {
             PurchaseItem("premium_yearly", "free_trial_14d", TYPE_IAP.SUBSCRIPTION)
         )
 
+        // Enable debug behaviour in debug builds (see Debug Mode below).
+        // A library AAR always compiles with BuildConfig.DEBUG = false, so the
+        // host app must inject its own build state BEFORE initBilling.
+        AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG)
+
         // Initialize billing
         AppPurchase.getInstance().initBilling(this, purchaseItems)
     }
 }
 ```
+
+### 3. Debug Mode
+
+`AppPurchase` cannot read the host app's `BuildConfig.DEBUG` (a library AAR is
+always built with it `false`), so inject your build state explicitly:
+
+```kotlin
+// Call BEFORE initBilling()
+AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG)
+```
+
+When debug mode is on:
+- A legacy test product is registered in `initBilling()`
+- `purchase()` / `subscribe()` show the **dev purchase bottom sheet** instead of
+  the real Google Play billing flow, so you can simulate purchases without a
+  signed release on a Play test track
+
+Leave it off (the default) in release builds.
 
 ---
 
@@ -93,6 +116,15 @@ PurchaseItem("premium_yearly", null, TYPE_IAP.SUBSCRIPTION)
 ---
 
 ## Making Purchases
+
+> **Acknowledgment is automatic.** You never call `acknowledgePurchase()`
+> yourself. `AppPurchase` acknowledges every `PURCHASED` purchase before it
+> fires `onProductPurchased` / `onNewPurchase`, on both the new-purchase path
+> and on every restore/query path (`verifyPurchased()`,
+> `updatePurchaseStatus()`, `refreshPurchases()`). This prevents Google Play's
+> 3-day auto-refund of unacknowledged purchases. For **consumables** you still
+> call `consumePurchase(productId)` after granting items — consuming both lets
+> the item be bought again and satisfies Play's acknowledgment requirement.
 
 ### In-App Products
 
@@ -714,6 +746,16 @@ class MainActivity : AppCompatActivity() {
     }
 }
 ```
+
+> **Since v3.5.8:** entitlement is live and correct. Restore paths
+> (`verifyPurchased()` / `updatePurchaseStatus()` / `refreshPurchases()`)
+> acknowledge any purchase that was restored after an interrupted
+> acknowledgment — preventing Google Play's 3-day auto-refund. Ownership is
+> rebuilt from each query, so refunds, cancellations, and expiry clear
+> `isPurchased()` within the session. Only purchases in `PurchaseState.PURCHASED`
+> grant entitlement — **pending (unpaid) purchases no longer disable ads or
+> unlock premium**, so always gate granting on `purchase.isPurchased()` (see
+> [Handle Pending Purchases](#4-handle-pending-purchases)).
 
 ### 3. Use Correct Categories
 
