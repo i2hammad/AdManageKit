@@ -828,8 +828,8 @@ object NativeAdManager {
         size: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize,
         useCachedAd: Boolean = true,
         callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
-    ) {
-        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
+    ): com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdLoadHandle {
+        return com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAd(
             activity, adUnitId, size, useCachedAd, callback
         )
     }
@@ -847,8 +847,8 @@ object NativeAdManager {
         adUnitId: String,
         useCachedAd: Boolean = true,
         callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
-    ) {
-        loadNativeAdProgrammatically(
+    ): com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdLoadHandle {
+        return loadNativeAdProgrammatically(
             activity, adUnitId,
             com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.SMALL,
             useCachedAd, callback
@@ -868,8 +868,8 @@ object NativeAdManager {
         adUnitId: String,
         useCachedAd: Boolean = true,
         callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
-    ) {
-        loadNativeAdProgrammatically(
+    ): com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdLoadHandle {
+        return loadNativeAdProgrammatically(
             activity, adUnitId,
             com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.MEDIUM,
             useCachedAd, callback
@@ -889,8 +889,8 @@ object NativeAdManager {
         adUnitId: String,
         useCachedAd: Boolean = true,
         callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback
-    ) {
-        loadNativeAdProgrammatically(
+    ): com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdLoadHandle {
+        return loadNativeAdProgrammatically(
             activity, adUnitId,
             com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdSize.LARGE,
             useCachedAd, callback
@@ -914,8 +914,8 @@ object NativeAdManager {
         container: android.view.ViewGroup,
         useCachedAd: Boolean = true,
         callback: com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.ProgrammaticAdCallback? = null
-    ) {
-        com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAdIntoContainer(
+    ): com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.NativeAdLoadHandle {
+        return com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader.loadNativeAdIntoContainer(
             activity, adUnitId, size, container, useCachedAd, callback
         )
     }

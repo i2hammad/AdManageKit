@@ -56,8 +56,12 @@ fun ProgrammaticNativeAdCompose(
     val context = LocalContext.current
     var nativeAdView by remember { mutableStateOf<NativeAdView?>(null) }
     var nativeAd by remember { mutableStateOf<NativeAd?>(null) }
+    // Holds a non-AdMob (e.g. Yandex) waterfall view when the native chain falls back.
+    var providerAdView by remember { mutableStateOf<android.view.View?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var hasError by remember { mutableStateOf(false) }
+    // Handle for the in-flight load, so it can be cancelled on dispose / reload.
+    var loadHandle by remember { mutableStateOf<ProgrammaticNativeAdLoader.NativeAdLoadHandle?>(null) }
 
     // Keep the latest callbacks available to long-lived async ad events
     val currentOnAdLoaded by rememberUpdatedState(onAdLoaded)
@@ -72,9 +76,11 @@ fun ProgrammaticNativeAdCompose(
     LaunchedEffect(adUnitId, size, useCachedAd) {
         isLoading = true
         hasError = false
+        // Cancel any prior in-flight load before starting a new one.
+        loadHandle?.cancel()
 
         if (context is androidx.activity.ComponentActivity) {
-            ProgrammaticNativeAdLoader.loadNativeAd(
+            loadHandle = ProgrammaticNativeAdLoader.loadNativeAd(
                 activity = context,
                 adUnitId = adUnitId,
                 size = size,
@@ -85,9 +91,21 @@ fun ProgrammaticNativeAdCompose(
                         nativeAd?.destroy()
                         nativeAd = loadedNativeAd
                         nativeAdView = loadedNativeAdView
+                        providerAdView = null
                         isLoading = false
                         hasError = false
                         currentOnAdLoaded?.invoke(loadedNativeAdView, loadedNativeAd)
+                    }
+
+                    override fun onProviderAdLoaded(adView: android.view.View, nativeAdRef: Any) {
+                        // Non-AdMob waterfall fallback (e.g. Yandex): attach the provided view.
+                        // It has its own opaque ad ref, so release any held AdMob ad.
+                        nativeAd?.destroy()
+                        nativeAd = null
+                        nativeAdView = null
+                        providerAdView = adView
+                        isLoading = false
+                        hasError = false
                     }
 
                     override fun onAdFailedToLoad(error: AdError) {
@@ -143,12 +161,17 @@ fun ProgrammaticNativeAdCompose(
                 // This maintains the same behavior as the original ad views
             }
 
-            nativeAdView != null -> {
+            nativeAdView != null || providerAdView != null -> {
+                val adView = providerAdView ?: nativeAdView!!
                 // key() ensures the AndroidView node is recreated when a new
                 // view replaces the old one, so the new view actually gets attached
-                key(nativeAdView) {
+                key(adView) {
                     AndroidView(
-                        factory = { nativeAdView!! },
+                        factory = {
+                            // Detach from any temporary parent before Compose attaches it.
+                            (adView.parent as? android.view.ViewGroup)?.removeView(adView)
+                            adView
+                        },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
@@ -159,10 +182,15 @@ fun ProgrammaticNativeAdCompose(
     // Clean up when the composable is disposed
     DisposableEffect(adUnitId) {
         onDispose {
-            // Destroy the displayed NativeAd to release its media/assets
+            // Cancel an in-flight load so a late fill isn't pushed into a dead hierarchy.
+            loadHandle?.cancel()
+            loadHandle = null
+            // Destroy the displayed NativeAd to release its media/assets. Non-AdMob
+            // provider views expose no destroy() here — dropping the reference is enough.
             nativeAd?.destroy()
             nativeAd = null
             nativeAdView = null
+            providerAdView = null
         }
     }
 }

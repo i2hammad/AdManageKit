@@ -7,6 +7,7 @@ import android.graphics.drawable.GradientDrawable
 import android.util.Log
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
@@ -57,7 +58,8 @@ class YandexNativeProvider : NativeAdProvider {
         context: Context,
         adUnitId: String,
         callback: NativeAdProvider.NativeAdCallback,
-        sizeHint: NativeAdSize
+        sizeHint: NativeAdSize,
+        templateLayoutResId: Int
     ) {
         val listener = object : NativeAdLoadListener {
             override fun onAdLoaded(nativeAd: NativeAd) {
@@ -81,7 +83,7 @@ class YandexNativeProvider : NativeAdProvider {
                 })
 
                 try {
-                    val adView = createNativeAdView(context, nativeAd, sizeHint)
+                    val adView = createNativeAdView(context, nativeAd, sizeHint, templateLayoutResId)
                     Log.d(TAG, "Native ad loaded ($sizeHint): $adUnitId")
                     callback.onNativeAdLoaded(adView, nativeAd)
                 } catch (e: Exception) {
@@ -116,12 +118,180 @@ class YandexNativeProvider : NativeAdProvider {
 
     // ======================== View Creation ========================
 
-    private fun createNativeAdView(context: Context, nativeAd: NativeAd, sizeHint: NativeAdSize): View {
+    private fun createNativeAdView(
+        context: Context,
+        nativeAd: NativeAd,
+        sizeHint: NativeAdSize,
+        templateLayoutResId: Int
+    ): View {
+        // When the caller selected an AdMob native template, render that exact layout so
+        // the Yandex fallback ad matches the AdMob ad. If anything goes wrong (missing
+        // layout, binding failure), fall back to the built-in size-based view.
+        if (templateLayoutResId != 0) {
+            try {
+                return createTemplateAdView(context, nativeAd, templateLayoutResId)
+            } catch (e: Exception) {
+                Log.w(TAG, "Template render failed ($templateLayoutResId), falling back to $sizeHint: ${e.message}")
+            }
+        }
         return when (sizeHint) {
             NativeAdSize.LARGE -> createLargeAdView(context, nativeAd)
             NativeAdSize.MEDIUM -> createMediumAdView(context, nativeAd)
             NativeAdSize.SMALL -> createSmallAdView(context, nativeAd)
         }
+    }
+
+    /**
+     * Renders [nativeAd] into the AdMob native template at [templateLayoutResId] so a
+     * Yandex fallback ad looks identical to the AdMob ad for the same template.
+     *
+     * The AdMob template XML is inflated as-is and its standard asset views are bound to
+     * the Yandex SDK by id name (`ad_headline`, `ad_body`, `ad_call_to_action`,
+     * `ad_app_icon`, `ad_advertiser`, `ad_media`). The template's Google `MediaView`
+     * (`ad_media`) is swapped in-place for a Yandex [MediaView] since the SDKs use
+     * incompatible media view types. A compact compliance row (feedback + sponsored +
+     * warning) is appended because the Yandex SDK requires those views to be present for
+     * the ad to bind and render legally — AdMob templates don't include them.
+     *
+     * @throws IllegalStateException if the template lacks a title view or Yandex binding fails.
+     */
+    private fun createTemplateAdView(context: Context, nativeAd: NativeAd, templateLayoutResId: Int): View {
+        val colors = resolveColors(context)
+        val dp4 = dpToPx(context, 4)
+        val dp8 = dpToPx(context, 8)
+
+        // Inflate the AdMob template. Its root is a Google NativeAdView (a FrameLayout
+        // subclass); we use it purely as a container and never call setNativeAd() on it.
+        val templateView = LayoutInflater.from(context).inflate(templateLayoutResId, null)
+            ?: throw IllegalStateException("Template layout inflated to null")
+
+        val nativeAdView = NativeAdView(context).apply {
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        val container = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        container.addView(
+            templateView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        // Resolve the standard AdMob template asset views by id name (this module has no
+        // compile-time access to the AdManageKit R class).
+        val titleView = findTemplateView<TextView>(context, templateView, "ad_headline")
+            ?: throw IllegalStateException("Template has no ad_headline title view")
+        val bodyView = findTemplateView<TextView>(context, templateView, "ad_body")
+        val ctaView = findTemplateView<TextView>(context, templateView, "ad_call_to_action")
+        val iconView = findTemplateView<ImageView>(context, templateView, "ad_app_icon")
+        val advertiserView = findTemplateView<TextView>(context, templateView, "ad_advertiser")
+
+        // Swap the Google MediaView for a Yandex MediaView at the same position.
+        val mediaView = swapMediaView(context, templateView)
+
+        // Hide the Google AdChoices view if the template declares one (Yandex provides its
+        // own feedback control in the compliance row below).
+        findTemplateView<View>(context, templateView, "ad_choices_view")?.visibility = View.GONE
+
+        // Mandatory Yandex compliance row appended under the template.
+        val complianceRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp4
+                marginStart = dp8
+                marginEnd = dp8
+                bottomMargin = dp4
+            }
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val feedbackView = ImageView(context).apply {
+            id = View.generateViewId()
+            layoutParams = LinearLayout.LayoutParams(dpToPx(context, 18), dpToPx(context, 18)).apply {
+                marginEnd = dp4
+            }
+        }
+        val sponsoredView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 10f)
+            setTextColor(colors.secondary)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginEnd = dp4 }
+        }
+        val warningView = TextView(context).apply {
+            id = View.generateViewId()
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 9f)
+            setTextColor(colors.secondary)
+            maxLines = 2
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        complianceRow.addView(feedbackView)
+        complianceRow.addView(sponsoredView)
+        complianceRow.addView(warningView)
+        container.addView(complianceRow)
+
+        nativeAdView.addView(container)
+
+        val binder = NativeAdViewBinder.Builder(nativeAdView)
+            .setTitleView(titleView)
+            .setFeedbackView(feedbackView)
+            .setSponsoredView(sponsoredView)
+            .setWarningView(warningView)
+            .apply {
+                bodyView?.let { setBodyView(it) }
+                ctaView?.let { setCallToActionView(it) }
+                iconView?.let { setIconView(it) }
+                advertiserView?.let { setDomainView(it) }
+                mediaView?.let { setMediaView(it) }
+            }
+            .build()
+
+        if (nativeAd.bindNativeAd(binder) is AdBindingResult.Failure) {
+            throw IllegalStateException("Native ad binding failed for template $templateLayoutResId")
+        }
+        return nativeAdView
+    }
+
+    /**
+     * Finds a template asset view by resource id name (e.g. "ad_headline") and returns it
+     * as [T], or null if absent or of an incompatible type.
+     */
+    private inline fun <reified T : View> findTemplateView(context: Context, root: View, idName: String): T? {
+        val id = context.resources.getIdentifier(idName, "id", context.packageName)
+        if (id == 0) return null
+        return root.findViewById<View>(id) as? T
+    }
+
+    /**
+     * Replaces the AdMob `MediaView` (`ad_media`) in [root] with a Yandex [MediaView] at the
+     * same parent position and layout params, returning the new view (or null if the
+     * template has no media slot).
+     */
+    private fun swapMediaView(context: Context, root: View): MediaView? {
+        val mediaId = context.resources.getIdentifier("ad_media", "id", context.packageName)
+        if (mediaId == 0) return null
+        val googleMedia = root.findViewById<View>(mediaId) ?: return null
+        val parent = googleMedia.parent as? ViewGroup ?: return null
+        val index = parent.indexOfChild(googleMedia)
+        val lp = googleMedia.layoutParams
+        parent.removeViewAt(index)
+        val yandexMedia = MediaView(context).apply { layoutParams = lp }
+        parent.addView(yandexMedia, index)
+        return yandexMedia
     }
 
     /** LARGE: MediaView + icon + title + body + CTA — full asset set for app-type ads. */

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tag key used by ProgrammaticNativeAdLoader.loadNativeAdIntoContainer to remember
+         the NativeAd currently displayed in a container, so it can be destroyed when the
+         container's ad is replaced. -->
+    <item name="admanagekit_native_ad_tag" type="id" />
+</resources>

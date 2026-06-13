@@ -3,7 +3,9 @@ package com.i2hammad.admanagekit.utils
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
@@ -24,6 +26,15 @@ import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
+import com.i2hammad.admanagekit.core.ad.AdProvider
+import com.i2hammad.admanagekit.core.ad.AdProviderConfig
+import com.i2hammad.admanagekit.core.ad.AdUnitMapping
+import com.i2hammad.admanagekit.core.ad.NativeAdProvider
+import com.i2hammad.admanagekit.waterfall.NativeWaterfall
+import com.i2hammad.admanagekit.core.ad.NativeAdSize as CoreNativeAdSize
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Utility class for loading native ads programmatically without requiring views to be added to layout first.
@@ -37,6 +48,62 @@ import com.i2hammad.admanagekit.core.BillingConfig
  * @since 2.1.0
  */
 object ProgrammaticNativeAdLoader {
+
+    private const val TAG = "ProgrammaticNativeAd"
+
+    /**
+     * Handle for an in-flight programmatic native ad load, returned by the load methods.
+     *
+     * Call [cancel] (e.g. from `onDestroy`/`onDispose`) to stop delivery of further
+     * [ProgrammaticAdCallback] events. After cancellation, any ad that still arrives is
+     * destroyed instead of delivered, so a load outliving its screen won't push a view into
+     * a dead hierarchy or leak the ad. The underlying AdMob `AdLoader` has no cancel API, so
+     * cancellation suppresses delivery rather than aborting the network request; a configured
+     * waterfall is actively torn down. [cancel] is idempotent and thread-safe.
+     */
+    class NativeAdLoadHandle internal constructor() {
+        private val cancelledFlag = AtomicBoolean(false)
+        @Volatile
+        private var onCancel: (() -> Unit)? = null
+
+        /** Whether [cancel] has been called. */
+        val isCancelled: Boolean get() = cancelledFlag.get()
+
+        /** Registers the teardown action, running it immediately if already cancelled. */
+        internal fun setOnCancel(action: () -> Unit) {
+            if (cancelledFlag.get()) {
+                action()
+            } else {
+                onCancel = action
+            }
+        }
+
+        /** Cancels the in-flight load. Idempotent; safe to call from any thread. */
+        fun cancel() {
+            if (cancelledFlag.compareAndSet(false, true)) {
+                val action = onCancel
+                onCancel = null
+                action?.invoke()
+            }
+        }
+    }
+
+    /**
+     * Returns true if [callback]'s concrete class overrides [ProgrammaticAdCallback.onProviderAdLoaded]
+     * (rather than inheriting the interface's no-op default). Used to warn integrators whose
+     * callback would silently drop non-AdMob waterfall fills. The interface is not part of a
+     * concrete class's superclass chain, so the default impl is never seen here.
+     */
+    private fun overridesProviderHook(callback: ProgrammaticAdCallback): Boolean {
+        var cls: Class<*>? = callback.javaClass
+        while (cls != null && cls != Any::class.java) {
+            if (cls.declaredMethods.any { it.name == "onProviderAdLoaded" && !it.isSynthetic && !it.isBridge }) {
+                return true
+            }
+            cls = cls.superclass
+        }
+        return false
+    }
 
     /**
      * Native ad size types
@@ -59,6 +126,21 @@ object ProgrammaticNativeAdLoader {
         fun onAdOpened()
         fun onAdClosed()
         fun onPaidEvent(adValue: AdKitValue)
+
+        /**
+         * Called when a non-AdMob waterfall provider (e.g. Yandex) supplies a
+         * ready-to-display native ad View. AdMob results continue to arrive through the
+         * typed [onAdLoaded]; this hook carries providers whose view/ad types are not
+         * AdMob's. Default no-op so existing consumers remain source-compatible.
+         *
+         * Only invoked when a native provider chain is configured via
+         * [com.i2hammad.admanagekit.core.ad.AdProviderConfig.setNativeChain]; otherwise the
+         * loader stays on the pure-AdMob path and this is never called.
+         *
+         * @param adView ready-to-display native ad view (already populated and bound)
+         * @param nativeAdRef opaque reference to the underlying ad — hold it to prevent GC
+         */
+        fun onProviderAdLoaded(adView: View, nativeAdRef: Any) {}
     }
 
     /**
@@ -69,6 +151,8 @@ object ProgrammaticNativeAdLoader {
      * @param size The native ad size
      * @param useCachedAd Whether to try cached ads first
      * @param callback Callback for ad events
+     * @return a [NativeAdLoadHandle] whose [NativeAdLoadHandle.cancel] stops delivery of
+     *         further callbacks (call it when the host screen is destroyed)
      */
     fun loadNativeAd(
         activity: Activity,
@@ -76,7 +160,9 @@ object ProgrammaticNativeAdLoader {
         size: NativeAdSize,
         useCachedAd: Boolean = true,
         callback: ProgrammaticAdCallback
-    ) {
+    ): NativeAdLoadHandle {
+        val handle = NativeAdLoadHandle()
+
         // Check if user has purchased (ads should be disabled)
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
@@ -87,23 +173,152 @@ object ProgrammaticNativeAdLoader {
                     AdManager.PURCHASED_APP_ERROR_DOMAIN
                 )
             )
-            return
+            return handle
         }
 
-        // Try to get cached ad first if requested
-        if (useCachedAd && NativeAdManager.enableCachingNativeAds) {
+        // The cache holds AdMob NativeAds, so an AdMob cache hit may only short-circuit the
+        // waterfall when AdMob is the first provider in the chain (or no chain is
+        // configured). Otherwise serving a cached AdMob ad would violate the configured
+        // provider order (e.g. a Yandex-first chain).
+        val nativeChain = AdProviderConfig.getNativeChain()
+        val adMobIsFirst = nativeChain.isEmpty() || nativeChain.first().provider == AdProvider.ADMOB
+        if (useCachedAd && NativeAdManager.enableCachingNativeAds && adMobIsFirst) {
             val cachedAd = NativeAdManager.getCachedNativeAd(adUnitId)
             if (cachedAd != null) {
+                if (handle.isCancelled) {
+                    cachedAd.destroy()
+                    return handle
+                }
                 val nativeAdView = createNativeAdView(activity, size)
                 populateNativeAdView(cachedAd, nativeAdView, size)
                 setupPaidEventListener(cachedAd, adUnitId, activity)
                 callback.onAdLoaded(nativeAdView, cachedAd)
-                return
+                return handle
             }
         }
 
+        // If a native provider chain is configured, load through the waterfall so AdMob
+        // no-fill falls back to other providers (e.g. Yandex). Otherwise stay on the
+        // pure-AdMob path.
+        if (nativeChain.isNotEmpty()) {
+            loadViaWaterfall(activity, adUnitId, size, callback, handle)
+            return handle
+        }
+
         // Load new ad from network
-        loadNewNativeAd(activity, adUnitId, size, callback)
+        loadNewNativeAd(activity, adUnitId, size, callback, handle)
+        return handle
+    }
+
+    /**
+     * Loads a native ad through the configured provider waterfall.
+     *
+     * AdMob results are delivered via the typed [ProgrammaticAdCallback.onAdLoaded]
+     * (the ref is a [NativeAd] and the view a [NativeAdView]); non-AdMob results (e.g.
+     * Yandex) are delivered via [ProgrammaticAdCallback.onProviderAdLoaded]. Firebase
+     * analytics events are logged here to match the pure-AdMob path, since providers
+     * only forward callbacks without logging.
+     */
+    private fun loadViaWaterfall(
+        activity: Activity,
+        adUnitId: String,
+        size: NativeAdSize,
+        callback: ProgrammaticAdCallback,
+        handle: NativeAdLoadHandle
+    ) {
+        val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
+        val sizeHint = when (size) {
+            NativeAdSize.SMALL -> CoreNativeAdSize.SMALL
+            NativeAdSize.MEDIUM -> CoreNativeAdSize.MEDIUM
+            NativeAdSize.LARGE -> CoreNativeAdSize.LARGE
+        }
+
+        val waterfall = NativeWaterfall(
+            providers = AdProviderConfig.getNativeChain(),
+            adUnitResolver = { provider ->
+                AdUnitMapping.getAdUnitId(adUnitId, provider)
+                    ?: adUnitId.takeIf { provider == AdProvider.ADMOB }
+            }
+        )
+        // Cancelling tears down the waterfall so in-flight provider attempts are dropped.
+        handle.setOnCancel { waterfall.destroy() }
+
+        waterfall.load(activity, object : NativeAdProvider.NativeAdCallback {
+            override fun onNativeAdLoaded(adView: View, nativeAdRef: Any) {
+                if (handle.isCancelled) {
+                    // Late fill after cancellation: don't deliver. Destroy AdMob ads to avoid
+                    // a leak; non-AdMob views are owned by their provider.
+                    (nativeAdRef as? NativeAd)?.destroy()
+                    return
+                }
+                if (nativeAdRef is NativeAd && adView is NativeAdView) {
+                    callback.onAdLoaded(adView, nativeAdRef)
+                } else {
+                    // Non-AdMob fill is delivered only via onProviderAdLoaded. If the caller
+                    // didn't override it, the ad would silently never be displayed — warn so
+                    // the integrator can fix it (or use loadNativeAdIntoContainer).
+                    if (!overridesProviderHook(callback)) {
+                        Log.w(
+                            TAG,
+                            "A non-AdMob native ad loaded via the waterfall, but the callback does " +
+                                "not override onProviderAdLoaded(); the ad will not be displayed. " +
+                                "Implement onProviderAdLoaded() or use loadNativeAdIntoContainer()."
+                        )
+                    }
+                    callback.onProviderAdLoaded(adView, nativeAdRef)
+                }
+            }
+
+            override fun onNativeAdFailedToLoad(error: AdKitAdError) {
+                if (handle.isCancelled) return
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("ad_error_code", error.code.toString())
+                    if (AdManageKitConfig.enablePerformanceMetrics) {
+                        putString("error_message", error.message)
+                    }
+                }
+                firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                callback.onAdFailedToLoad(AdError(error.code, error.message, error.domain))
+            }
+
+            override fun onNativeAdClicked() {
+                if (handle.isCancelled) return
+                callback.onAdClicked()
+            }
+
+            override fun onNativeAdOpened() {
+                if (handle.isCancelled) return
+                callback.onAdOpened()
+            }
+
+            override fun onNativeAdClosed() {
+                if (handle.isCancelled) return
+                callback.onAdClosed()
+            }
+
+            override fun onNativeAdImpression() {
+                if (handle.isCancelled) return
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                }
+                firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                callback.onAdImpression()
+            }
+
+            override fun onPaidEvent(adValue: AdKitAdValue) {
+                if (handle.isCancelled) return
+                // The typed onPaidEvent(AdValue) can't be built from the SDK-agnostic value,
+                // so log analytics directly here (consistent with NativeTemplateView).
+                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                }
+                firebaseAnalytics.logEvent("ad_paid_event", params)
+            }
+        }, sizeHint = sizeHint)
     }
 
     /**
@@ -115,6 +330,7 @@ object ProgrammaticNativeAdLoader {
      * @param container The ViewGroup to add the ad to
      * @param useCachedAd Whether to try cached ads first
      * @param callback Optional callback for ad events
+     * @return a [NativeAdLoadHandle] whose [NativeAdLoadHandle.cancel] stops the load
      */
     fun loadNativeAdIntoContainer(
         activity: Activity,
@@ -123,12 +339,28 @@ object ProgrammaticNativeAdLoader {
         container: ViewGroup,
         useCachedAd: Boolean = true,
         callback: ProgrammaticAdCallback? = null
-    ) {
-        loadNativeAd(activity, adUnitId, size, useCachedAd, object : ProgrammaticAdCallback {
+    ): NativeAdLoadHandle {
+        return loadNativeAd(activity, adUnitId, size, useCachedAd, object : ProgrammaticAdCallback {
             override fun onAdLoaded(nativeAdView: NativeAdView, nativeAd: NativeAd) {
+                // Destroy the ad previously displayed in this container (if any) before
+                // replacing it, otherwise repeated loads leak NativeAds and their media.
+                destroyTrackedContainerAd(container, keep = nativeAd)
                 container.removeAllViews()
                 container.addView(nativeAdView)
+                container.setTag(R.id.admanagekit_native_ad_tag, nativeAd)
                 callback?.onAdLoaded(nativeAdView, nativeAd)
+            }
+
+            override fun onProviderAdLoaded(adView: View, nativeAdRef: Any) {
+                // Non-AdMob (e.g. Yandex) waterfall result: attach the provider's view.
+                // Detach from any temporary parent first to avoid an IllegalStateException.
+                destroyTrackedContainerAd(container, keep = null)
+                (adView.parent as? ViewGroup)?.removeView(adView)
+                container.removeAllViews()
+                container.addView(adView)
+                // Provider views own their own ad ref; nothing AdMob-destroyable to track.
+                container.setTag(R.id.admanagekit_native_ad_tag, null)
+                callback?.onProviderAdLoaded(adView, nativeAdRef)
             }
 
             override fun onAdFailedToLoad(error: AdError) {
@@ -155,6 +387,20 @@ object ProgrammaticNativeAdLoader {
                 callback?.onPaidEvent(adValue)
             }
         })
+    }
+
+    /**
+     * Destroys the [NativeAd] currently tracked on [container] (set by
+     * [loadNativeAdIntoContainer]) unless it is the same instance as [keep], then clears the
+     * tag. No-op when nothing is tracked. Prevents leaking the previously displayed ad when
+     * a container's content is replaced.
+     */
+    private fun destroyTrackedContainerAd(container: ViewGroup, keep: NativeAd?) {
+        val previous = container.getTag(R.id.admanagekit_native_ad_tag) as? NativeAd
+        if (previous != null && previous !== keep) {
+            previous.destroy()
+        }
+        container.setTag(R.id.admanagekit_native_ad_tag, null)
     }
 
     /**
@@ -291,7 +537,8 @@ object ProgrammaticNativeAdLoader {
         activity: Activity,
         adUnitId: String,
         size: NativeAdSize,
-        callback: ProgrammaticAdCallback
+        callback: ProgrammaticAdCallback,
+        handle: NativeAdLoadHandle
     ) {
         val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
 
@@ -299,6 +546,13 @@ object ProgrammaticNativeAdLoader {
             // NOTE: Do NOT cache ad here - it's passed to callback for immediate display
             // Caching is only for preloaded ads that will be shown later via getCachedNativeAd()
             // Ads expire after 1 hour, so caching displayed ads wastes memory
+
+            // Cancelled while the request was in flight: drop and destroy to avoid pushing a
+            // view into a dead hierarchy or leaking the ad.
+            if (handle.isCancelled) {
+                nativeAd.destroy()
+                return@forNativeAd
+            }
 
             val nativeAdView = createNativeAdView(activity, size)
             populateNativeAdView(nativeAd, nativeAdView, size)
@@ -323,6 +577,7 @@ object ProgrammaticNativeAdLoader {
                     }
                 }
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
+                if (handle.isCancelled) return
                 callback.onAdFailedToLoad(adError)
             }
 
@@ -333,24 +588,28 @@ object ProgrammaticNativeAdLoader {
                 }
                 firebaseAnalytics.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
                 AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Programmatic native ad impression", true)
+                if (handle.isCancelled) return
                 callback.onAdImpression()
             }
 
             override fun onAdClicked() {
                 super.onAdClicked()
                 AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Programmatic native ad clicked", true)
+                if (handle.isCancelled) return
                 callback.onAdClicked()
             }
 
             override fun onAdOpened() {
                 super.onAdOpened()
                 AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Programmatic native ad opened", true)
+                if (handle.isCancelled) return
                 callback.onAdOpened()
             }
 
             override fun onAdClosed() {
                 super.onAdClosed()
                 AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Programmatic native ad closed", true)
+                if (handle.isCancelled) return
                 callback.onAdClosed()
             }
         })

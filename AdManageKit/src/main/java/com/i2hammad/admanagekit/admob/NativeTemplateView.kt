@@ -851,7 +851,9 @@ class NativeTemplateView @JvmOverloads constructor(
                 }
                 firebaseAnalytics?.logEvent("ad_paid_event", params)
             }
-        }, sizeHint = getNativeAdSizeForTemplate())
+            // Pass the selected template layout so non-AdMob providers (e.g. Yandex) can
+            // render the same template instead of a generic size-based view.
+        }, sizeHint = getNativeAdSizeForTemplate(), templateLayoutResId = currentTemplate.layoutResId)
     }
 
     /**

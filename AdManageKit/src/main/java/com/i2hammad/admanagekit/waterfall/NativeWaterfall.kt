@@ -55,11 +55,12 @@ class NativeWaterfall @JvmOverloads constructor(
     fun load(
         context: Context,
         callback: NativeAdProvider.NativeAdCallback,
-        sizeHint: NativeAdSize = NativeAdSize.LARGE
+        sizeHint: NativeAdSize = NativeAdSize.LARGE,
+        templateLayoutResId: Int = 0
     ) {
         val token = generation.incrementAndGet()
         loadedProvider = null
-        loadNext(context, 0, token, callback, sizeHint)
+        loadNext(context, 0, token, callback, sizeHint, templateLayoutResId)
     }
 
     private fun loadNext(
@@ -67,7 +68,8 @@ class NativeWaterfall @JvmOverloads constructor(
         index: Int,
         token: Int,
         callback: NativeAdProvider.NativeAdCallback,
-        sizeHint: NativeAdSize
+        sizeHint: NativeAdSize,
+        templateLayoutResId: Int
     ) {
         if (token != generation.get()) {
             Log.d(TAG, "Load chain cancelled (stale token), aborting")
@@ -87,7 +89,7 @@ class NativeWaterfall @JvmOverloads constructor(
 
         if (adUnitId == null) {
             Log.w(TAG, "No ad unit ID for ${provider.provider.displayName}, skipping")
-            loadNext(context, index + 1, token, callback, sizeHint)
+            loadNext(context, index + 1, token, callback, sizeHint, templateLayoutResId)
             return
         }
 
@@ -98,7 +100,7 @@ class NativeWaterfall @JvmOverloads constructor(
         val watchdog = Runnable {
             if (settled.compareAndSet(false, true)) {
                 Log.w(TAG, "${provider.provider.displayName} timed out after ${attemptTimeoutMillis}ms (code ${AdKitAdError.ERROR_CODE_TIMEOUT})")
-                loadNext(context, index + 1, token, callback, sizeHint)
+                loadNext(context, index + 1, token, callback, sizeHint, templateLayoutResId)
             }
         }
         if (attemptTimeoutMillis > 0) handler.postDelayed(watchdog, attemptTimeoutMillis)
@@ -126,13 +128,15 @@ class NativeWaterfall @JvmOverloads constructor(
                 }
                 handler.removeCallbacks(watchdog)
                 Log.w(TAG, "${provider.provider.displayName} failed: ${error.message}")
-                loadNext(context, index + 1, token, callback, sizeHint)
+                loadNext(context, index + 1, token, callback, sizeHint, templateLayoutResId)
             }
 
             override fun onNativeAdClicked() { callback.onNativeAdClicked() }
             override fun onNativeAdImpression() { callback.onNativeAdImpression() }
             override fun onPaidEvent(adValue: AdKitAdValue) { callback.onPaidEvent(adValue) }
-        }, sizeHint = sizeHint)
+            override fun onNativeAdOpened() { callback.onNativeAdOpened() }
+            override fun onNativeAdClosed() { callback.onNativeAdClosed() }
+        }, sizeHint = sizeHint, templateLayoutResId = templateLayoutResId)
     }
 
     /**

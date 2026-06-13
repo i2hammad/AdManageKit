@@ -5,7 +5,7 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.5.9`** fixes Compose adaptive banner clipping/misalignment (banners were clamped to 50dp and sized to the window instead of their slot) and adds CI, broader test coverage, and lint health on top of the 3.5.8 stability release.
+**Latest Version `3.6.0`** makes the native-ad waterfall first-class: Yandex now renders the **same AdMob template** you select on `NativeTemplateView`, and the programmatic native loader (`loadNativeAdProgrammatically` and friends) now **falls back through the provider chain** on AdMob no-fill. Also adds cancellable loads and fixes a container leak and a cache-vs-chain ordering bug.
 
 ---
 
@@ -54,34 +54,36 @@ Your callback implementations work on both branches without changes.
 
 | Use Case | Recommended |
 |----------|-------------|
-| Production apps (stable) | **Main branch** (v3.5.9) |
+| Production apps (stable) | **Main branch** (v3.6.0) |
 | New projects wanting latest features | **Nextgen branch** (v4.1.1) |
 | Testing preloader system | **Nextgen branch** |
 | Risk-averse production | **Main branch** |
 
 ---
 
-## What's New in 3.5.9
+## What's New in 3.6.0
 
-### Compose adaptive banner fix (#39)
-`BannerAdCompose` previously clamped every banner to a fixed 50dp — but adaptive banners are 50–90dp tall depending on the device — and loaded before the slot was measured, sizing the ad to the full window. Both are fixed:
+### Yandex native ads match AdMob templates
+When a `NativeTemplateView` falls back to Yandex through the waterfall, `YandexNativeProvider` now renders the **exact AdMob template** you selected (all 37 templates) instead of a generic placeholder — the same layout is inflated and Yandex assets are bound to it (the Google `MediaView` is swapped for a Yandex one, plus the mandatory Yandex compliance row). It falls back to the built-in size-based view only if a template can't be bound.
 
-- The composable reserves the **real anchored-adaptive height** for the available width
-- The load waits until the slot is measured, so the ad matches your layout (padding included)
-- The ad is centered in its container (adaptive widths are floored to whole dp)
-- `CollapsibleBannerAdCompose` gets the same height reservation — no more layout jump on load
+### Programmatic native loader respects the waterfall
+`loadNativeAdProgrammatically`, `loadSmall|Medium|LargeNativeAd`, and `loadNativeAdIntoContainer` now route through the chain configured via `AdProviderConfig.setNativeChain`, so AdMob no-fill falls back to other providers (e.g. Yandex). With no chain configured, the pure-AdMob path is unchanged.
+- New `ProgrammaticAdCallback.onProviderAdLoaded(...)` hook delivers non-AdMob views (AdMob fills still arrive via the typed `onAdLoaded`); the container and Compose helpers display them automatically
+- `onNativeAdOpened()` / `onNativeAdClosed()` now fire consistently whether or not a chain is configured
 
-### Project health
-- **CI**: every push/PR to main now builds all modules and runs the test suite (GitHub Actions)
-- Tests moved into their owning library modules; 15 new tests for the Yandex error/value mappers — 98 tests total
-- `MissingTranslation` lint error fixed; plain `./gradlew build` passes again
-- `AdKitAdError.ERROR_CODE_PURCHASE_BLOCKED` names the purchase-blocked error code (1001)
-- `AdsConsentManager` queues concurrent consent requesters; `refreshAd()` preserves collapsible config
-- `docs/V4_API_PLAN.md` outlines the planned v4 API improvements
+### Cancellable loads
+The programmatic native load methods return a `NativeAdLoadHandle` — call `handle.cancel()` (e.g. in `onDestroy`) to stop further callbacks; a fill that arrives late is destroyed instead of pushed into a dead view. `ProgrammaticNativeAdCompose` cancels automatically on dispose.
 
-See [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md) for details.
+### Fixes
+- `loadNativeAdIntoContainer` no longer leaks the previously displayed `NativeAd` on reload
+- An AdMob cached ad no longer short-circuits a Yandex-first waterfall (configured provider order is honoured)
+- Non-AdMob fills through the raw `loadNativeAd` callback no longer fail silently (a warning points you to `onProviderAdLoaded`)
 
-For the 3.5.8 stability release (full-library audit fixes, including two revenue-critical billing bugs), see [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md).
+> **Compatibility:** source-compatible with 3.5.9. One binary-incompatible change — the programmatic native load methods now return `NativeAdLoadHandle` instead of `Unit`; recompile against 3.6.0 (JitPack builds from source, so consumers are unaffected).
+
+See [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md) for details.
+
+For the 3.5.9 release (Compose adaptive banner fix, CI, and test/lint health), see [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md).
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -124,15 +126,15 @@ dependencyResolutionManagement {
 <td>
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.5.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.6.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.6.0'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.6.0'
 ```
 
 </td>
@@ -260,7 +262,7 @@ Add Yandex (or other providers) as fallback ad networks with zero changes to you
 
 ```groovy
 // Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.6.0'
 ```
 
 ```kotlin
@@ -610,6 +612,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md)
 - [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md)
 - [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md)
 - [Release Notes v3.5.7](docs/release-notes/RELEASE_NOTES_v3.5.7.md)

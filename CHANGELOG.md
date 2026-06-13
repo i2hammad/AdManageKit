@@ -5,6 +5,32 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-06-13
+
+Native-ad waterfall improvements: Yandex now renders the same templates as AdMob, and the programmatic native loader honours the provider chain.
+
+### Added
+
+#### Yandex native ads match AdMob templates
+- `YandexNativeProvider` now renders the **exact AdMob native template** selected on `NativeTemplateView` (all 37 templates) instead of a generic size-based view. The chosen template's layout is inflated and Yandex assets are bound to the standard asset ids (`ad_headline`, `ad_body`, `ad_call_to_action`, `ad_app_icon`, `ad_advertiser`, `ad_media`), with the Google `MediaView` swapped for a Yandex `MediaView` and a small mandatory Yandex compliance row (feedback + sponsored + warning) appended. Falls back to the built-in size-based view if a template can't be bound
+- `NativeAdProvider.loadNativeAd` gains an optional `templateLayoutResId: Int = 0` parameter carrying the template layout down the waterfall (kept an `Int` so the core module stays dependency-free)
+
+#### Programmatic native loader respects the waterfall
+- `ProgrammaticNativeAdLoader` (and `NativeAdManager.loadNativeAdProgrammatically` / `loadSmall|Medium|LargeNativeAd` / `loadNativeAdIntoContainer`) now route through the provider chain when one is configured via `AdProviderConfig.setNativeChain`, so AdMob no-fill falls back to other providers (e.g. Yandex). With no chain configured the pure-AdMob path is unchanged
+- `ProgrammaticAdCallback.onProviderAdLoaded(adView, nativeAdRef)` — new default-no-op hook delivering non-AdMob (e.g. Yandex) views; AdMob fills still arrive via the typed `onAdLoaded`. `ProgrammaticNativeAdCompose` and `loadNativeAdIntoContainer` display these automatically
+- `NativeAdProvider.NativeAdCallback` gains `onNativeAdOpened()` / `onNativeAdClosed()` default hooks, forwarded by `AdMobNativeProvider` and the waterfall so open/close events fire consistently whether or not a chain is configured
+
+#### Cancellable loads
+- The programmatic native load methods now return a `ProgrammaticNativeAdLoader.NativeAdLoadHandle` whose `cancel()` stops delivery of further callbacks; a fill arriving after cancellation is destroyed instead of pushed into a dead view hierarchy. `ProgrammaticNativeAdCompose` cancels automatically on dispose/reload
+
+### Fixed
+- `loadNativeAdIntoContainer` no longer leaks the previously displayed `NativeAd` — it destroys the prior ad (tracked via a container view tag) before replacing the container's content
+- An AdMob cached ad no longer short-circuits a configured waterfall when AdMob is **not** first in the chain (e.g. a Yandex-first chain), which previously violated the configured provider order
+- Non-AdMob waterfall fills delivered through the raw `loadNativeAd` callback no longer fail silently: the loader logs a warning when the callback doesn't override `onProviderAdLoaded`
+
+### Changed
+- The programmatic native load methods changed their return type from `Unit` to `NativeAdLoadHandle`. **Source-compatible** (callers ignoring the return value need no change) but **binary-incompatible** — recompile against 3.6.0 (JitPack builds from source, so consumers are unaffected)
+
 ## [3.5.9] - 2026-06-11
 
 ### Fixed

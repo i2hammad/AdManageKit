@@ -43,7 +43,10 @@ class AdMobNativeProvider : NativeAdProvider {
         context: Context,
         adUnitId: String,
         callback: NativeAdProvider.NativeAdCallback,
-        sizeHint: NativeAdSize
+        sizeHint: NativeAdSize,
+        // AdMob hands back the raw NativeAd; the consumer (NativeTemplateView) re-binds it
+        // into the selected template layout itself, so the template id is not needed here.
+        templateLayoutResId: Int
     ) {
         val adLoader = AdLoader.Builder(context, adUnitId)
             .forNativeAd { nativeAd ->
@@ -72,6 +75,14 @@ class AdMobNativeProvider : NativeAdProvider {
 
                 override fun onAdImpression() {
                     callback.onNativeAdImpression()
+                }
+
+                override fun onAdOpened() {
+                    callback.onNativeAdOpened()
+                }
+
+                override fun onAdClosed() {
+                    callback.onNativeAdClosed()
                 }
             })
             .build()

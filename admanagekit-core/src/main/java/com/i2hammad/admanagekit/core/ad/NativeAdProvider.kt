@@ -19,12 +19,21 @@ interface NativeAdProvider {
      * @param adUnitId Network-specific ad unit ID
      * @param callback Receives the native ad View and an opaque reference
      * @param sizeHint Hint for the desired ad view size (default: LARGE)
+     * @param templateLayoutResId Optional layout resource id of an AdMob-style native
+     *        template (the same XML used by the AdMob renderer). When non-zero, providers
+     *        that support it should inflate this exact layout and bind their assets to the
+     *        standard asset ids (`ad_headline`, `ad_body`, `ad_call_to_action`,
+     *        `ad_app_icon`, `ad_advertiser`, `ad_media`, `ad_stars`) so a fallback
+     *        provider renders the same template as AdMob. Pass 0 (default) to use the
+     *        provider's built-in [sizeHint]-based layout. It is an Int rather than a typed
+     *        reference to keep this core module dependency-free.
      */
     fun loadNativeAd(
         context: Context,
         adUnitId: String,
         callback: NativeAdCallback,
-        sizeHint: NativeAdSize = NativeAdSize.LARGE
+        sizeHint: NativeAdSize = NativeAdSize.LARGE,
+        templateLayoutResId: Int = 0
     )
 
     /** Release resources held by this provider. */
@@ -44,5 +53,9 @@ interface NativeAdProvider {
         fun onNativeAdClicked() {}
         fun onNativeAdImpression() {}
         fun onPaidEvent(adValue: AdKitAdValue) {}
+        /** The ad opened an overlay/left the app. Not all networks emit this. */
+        fun onNativeAdOpened() {}
+        /** The ad's overlay closed/returned to the app. Not all networks emit this. */
+        fun onNativeAdClosed() {}
     }
 }
