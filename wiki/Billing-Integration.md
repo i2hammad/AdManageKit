@@ -7,8 +7,8 @@ AdManageKit provides a comprehensive billing integration module (`admanagekit-bi
 ### 1. Add Dependency
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
 ```
 
 ### 2. Define Products
@@ -35,10 +35,22 @@ val products = listOf(
 class MyApp : Application() {
     override fun onCreate() {
         super.onCreate()
+
+        // Inject your build state (a library AAR always has BuildConfig.DEBUG = false).
+        // In debug builds this registers a test product and routes purchase()/subscribe()
+        // to the dev purchase bottom sheet instead of the real Play flow. Call BEFORE initBilling.
+        AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG)
+
         AppPurchase.getInstance().initBilling(this, products)
     }
 }
 ```
+
+> **Acknowledgment is automatic.** `AppPurchase` acknowledges every `PURCHASED`
+> purchase before firing its callbacks, on both the new-purchase and restore
+> paths — preventing Google Play's 3-day auto-refund of unacknowledged purchases.
+> Only `PurchaseState.PURCHASED` grants entitlement (pending purchases do not).
+> Consumables still require a manual `consumePurchase(productId)` after granting.
 
 ### 4. Make Purchases
 
