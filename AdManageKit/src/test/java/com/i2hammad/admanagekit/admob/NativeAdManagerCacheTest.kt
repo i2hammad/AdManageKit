@@ -1,6 +1,6 @@
 package com.i2hammad.admanagekit.admob
 
-import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import io.mockk.mockk
 import io.mockk.verify

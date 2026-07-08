@@ -10,10 +10,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
@@ -120,7 +119,7 @@ class InterstitialTestActivity : AppCompatActivity() {
         AdManager.getInstance().loadInterstitialAd(
             this,
             TEST_AD_UNIT,
-            object : InterstitialAdLoadCallback() {
+            object : AdLoadCallback<InterstitialAd> {
                 override fun onAdLoaded(ad: InterstitialAd) {
                     log("✅ AdManager.loadInterstitialAd: Ad loaded")
                     updateStatus("Ad Loaded")
@@ -314,7 +313,7 @@ class InterstitialTestActivity : AppCompatActivity() {
                     log("forceShowWithDialog: Next action called")
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     log("❌ forceShowWithDialog failed: ${error?.message}")
                 }
             }
@@ -334,7 +333,7 @@ class InterstitialTestActivity : AppCompatActivity() {
                     log("showIfReady: Next action called")
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     log("❌ showIfReady failed: ${error?.message}")
                 }
             }
@@ -358,7 +357,7 @@ class InterstitialTestActivity : AppCompatActivity() {
                     log("showByTime: Next action (skipped - no cached ad or interval not met)")
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     log("❌ showByTime failed: ${error?.message}")
                 }
             }
@@ -381,7 +380,7 @@ class InterstitialTestActivity : AppCompatActivity() {
                     log("showByCount: Next action (skipped - no cached ad or max count reached)")
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     log("❌ showByCount failed: ${error?.message}")
                 }
             },

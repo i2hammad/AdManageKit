@@ -5,6 +5,28 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] - 2026-07-08
+
+Major SDK migration: the Google Mobile Ads **Next-Gen SDK** replaces the legacy `play-services-ads` dependency on `main` (previously only available on a separate, now-retired `nextgen` branch), Google Play Billing Library is upgraded to 9.1.0, and `compileSdk` moves to 37. Includes two native-ad rendering fixes found while validating the migration.
+
+### Changed — Breaking
+
+- **Google Mobile Ads SDK**: `com.google.android.gms:play-services-ads` replaced with `com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk:1.2.1` (stable). The legacy SDK is no longer pulled in transitively at all — consumer apps that referenced `com.google.android.gms.ads.*` types directly through AdManageKit's callback parameters (`AdKitError`/`AdKitLoadError`/`AdKitValue` type aliases, `AdManager.loadInterstitialAd(context, adUnitId, callback)`'s callback type, all Compose composable callback parameters, `NativeTemplateView`/`ProgrammaticNativeAdCompose`'s exposed `NativeAd`/`NativeAdView` types) now receive Next-Gen SDK types instead. Code that only calls the callback methods (`onFailedToLoad`, `onAdLoaded`, etc.) without touching legacy-only members (e.g. the old `AdError.domain`) is source-compatible; code that does will need updating
+- **Custom native ad layouts**: XML layouts supplying custom templates must retarget `com.google.android.gms.ads.nativead.NativeAdView`/`MediaView` → `com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView`/`MediaView`, and `com.google.android.gms.ads.nativead.AdChoicesView` → `com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView`
+- **`MobileAds.initialize()` is now mandatory** before any ad request — the Next-Gen SDK throws instead of the legacy SDK's silent lazy-init. Call it once at app startup (it's policy-compliant to do so before UMP consent; only the ad *request* needs to wait for consent)
+- **`compileSdk` requirement raised to 37** (transitively required by `androidx-core-ktx` 1.19.0+); consumer apps' `compileSdk` must be 37 or higher
+- Banner `pause()`/`resume()` are now no-ops — the Next-Gen SDK's `AdView` has no equivalent methods
+
+### Changed
+
+- Google Play Billing Library upgraded 8.3.0 → **9.1.0**. No API changes were required in `AppPurchase` — the codebase was already on v8+ patterns (`enablePendingPurchases(PendingPurchasesParams)`, `enableAutoServiceReconnection()`, the `(BillingResult, QueryProductDetailsResult)` callback signature). Source-compatible for consumers of `AppPurchase`/`PurchaseItem`
+
+### Fixed
+
+- **Native ad `MediaView` rendering blank** in `NativeTemplateView` and the programmatic native provider: a manual `mediaView.mediaContent = ...` assignment before `registerNativeAd()` — a leftover pattern from the legacy SDK — left the Next-Gen SDK's automatic media rendering uninitialized. Removed; `registerNativeAd(nativeAd, mediaView)` alone now handles it, per Google's documented pattern
+- **`NativeAdView.mediaView` getter returning `null`** for dynamically-inflated templates (`NativeTemplateView`, and the `LARGE` size in the programmatic provider): the getter's internal auto-discovery only resolves once the view is genuinely window-attached, which isn't yet true for a freshly `LayoutInflater.inflate(..., null)`-created view. Both call sites now look the `MediaView` up directly via `findViewById()` instead
+- **Native Validator "asset outside native ad view" false-positive risk** on deeply-nested templates (e.g. `CARD_MODERN`'s `MaterialCardView`-wrapped advertiser text): `registerNativeAd()` was called immediately after adding the view to its placeholder, before the next layout pass had measured/positioned the freshly-inflated subtree. Deferred via `doOnNextLayout {}` so registration happens against real, laid-out bounds
+
 ## [3.6.0] - 2026-06-13
 
 Native-ad waterfall improvements: Yandex now renders the same templates as AdMob, and the programmatic native loader honours the provider chain.

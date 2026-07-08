@@ -1,7 +1,9 @@
 package com.i2hammad.admanagekit.admob
 
 import android.app.Activity
-import com.google.android.gms.ads.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 
@@ -458,12 +460,9 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
                 onComplete()
             }
 
-            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 if (debugMode) android.util.Log.e("InterstitialBuilder", "Ad failed: ${error?.message}")
-                error?.let {
-                    val loadError = LoadAdError(it.code, it.message, it.domain, it.cause, null)
-                    onAdFailedCallback?.invoke(loadError)
-                }
+                error?.let { onAdFailedCallback?.invoke(it) }
                 onComplete()
             }
         }
@@ -589,10 +588,8 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         if (index >= allUnits.size) {
             // All ad units failed
             val error = LoadAdError(
-                0,
+                LoadAdError.ErrorCode.NO_FILL,
                 "All ad units failed to load (tried ${allUnits.size} units)",
-                "AdManageKit",
-                null,
                 null
             )
             onFailure(error)
@@ -605,8 +602,8 @@ class InterstitialAdBuilder private constructor(private val activity: Activity) 
         adManager.loadInterstitialAd(
             activity,
             currentUnit,
-            object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
-                override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) {
+            object : AdLoadCallback<InterstitialAd> {
+                override fun onAdLoaded(ad: InterstitialAd) {
                     // Ad loaded successfully
                     onAdLoadedCallback?.invoke()
                     onSuccess()

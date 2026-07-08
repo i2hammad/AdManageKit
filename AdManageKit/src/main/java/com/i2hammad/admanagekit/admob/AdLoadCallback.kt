@@ -41,22 +41,11 @@ abstract class AdLoadCallback {
      * no fill, invalid ad unit ID, or other errors. You should handle this
      * gracefully by either retrying the request or showing alternative content.
      * 
-     * @param error The error that occurred during ad loading. Contains error code,
-     *              message, and domain information. May be null in rare cases.
-     * 
-     * Common error codes:
-     * - ERROR_CODE_INTERNAL_ERROR (0): Internal error
-     * - ERROR_CODE_INVALID_REQUEST (1): Invalid request  
-     * - ERROR_CODE_NETWORK_ERROR (2): Network error
-     * - ERROR_CODE_NO_FILL (3): No ad available
-     * - ERROR_CODE_INVALID_AD_UNIT_ID (4): Invalid ad unit ID
-     * - ERROR_CODE_MEDIATION_DATA_ERROR (5): Mediation error
-     * - ERROR_CODE_MEDIATION_ADAPTER_ERROR (6): Mediation adapter error
-     * - ERROR_CODE_MEDIATION_INVALID_AD_SIZE (7): Invalid ad size for mediation
-     * - ERROR_CODE_INTERNAL_ERROR (8): Internal error
-     * - ERROR_CODE_INVALID_ARGUMENT (9): Invalid argument
-     * - ERROR_CODE_REQUEST_ID_MISMATCH (10): Request ID mismatch
-     * 
+     * @param error The error that occurred during ad loading (a LoadAdError),
+     *              exposing a message and a LoadAdError.ErrorCode (e.g.
+     *              INTERNAL_ERROR, INVALID_REQUEST, NETWORK_ERROR, NO_FILL,
+     *              NOT_FOUND, TIMEOUT, CANCELLED). May be null in rare cases.
+     *
      * @since 1.0.0
      */
     open fun onFailedToLoad(error: AdKitError?) {

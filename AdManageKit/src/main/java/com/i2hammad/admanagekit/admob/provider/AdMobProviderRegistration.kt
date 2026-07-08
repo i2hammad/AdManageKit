@@ -1,6 +1,6 @@
 package com.i2hammad.admanagekit.admob.provider
 
-import com.google.android.gms.ads.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.AdProviderRegistration
 import com.i2hammad.admanagekit.core.ad.AppOpenAdProvider

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Gradient Card - Beautiful gradient overlay on media -->
-<com.google.android.gms.ads.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/native_ad_view"
     android:layout_width="match_parent"
@@ -19,7 +19,7 @@
             android:layout_height="240dp">
 
             <!-- Background Media -->
-            <com.google.android.gms.ads.nativead.MediaView
+            <com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
                 android:id="@+id/ad_media"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
@@ -48,7 +48,7 @@
                     android:layout_height="1dp"
                     android:layout_weight="1" />
 
-                <com.google.android.gms.ads.nativead.AdChoicesView
+                <com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView
                     android:id="@+id/ad_choices_view"
                     android:layout_width="20dp"
                     android:layout_height="20dp" />
@@ -181,4 +181,4 @@
 
     </com.google.android.material.card.MaterialCardView>
 
-</com.google.android.gms.ads.nativead.NativeAdView>
+</com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView>

@@ -17,13 +17,13 @@ import android.os.Build
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.OnPaidEventListener
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
@@ -315,7 +315,7 @@ class AdManager() {
 
         this.adUnitId = adUnitId
         initializeFirebase(context)
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
         // Cancel any pending retry since we're manually loading
         AdRetryManager.getInstance().cancelRetry(adUnitId)
@@ -327,7 +327,7 @@ class AdManager() {
         var callbackCalled = false  // Prevent double callbacks
 
         // Load the interstitial ad
-        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad (improves show rate even if timeout already fired)
                 mInterstitialAd = interstitialAd
@@ -445,7 +445,7 @@ class AdManager() {
         }
 
         initializeFirebase(context)
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
         // Cancel any pending retry since we're manually loading
         AdRetryManager.getInstance().cancelRetry(adUnitId)
@@ -460,7 +460,7 @@ class AdManager() {
         // Firebase: Log ad request
         logAdRequest(adUnitId, "interstitial")
 
-        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Add to pool
                 adPool[adUnitId] = interstitialAd
@@ -568,35 +568,37 @@ class AdManager() {
      * @param interstitialAdLoadCallback Callback for ad loading events
      */
     fun loadInterstitialAd(
-        context: Context, adUnitId: String, interstitialAdLoadCallback: InterstitialAdLoadCallback
+        context: Context, adUnitId: String, interstitialAdLoadCallback: AdLoadCallback<InterstitialAd>
     ) {
         if (AdManageKitConfig.testMode) {
             AdDebugUtils.logEvent(adUnitId, "testMode", "Using test mode for interstitial ads with callback", true)
         }
         var purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()){
-            // User has purchased, no ads should be shown
+            // User has purchased, no ads should be shown.
+            // Next-Gen SDK's LoadAdError.ErrorCode is a closed enum with no
+            // purchase-blocked value, so this only carries the message - the
+            // numeric PURCHASED_APP_ERROR_CODE (1001) contract lives on
+            // AdKitAdError in the SDK-agnostic waterfall/provider path, not here.
             interstitialAdLoadCallback.onAdFailedToLoad(
                 LoadAdError(
-                    PURCHASED_APP_ERROR_CODE,
+                    LoadAdError.ErrorCode.INTERNAL_ERROR,
                     PURCHASED_APP_ERROR_MESSAGE,
-                    PURCHASED_APP_ERROR_DOMAIN,
-                    null, // No underlying AdError cause
-                    null  // No additional ResponseInfo
+                    null
                 )
             )
             return
         }
         this.adUnitId = adUnitId
         initializeFirebase(context)
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
         // Cancel any pending retry since we're manually loading
         AdRetryManager.getInstance().cancelRetry(adUnitId)
         retryAttempts.remove(adUnitId)
 
         isAdLoading = true
-        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 mInterstitialAd = interstitialAd
                 isAdLoading = false
@@ -847,7 +849,7 @@ class AdManager() {
         val dialogViews = showBeautifulLoadingDialog(activity)
 
         // Load fresh ad with timeout
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(currentAdUnitId).build()
         val timeoutMillis = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
         var adLoaded = false
         var timeoutTriggered = false
@@ -886,7 +888,7 @@ class AdManager() {
             return false
         }
 
-        InterstitialAd.load(activity, currentAdUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad
                 mInterstitialAd = interstitialAd
@@ -1281,7 +1283,7 @@ class AdManager() {
         Log.d("AdManager", "Showing ad from unit: $shownAdUnitId (remaining in pool: ${adPool.size})")
         AdDebugUtils.logEvent(shownAdUnitId, "showingFromPool", "Pool size after: ${adPool.size}", true)
 
-        interstitialAd.fullScreenContentCallback = object : FullScreenContentCallback() {
+        interstitialAd.adEventCallback = object : InterstitialAdEventCallback {
             override fun onAdDismissedFullScreenContent() {
                 isDisplayingAd = false
                 // Only clear the mirror if it still points at this ad (a newer ad may have loaded meanwhile)
@@ -1305,7 +1307,7 @@ class AdManager() {
                 }
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
                 isDisplayingAd = false
                 // Only clear the mirror if it still points at this ad (a newer ad may have loaded meanwhile)
                 if (mInterstitialAd === interstitialAd) {
@@ -1350,17 +1352,17 @@ class AdManager() {
                 // Log detailed impression with per-user tracking
                 logAdImpression(shownAdUnitId, "interstitial")
             }
-        }
 
-        interstitialAd.onPaidEventListener = OnPaidEventListener { adValue ->
-            val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+            override fun onAdPaid(value: AdValue) {
+                val adValueInStandardUnits = value.valueMicros / 1000000.0
 
-            // Log Firebase event for paid event
-            val params = Bundle()
-            params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
-            params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-            params.putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-            firebaseAnalytics.logEvent("ad_paid_event", params)
+                // Log Firebase event for paid event
+                val params = Bundle()
+                params.putString(FirebaseAnalytics.Param.AD_UNIT_NAME, shownAdUnitId)
+                params.putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                params.putString(FirebaseAnalytics.Param.CURRENCY, value.currencyCode)
+                firebaseAnalytics.logEvent("ad_paid_event", params)
+            }
         }
 
         interstitialAd.show(activity)
@@ -1677,8 +1679,11 @@ class AdManager() {
                 if (!callbackCalled) {
                     callbackCalled = true
                     callback.onNextAction()
+                    // AdKitAdError's numeric code (from the waterfall/provider path) has no
+                    // equivalent in the Next-Gen SDK's closed LoadAdError.ErrorCode enum -
+                    // the message carries the real detail here.
                     callback.onFailedToLoad(
-                        LoadAdError(error.code, error.message, error.domain, null, null)
+                        LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                     )
                 }
             }

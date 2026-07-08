@@ -19,8 +19,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import com.facebook.shimmer.ShimmerFrameLayout
-import com.google.ads.mediation.admob.AdMobAdapter
-import com.google.android.gms.ads.*
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -212,25 +217,26 @@ class BannerAdView @JvmOverloads constructor(
         // Check purchase status
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
+            // Next-Gen SDK's LoadAdError.ErrorCode is a closed enum with no
+            // purchase-blocked value, so this only carries the message - the
+            // numeric PURCHASED_APP_ERROR_CODE (1001) contract lives on
+            // AdKitAdError in the SDK-agnostic waterfall/provider path, not here.
             handleAdLoadFailure(
                 adUnitId,
-                AdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
-                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN
-                ),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null),
                 callback,
-                "User has purchased app"
+                "User has purchased app",
+                isPurchaseBlocked = true
             )
             return
         }
-        
+
         // Use activity safely with WeakReference
         val activity = activityRef?.get()
         if (activity == null || activity.isFinishing || activity.isDestroyed) {
             handleAdLoadFailure(
                 adUnitId,
-                LoadAdError(9997, "Activity not available", "AdManageKit", null, null),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Activity not available", null),
                 callback,
                 "Activity reference is null or invalid"
             )
@@ -247,47 +253,41 @@ class BannerAdView @JvmOverloads constructor(
             // leaking a WebView-backed view on every reload/auto-refresh
             adView?.destroy()
 
-            // Create and configure AdView
+            // Create AdView (Next-Gen SDK: ad unit id and size are no longer set
+            // on the AdView itself - setAdUnitId()/setAdSize() are gone - both are
+            // now supplied via the request below)
             val calculatedAdSize = getAdSize()
-            adView = AdView(activity).apply {
-                setAdUnitId(adUnitId)
-                setAdSize(calculatedAdSize)
-            }
-            
+            adView = AdView(activity)
+
             // Build ad request
-            val builder = AdRequest.Builder()
+            val requestBuilder = BannerAdRequest.Builder(adUnitId, calculatedAdSize)
 
             // Add collapsible extras if needed
             if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
                 val extras = Bundle()
                 extras.putString("collapsible", placement.value)
-                builder.addNetworkExtrasBundle(AdMobAdapter::class.java, extras)
+                requestBuilder.setGoogleExtrasBundle(extras)
 
                 AdDebugUtils.logDebug("BannerAdView", "Loading collapsible banner with placement: ${placement.value}")
             }
-            
-            // Configure ad listener with enhanced functionality
-            adView?.adListener = createEnhancedAdListener(adUnitId, callback)
-            
-            // Configure paid event listener with enhanced tracking
-            adView?.onPaidEventListener = OnPaidEventListener { adValue ->
-                handlePaidEvent(adUnitId, adValue, callback)
-            }
-            
+
             // Adjust shimmer to match ad size
             adjustShimmerLayout()
-            
-            // Load the ad
-            val adRequest = builder.build()
-            adView?.loadAd(adRequest)
-            
+
+            // Load the ad. Click/impression/open/close/paid events are wired onto
+            // the BannerAd handed back in onAdLoaded (see createEnhancedAdLoadCallback) -
+            // Next-Gen SDK exposes them there, not on the AdView and not via a
+            // separate AdListener/OnPaidEventListener.
+            val adRequest = requestBuilder.build()
+            adView?.loadAd(adRequest, createEnhancedAdLoadCallback(adUnitId, callback))
+
             // Notify callback of load start
             callback?.onAdLoadStarted()
-            
+
         } catch (e: Exception) {
             handleAdLoadFailure(
                 adUnitId,
-                LoadAdError(9998, "Exception during ad load: ${e.message}", "AdManageKit", null, null),
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Exception during ad load: ${e.message}", null),
                 callback,
                 "Exception occurred: ${e.message}"
             )
@@ -304,47 +304,74 @@ class BannerAdView @JvmOverloads constructor(
     }
 
     /**
-     * Creates enhanced ad listener with improved error handling.
+     * Creates the enhanced ad load callback with improved error handling.
+     *
+     * Next-Gen SDK splits what used to be a single AdListener into two pieces:
+     * load success/failure arrive here via [com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback],
+     * while click/open/close/impression/paid events are only available on the
+     * loaded [BannerAd] itself (wired up inside [onAdLoaded] below) - there is no
+     * longer a single listener object that covers both.
      */
-    private fun createEnhancedAdListener(adUnitId: String, callback: AdLoadCallback?): AdListener {
-        return object : AdListener() {
-            override fun onAdLoaded() {
+    private fun createEnhancedAdLoadCallback(
+        adUnitId: String,
+        callback: AdLoadCallback?
+    ): com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<BannerAd> {
+        return object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<BannerAd> {
+            override fun onAdLoaded(bannerAd: BannerAd) {
+                // Wire click/open/close/impression/paid events on the BannerAd -
+                // Next-Gen SDK callbacks fire on a background thread, so each
+                // dispatch to the (possibly UI-touching) external callback is
+                // wrapped on the main thread, matching the old SDK's guarantee.
+                bannerAd.adEventCallback = object : BannerAdEventCallback {
+                    override fun onAdClicked() {
+                        ensureMainThread {
+                            AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Banner ad clicked", true)
+                            callback?.onAdClicked()
+                        }
+                    }
+
+                    override fun onAdDismissedFullScreenContent() {
+                        ensureMainThread {
+                            AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Banner ad closed", true)
+                            callback?.onAdClosed()
+                        }
+                    }
+
+                    override fun onAdShowedFullScreenContent() {
+                        ensureMainThread {
+                            AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Banner ad opened", true)
+                            callback?.onAdOpened()
+                        }
+                    }
+
+                    override fun onAdImpression() {
+                        ensureMainThread {
+                            val loadTime = System.currentTimeMillis() - loadStartTime
+                            val params = Bundle().apply {
+                                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                                if (AdManageKitConfig.enablePerformanceMetrics) {
+                                    putLong("load_time_ms", loadTime)
+                                    putInt("attempt_number", loadAttempt.get())
+                                }
+                            }
+                            firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+
+                            AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Banner ad impression (load time: ${loadTime}ms)", true)
+                            AdDebugUtils.logPerformance(adUnitId, "AdImpression", loadTime)
+                            callback?.onAdImpression()
+                        }
+                    }
+
+                    override fun onAdPaid(value: AdValue) {
+                        handlePaidEvent(adUnitId, value, callback)
+                    }
+                }
+
                 handleAdLoadSuccess(adUnitId, callback)
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 handleAdLoadFailure(adUnitId, adError, callback, "AdMob load failure")
-            }
-
-            override fun onAdClicked() {
-                AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Banner ad clicked", true)
-                callback?.onAdClicked()
-            }
-
-            override fun onAdClosed() {
-                AdDebugUtils.logEvent(adUnitId, "onAdClosed", "Banner ad closed", true)
-                callback?.onAdClosed()
-            }
-
-            override fun onAdOpened() {
-                AdDebugUtils.logEvent(adUnitId, "onAdOpened", "Banner ad opened", true)
-                callback?.onAdOpened()
-            }
-
-            override fun onAdImpression() {
-                val loadTime = System.currentTimeMillis() - loadStartTime
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    if (AdManageKitConfig.enablePerformanceMetrics) {
-                        putLong("load_time_ms", loadTime)
-                        putInt("attempt_number", loadAttempt.get())
-                    }
-                }
-                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                
-                AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Banner ad impression (load time: ${loadTime}ms)", true)
-                AdDebugUtils.logPerformance(adUnitId, "AdImpression", loadTime)
-                callback?.onAdImpression()
             }
         }
     }
@@ -388,10 +415,11 @@ class BannerAdView @JvmOverloads constructor(
      * Handles ad loading failure with basic retry logic.
      */
     private fun handleAdLoadFailure(
-        adUnitId: String, 
-        error: AdError, 
-        callback: AdLoadCallback?, 
-        reason: String
+        adUnitId: String,
+        error: LoadAdError,
+        callback: AdLoadCallback?,
+        reason: String,
+        isPurchaseBlocked: Boolean = false
     ) {
         ensureMainThread {
             // Update UI - stop shimmer but keep view visible for retries
@@ -415,8 +443,10 @@ class BannerAdView @JvmOverloads constructor(
             
             AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "$reason (attempt $attempt)", false)
 
-            // Purchase-blocked loads should fail fast - retrying can never succeed for premium users
-            if (error.code == AdManager.PURCHASED_APP_ERROR_CODE) {
+            // Purchase-blocked loads should fail fast - retrying can never succeed for premium users.
+            // Next-Gen SDK's LoadAdError.ErrorCode is a closed enum with no purchase-blocked
+            // value, so this is signalled explicitly by the caller rather than inferred from error.code.
+            if (isPurchaseBlocked) {
                 visibility = View.GONE
                 callback?.onFailedToLoad(error)
                 return@ensureMainThread
@@ -450,21 +480,25 @@ class BannerAdView @JvmOverloads constructor(
      * Handles paid event with enhanced tracking.
      */
     private fun handlePaidEvent(adUnitId: String, adValue: AdValue, callback: AdLoadCallback?) {
-        val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-        val params = Bundle().apply {
-            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-            putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-            putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
-            putString("ad_format", "banner")
-            if (AdManageKitConfig.enablePerformanceMetrics) {
-                putLong("session_time", System.currentTimeMillis() - loadStartTime)
+        // Next-Gen SDK's onAdPaid fires on a background thread; wrap to preserve
+        // the old SDK's main-thread guarantee for this (possibly UI-touching) callback.
+        ensureMainThread {
+            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+            val params = Bundle().apply {
+                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                putString("ad_format", "banner")
+                if (AdManageKitConfig.enablePerformanceMetrics) {
+                    putLong("session_time", System.currentTimeMillis() - loadStartTime)
+                }
             }
+            firebaseAnalytics?.logEvent("ad_paid_event", params)
+
+            AdDebugUtils.logEvent(adUnitId, "onPaidEvent", "Ad revenue: $adValueInStandardUnits ${adValue.currencyCode}", true)
+
+            callback?.onPaidEvent(adValue)
         }
-        firebaseAnalytics?.logEvent("ad_paid_event", params)
-        
-        AdDebugUtils.logEvent(adUnitId, "onPaidEvent", "Ad revenue: $adValueInStandardUnits ${adValue.currencyCode}", true)
-        
-        callback?.onPaidEvent(adValue)
     }
 
     /**
@@ -499,7 +533,7 @@ class BannerAdView @JvmOverloads constructor(
 
             val density = resources.displayMetrics.density
             val adWidth = (adWidthPixels / density).toInt()
-            AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, adWidth)
+            AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, adWidth)
         } ?: AdSize.BANNER // Fallback to standard banner size
     }
     
@@ -534,12 +568,10 @@ class BannerAdView @JvmOverloads constructor(
             isAdLoading.set(false)
             shimmerFrameLayout.stopShimmer()
             shimmerFrameLayout.visibility = View.GONE
+            // Next-Gen SDK's LoadAdError.ErrorCode is a closed enum with no
+            // purchase-blocked value, so this only carries the message.
             callback?.onFailedToLoad(
-                AdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
-                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN
-                )
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
             return
         }
@@ -600,30 +632,53 @@ class BannerAdView @JvmOverloads constructor(
                         putString("ad_error_code", error.code.toString())
                     }
                     firebaseAnalytics?.logEvent("ad_failed_to_load", params)
+                    // AdKitAdError.code is an arbitrary SDK-agnostic Int (see AdKitAdError.Companion);
+                    // Next-Gen SDK's LoadAdError.ErrorCode is a closed enum, so it's mapped rather
+                    // than passed through - see waterfallErrorCodeToLoadAdErrorCode().
                     callback?.onFailedToLoad(
-                        AdError(error.code, error.message, error.domain)
+                        LoadAdError(error.waterfallErrorCodeToLoadAdErrorCode(), error.message, null)
                     )
                 }
             }
 
-            override fun onBannerClicked() { callback?.onAdClicked() }
+            // Waterfall provider callbacks (e.g. AdMobBannerProvider) may now fire on a
+            // background thread under the Next-Gen SDK; wrap dispatch to the (possibly
+            // UI-touching) external callback to preserve the old SDK's main-thread guarantee.
+            override fun onBannerClicked() { ensureMainThread { callback?.onAdClicked() } }
             override fun onBannerImpression() {
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                ensureMainThread {
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    }
+                    firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
+                    callback?.onAdImpression()
                 }
-                firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
-                callback?.onAdImpression()
             }
             override fun onPaidEvent(adValue: AdKitAdValue) {
-                val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-                val params = Bundle().apply {
-                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                    putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                ensureMainThread {
+                    val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
+                    val params = Bundle().apply {
+                        putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                        putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                        putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                    }
+                    firebaseAnalytics?.logEvent("ad_paid_event", params)
                 }
-                firebaseAnalytics?.logEvent("ad_paid_event", params)
             }
         })
+    }
+
+    /**
+     * Maps the SDK-agnostic waterfall error code (see [AdKitAdError.Companion]) to the
+     * Next-Gen SDK's closed [LoadAdError.ErrorCode] enum, since [AdLoadCallback.onFailedToLoad]
+     * requires a real LoadAdError for its network-agnostic AdKitError alias.
+     */
+    private fun AdKitAdError.waterfallErrorCodeToLoadAdErrorCode(): LoadAdError.ErrorCode = when (code) {
+        AdKitAdError.ERROR_CODE_INVALID_REQUEST -> LoadAdError.ErrorCode.INVALID_REQUEST
+        AdKitAdError.ERROR_CODE_NETWORK -> LoadAdError.ErrorCode.NETWORK_ERROR
+        AdKitAdError.ERROR_CODE_NO_FILL -> LoadAdError.ErrorCode.NO_FILL
+        AdKitAdError.ERROR_CODE_TIMEOUT -> LoadAdError.ErrorCode.TIMEOUT
+        else -> LoadAdError.ErrorCode.INTERNAL_ERROR
     }
 
     // =================== AUTO-REFRESH METHODS ===================
@@ -722,12 +777,16 @@ class BannerAdView @JvmOverloads constructor(
 
     fun resumeAd() {
         if (useWaterfall) { bannerWaterfall?.resume(); return }
-        adView?.resume()
+        // Next-Gen SDK's AdView has no resume() - banner lifecycle is managed
+        // internally by the SDK now.
+        Log.d("BannerAdView", "resumeAd: no-op under Next-Gen SDK (AdView.resume() no longer exists)")
     }
 
     fun pauseAd() {
         if (useWaterfall) { bannerWaterfall?.pause(); return }
-        adView?.pause()
+        // Next-Gen SDK's AdView has no pause() - banner lifecycle is managed
+        // internally by the SDK now.
+        Log.d("BannerAdView", "pauseAd: no-op under Next-Gen SDK (AdView.pause() no longer exists)")
     }
     
     // =================== NEW CONVENIENCE METHODS ===================

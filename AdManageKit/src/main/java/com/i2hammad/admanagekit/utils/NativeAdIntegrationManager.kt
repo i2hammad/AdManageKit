@@ -2,8 +2,9 @@ package com.i2hammad.admanagekit.utils
 
 import android.app.Activity
 import android.util.Log
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
@@ -147,10 +148,10 @@ object NativeAdIntegrationManager {
                 // No cached ad - fail immediately (no network call)
                 logDebug("ONLY_CACHE strategy: cache miss for $screenKey, failing immediately (no network)")
                 callback?.onFailedToLoad(
-                    com.google.android.gms.ads.AdError(
-                        ERROR_CODE_CACHE_MISS,
+                    LoadAdError(
+                        LoadAdError.ErrorCode.INTERNAL_ERROR,
                         "No cached ad available (ONLY_CACHE strategy)",
-                        "AdManageKit"
+                        null
                     )
                 )
             }
@@ -261,7 +262,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdLoaded()
             }
             
-            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 logDebug("Ad failed to load for $screenKey: ${error?.message}")
                 originalCallback?.onFailedToLoad(error)
             }
@@ -284,7 +285,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdOpened()
             }
             
-            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+            override fun onPaidEvent(adValue: AdValue) {
                 logDebug("Paid event for $screenKey: ${adValue.valueMicros}")
                 originalCallback?.onPaidEvent(adValue)
             }
@@ -314,7 +315,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdLoaded()
             }
             
-            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 logDebug("Ad failed to load for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
 
                 // NOTE: Do NOT consume a cached ad as fallback here. This callback fires
@@ -327,8 +328,7 @@ object NativeAdIntegrationManager {
                 val isRetryableError = when (error) {
                     is LoadAdError -> {
                         // Retry for network errors and internal errors, but not for no fill or invalid requests
-                        // Error codes: 0=INTERNAL_ERROR, 2=NETWORK_ERROR
-                        error.code in listOf(0, 2)
+                        error.code == LoadAdError.ErrorCode.INTERNAL_ERROR || error.code == LoadAdError.ErrorCode.NETWORK_ERROR
                     }
                     else -> false
                 }
@@ -381,7 +381,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdOpened()
             }
             
-            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+            override fun onPaidEvent(adValue: AdValue) {
                 logDebug("Paid event for $screenKey: ${adValue.valueMicros}")
                 originalCallback?.onPaidEvent(adValue)
             }
@@ -419,7 +419,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdLoaded()
             }
 
-            override fun onFailedToLoad(error: com.google.android.gms.ads.AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 logDebug("FRESH_WITH_CACHE_FALLBACK: Fresh load failed for $screenKey (attempt ${retryAttempt + 1}): ${error?.message}")
 
                 // NOTE: Do NOT consume a cached ad into the temporary cache here. This
@@ -432,7 +432,7 @@ object NativeAdIntegrationManager {
                 val isRetryableError = when (error) {
                     is LoadAdError -> {
                         // Retry for network errors and internal errors
-                        error.code in listOf(0, 2)
+                        error.code == LoadAdError.ErrorCode.INTERNAL_ERROR || error.code == LoadAdError.ErrorCode.NETWORK_ERROR
                     }
                     else -> false
                 }
@@ -483,7 +483,7 @@ object NativeAdIntegrationManager {
                 originalCallback?.onAdOpened()
             }
 
-            override fun onPaidEvent(adValue: com.google.android.gms.ads.AdValue) {
+            override fun onPaidEvent(adValue: AdValue) {
                 logDebug("Paid event for $screenKey: ${adValue.valueMicros}")
                 originalCallback?.onPaidEvent(adValue)
             }

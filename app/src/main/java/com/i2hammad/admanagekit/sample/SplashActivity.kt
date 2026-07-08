@@ -8,8 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.i2hammad.admanagekit.AdConfig
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
@@ -65,7 +64,8 @@ class SplashActivity : AppCompatActivity() {
         if (adsConsentManager.canRequestAds()) {
             Log.d("SplashActivity", "requestUMP: Consent already granted, can request ads")
             statusTextView.text = "Consent Already Requested. Ready to serve Ads"
-            MyApplication.instance.initAds()
+            // MobileAds is already initialized in MyApplication.onCreate() - only the
+            // actual ad request needs to wait for consent, which canRequestAds() gates.
             runOnUiThread {
                 Log.d("SplashActivity", "requestUMP: Forcing interstitial ad load")
                 forceLoadAppOpen()
@@ -80,7 +80,6 @@ class SplashActivity : AppCompatActivity() {
                 if (isUserAccepted) {
                     Log.d("SplashActivity", "requestUMP: Consent accepted by user")
                     statusTextView.text = "Consent shown and user accepted."
-                    MyApplication.instance.initAds()
                 } else {
                     Log.d("SplashActivity", "requestUMP: Consent not accepted or not shown")
                 }
@@ -157,7 +156,7 @@ class SplashActivity : AppCompatActivity() {
                 showAppOpenAd()
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 super.onFailedToLoad(error)
                 Log.e("SplashActivity", "forceLoadAppOpen: Failed to load app open ad: ${error?.message}")
                 statusTextView.text = "Failed to load app open ad."

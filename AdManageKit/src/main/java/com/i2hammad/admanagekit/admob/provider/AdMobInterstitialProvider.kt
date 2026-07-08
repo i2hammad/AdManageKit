@@ -2,14 +2,16 @@ package com.i2hammad.admanagekit.admob.provider
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.OnPaidEventListener
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.InterstitialAdProvider
@@ -39,20 +41,24 @@ class AdMobInterstitialProvider : InterstitialAdProvider {
         adUnitId: String,
         callback: InterstitialAdProvider.InterstitialAdCallback
     ) {
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
-        InterstitialAd.load(context, adUnitId, adRequest, object : InterstitialAdLoadCallback() {
+        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(ad: InterstitialAd) {
-                loadedAds[adUnitId] = ad
-                Log.d(TAG, "Interstitial ad loaded: $adUnitId")
-                callback.onAdLoaded()
+                Handler(Looper.getMainLooper()).post {
+                    loadedAds[adUnitId] = ad
+                    Log.d(TAG, "Interstitial ad loaded: $adUnitId")
+                    callback.onAdLoaded()
+                }
             }
 
-            override fun onAdFailedToLoad(error: LoadAdError) {
-                // Do NOT discard a previously loaded ad for this (or any other) unit:
-                // the failure only concerns this load request.
-                Log.e(TAG, "Interstitial ad failed to load: ${error.message}")
-                callback.onAdFailedToLoad(error.toAdKitError())
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                Handler(Looper.getMainLooper()).post {
+                    // Do NOT discard a previously loaded ad for this (or any other) unit:
+                    // the failure only concerns this load request.
+                    Log.e(TAG, "Interstitial ad failed to load: ${adError.message}")
+                    callback.onAdFailedToLoad(adError.toAdKitError())
+                }
             }
         })
     }
@@ -84,36 +90,48 @@ class AdMobInterstitialProvider : InterstitialAdProvider {
             return
         }
 
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+        ad.adEventCallback = object : InterstitialAdEventCallback {
             override fun onAdShowedFullScreenContent() {
-                Log.d(TAG, "Interstitial ad showed: $adUnitId")
-                callback.onAdShowed()
+                Handler(Looper.getMainLooper()).post {
+                    Log.d(TAG, "Interstitial ad showed: $adUnitId")
+                    callback.onAdShowed()
+                }
             }
 
             override fun onAdDismissedFullScreenContent() {
-                Log.d(TAG, "Interstitial ad dismissed: $adUnitId")
-                loadedAds.remove(adUnitId, ad)
-                callback.onAdDismissed()
+                Handler(Looper.getMainLooper()).post {
+                    Log.d(TAG, "Interstitial ad dismissed: $adUnitId")
+                    loadedAds.remove(adUnitId, ad)
+                    callback.onAdDismissed()
+                }
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                Log.e(TAG, "Interstitial ad failed to show: ${adError.message}")
-                loadedAds.remove(adUnitId, ad)
-                callback.onAdFailedToShow(adError.toAdKitError())
-                callback.onAdDismissed()
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
+                Handler(Looper.getMainLooper()).post {
+                    Log.e(TAG, "Interstitial ad failed to show: ${adError.message}")
+                    loadedAds.remove(adUnitId, ad)
+                    callback.onAdFailedToShow(adError.toAdKitError())
+                    callback.onAdDismissed()
+                }
             }
 
             override fun onAdClicked() {
-                callback.onAdClicked()
+                Handler(Looper.getMainLooper()).post {
+                    callback.onAdClicked()
+                }
             }
 
             override fun onAdImpression() {
-                callback.onAdImpression()
+                Handler(Looper.getMainLooper()).post {
+                    callback.onAdImpression()
+                }
             }
-        }
 
-        ad.onPaidEventListener = OnPaidEventListener { adValue ->
-            callback.onPaidEvent(adValue.toAdKitValue())
+            override fun onAdPaid(value: AdValue) {
+                Handler(Looper.getMainLooper()).post {
+                    callback.onPaidEvent(value.toAdKitValue())
+                }
+            }
         }
 
         ad.show(activity)

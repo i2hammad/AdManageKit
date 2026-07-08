@@ -1,17 +1,23 @@
 package com.i2hammad.admanagekit.admob.provider
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.TextView
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdLoader
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.nativead.NativeAd
-import com.google.android.gms.ads.nativead.NativeAdView
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallback
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
+import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdSize
@@ -48,46 +54,52 @@ class AdMobNativeProvider : NativeAdProvider {
         // into the selected template layout itself, so the template id is not needed here.
         templateLayoutResId: Int
     ) {
-        val adLoader = AdLoader.Builder(context, adUnitId)
-            .forNativeAd { nativeAd ->
-                nativeAd.setOnPaidEventListener { adValue ->
-                    callback.onPaidEvent(adValue.toAdKitValue())
+        // Next-Gen native ads are requested via the static NativeAdLoader, never instantiated.
+        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE)).build()
+
+        NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
+            override fun onNativeAdLoaded(nativeAd: NativeAd) {
+                // Next-Gen SDK callbacks fire on a background thread; all the work below
+                // touches views, so it must run on the main thread.
+                Handler(Looper.getMainLooper()).post {
+                    // Click/impression/paid reporting is no longer a separate AdListener -
+                    // it is delivered through the loaded NativeAd's own adEventCallback.
+                    nativeAd.adEventCallback = object : NativeAdEventCallback {
+                        override fun onAdClicked() {
+                            callback.onNativeAdClicked()
+                        }
+
+                        override fun onAdImpression() {
+                            callback.onNativeAdImpression()
+                        }
+
+                        override fun onAdPaid(value: AdValue) {
+                            callback.onPaidEvent(value.toAdKitValue())
+                        }
+                        // NOTE: Next-Gen's NativeAdEventCallback has no onAdOpened()/onAdClosed()
+                        // equivalent for native ads (those were legacy AdListener callbacks tied
+                        // to full-screen content). callback.onNativeAdOpened()/onNativeAdClosed()
+                        // are therefore never invoked from this provider anymore.
+                    }
+
+                    // Build a real template view and bind the ad's assets to it before
+                    // activating tracking via registerNativeAd(). Consumers that prefer their
+                    // own layout can re-bind the raw nativeAdRef instead.
+                    val adView = createBoundAdView(context, nativeAd, sizeHint)
+
+                    Log.d(TAG, "Native ad loaded: $adUnitId")
+                    // Ownership of nativeAd transfers to the consumer here.
+                    callback.onNativeAdLoaded(adView, nativeAd)
                 }
-
-                // Build a real template view and bind the ad's assets to it before
-                // activating tracking via setNativeAd(). Consumers that prefer their
-                // own layout can re-bind the raw nativeAdRef instead.
-                val adView = createBoundAdView(context, nativeAd, sizeHint)
-
-                Log.d(TAG, "Native ad loaded: $adUnitId")
-                // Ownership of nativeAd transfers to the consumer here.
-                callback.onNativeAdLoaded(adView, nativeAd)
             }
-            .withAdListener(object : AdListener() {
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    Log.e(TAG, "Native ad failed to load: ${error.message}")
-                    callback.onNativeAdFailedToLoad(error.toAdKitError())
-                }
 
-                override fun onAdClicked() {
-                    callback.onNativeAdClicked()
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                Handler(Looper.getMainLooper()).post {
+                    Log.e(TAG, "Native ad failed to load: ${adError.message}")
+                    callback.onNativeAdFailedToLoad(adError.toAdKitError())
                 }
-
-                override fun onAdImpression() {
-                    callback.onNativeAdImpression()
-                }
-
-                override fun onAdOpened() {
-                    callback.onNativeAdOpened()
-                }
-
-                override fun onAdClosed() {
-                    callback.onNativeAdClosed()
-                }
-            })
-            .build()
-
-        adLoader.loadAd(AdRequest.Builder().build())
+            }
+        })
     }
 
     /** Inflate the template for [sizeHint], populate its asset views and bind [nativeAd]. */
@@ -128,11 +140,20 @@ class AdMobNativeProvider : NativeAdProvider {
             }
         }
 
-        nativeAd.mediaContent?.let { mediaContent ->
-            adView.mediaView?.mediaContent = mediaContent
-        }
-
-        adView.setNativeAd(nativeAd)
+        // setNativeAd() no longer exists on NativeAdView - registerNativeAd() both binds
+        // the ad's assets/tracking to this view AND renders media into the MediaView in one
+        // call. Do NOT also call mediaView.mediaContent = ... beforehand - it leaves the
+        // MediaView blank (the SDK's automatic media rendering only kicks in through
+        // registerNativeAd(), per Google's docs; a manual pre-assignment was found to
+        // interfere with it).
+        //
+        // Look the MediaView up directly by id rather than via adView.mediaView: this view
+        // is inflated into a temporary, never-window-attached parent (createNativeAdView()),
+        // and the getter's auto-discovery was found to return null in that state, leaving
+        // media blank for the LARGE template (SMALL/MEDIUM have no MediaView at all, so this
+        // is a no-op there either way).
+        val mediaView: MediaView? = adView.findViewById(R.id.media_view)
+        adView.registerNativeAd(nativeAd, mediaView)
         return adView
     }
 

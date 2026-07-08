@@ -6,13 +6,13 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.OnPaidEventListener
-import com.google.android.gms.ads.OnUserEarnedRewardListener
-import com.google.android.gms.ads.rewarded.RewardedAd
-import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAd
+import com.google.android.libraries.ads.mobile.sdk.rewarded.RewardedAdEventCallback
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -108,7 +108,7 @@ object RewardedAdManager {
          * Called when the ad fails to show.
          * @param error The error that occurred
          */
-        fun onAdFailedToShow(error: com.google.android.gms.ads.AdError) {}
+        fun onAdFailedToShow(error: AdKitAdError) {}
 
         /**
          * Called when the ad is clicked.
@@ -207,11 +207,11 @@ object RewardedAdManager {
         // Log ad request for analytics
         logAdRequest()
 
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
         AdDebugUtils.logEvent(adUnitId, "loadStarted", "Starting rewarded ad load", true)
 
-        RewardedAd.load(context, adUnitId, adRequest, object : RewardedAdLoadCallback() {
+        RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 isLoading = false
                 rewardedAd = null
@@ -270,7 +270,7 @@ object RewardedAdManager {
         if (adUnitId.isEmpty()) {
             Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
             callback.onAdFailedToLoad(
-                LoadAdError(-1, "Ad unit ID not set. Call initialize() first.", "com.i2hammad.admanagekit", null, null)
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Ad unit ID not set. Call initialize() first.", null)
             )
             return
         }
@@ -281,13 +281,7 @@ object RewardedAdManager {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onAdFailedToLoad(
-                LoadAdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
-                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN,
-                    null,
-                    null
-                )
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
             return
         }
@@ -310,9 +304,9 @@ object RewardedAdManager {
         initializeFirebase(context)
         logAdRequest()
 
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
-        RewardedAd.load(context, adUnitId, adRequest, object : RewardedAdLoadCallback() {
+        RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 isLoading = false
                 rewardedAd = null
@@ -359,7 +353,7 @@ object RewardedAdManager {
         if (adUnitId.isEmpty()) {
             Log.w(TAG, "Ad unit ID not set. Call initialize() first.")
             callback.onAdFailedToLoad(
-                LoadAdError(-1, "Ad unit ID not set. Call initialize() first.", "com.i2hammad.admanagekit", null, null)
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, "Ad unit ID not set. Call initialize() first.", null)
             )
             return
         }
@@ -369,13 +363,7 @@ object RewardedAdManager {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onAdFailedToLoad(
-                LoadAdError(
-                    AdManager.PURCHASED_APP_ERROR_CODE,
-                    AdManager.PURCHASED_APP_ERROR_MESSAGE,
-                    AdManager.PURCHASED_APP_ERROR_DOMAIN,
-                    null,
-                    null
-                )
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
             return
         }
@@ -414,7 +402,7 @@ object RewardedAdManager {
                     synchronized(pendingLoadCallbacks) { pendingLoadCallbacks.remove(pendingCallback) }
                     Log.d(TAG, "In-flight ad load timed out for attached caller")
                     callback.onAdFailedToLoad(
-                        LoadAdError(-1, "Ad loading timed out", "com.i2hammad.admanagekit", null, null)
+                        LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad loading timed out", null)
                     )
                 }
             }, timeoutMillis)
@@ -427,9 +415,9 @@ object RewardedAdManager {
 
         var callbackCalled = false
 
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
-        RewardedAd.load(context, adUnitId, adRequest, object : RewardedAdLoadCallback() {
+        RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
             override fun onAdFailedToLoad(adError: LoadAdError) {
                 isLoading = false
                 rewardedAd = null
@@ -482,13 +470,7 @@ object RewardedAdManager {
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Rewarded ad loading timed out", false)
 
                 callback.onAdFailedToLoad(
-                    LoadAdError(
-                        -1,
-                        "Ad loading timed out",
-                        "com.i2hammad.admanagekit",
-                        null,
-                        null
-                    )
+                    LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad loading timed out", null)
                 )
             }
         }, timeoutMillis)
@@ -538,7 +520,7 @@ object RewardedAdManager {
             return
         }
 
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+        ad.adEventCallback = object : RewardedAdEventCallback {
             override fun onAdClicked() {
                 Log.d(TAG, "Ad was clicked.")
                 AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Rewarded ad clicked", true)
@@ -563,7 +545,7 @@ object RewardedAdManager {
                 callback.onAdDismissed()
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: com.google.android.gms.ads.AdError) {
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
                 Log.e(TAG, "Ad failed to show fullscreen content: ${adError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "Rewarded ad failed to show: ${adError.message}", false)
                 // Only reset state owned by this ad - don't clobber a different ad that is showing
@@ -584,7 +566,7 @@ object RewardedAdManager {
                 if (autoReload) {
                     loadRewardedAd(activity)
                 }
-                callback.onAdFailedToShow(adError)
+                callback.onAdFailedToShow(AdKitAdError(AdKitAdError.ERROR_CODE_INTERNAL, adError.message, "admob"))
                 callback.onAdDismissed()
             }
 
@@ -606,17 +588,17 @@ object RewardedAdManager {
                 isShowingAd = true
                 callback.onAdShowed()
             }
-        }
 
-        ad.onPaidEventListener = OnPaidEventListener { adValue ->
-            val adValueInStandardUnits = adValue.valueMicros / 1000000.0
+            override fun onAdPaid(value: AdValue) {
+                val adValueInStandardUnits = value.valueMicros / 1000000.0
 
-            val params = Bundle().apply {
-                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, value.currencyCode)
+                }
+                firebaseAnalytics?.logEvent("ad_paid_event", params)
             }
-            firebaseAnalytics?.logEvent("ad_paid_event", params)
         }
 
         // Claim the showing slot before show() so a concurrent showAd call is rejected
@@ -635,32 +617,6 @@ object RewardedAdManager {
 
             callback.onRewardEarned(rewardItem.type, rewardItem.amount)
         }
-    }
-
-    /**
-     * Show the rewarded ad with legacy callback support.
-     * @deprecated Use showAd(activity, RewardedAdCallback) instead
-     */
-    @Suppress("DEPRECATION")
-    @Deprecated("Use showAd with RewardedAdCallback", ReplaceWith("showAd(activity, callback)"))
-    fun showAd(
-        activity: Activity,
-        onUserEarnedRewardListener: OnUserEarnedRewardListener,
-        onAdDismissedListener: OnAdDismissedListener
-    ) {
-        showAd(activity, object : RewardedAdCallback {
-            override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
-                val rewardItem = object : com.google.android.gms.ads.rewarded.RewardItem {
-                    override fun getAmount(): Int = rewardAmount
-                    override fun getType(): String = rewardType
-                }
-                onUserEarnedRewardListener.onUserEarnedReward(rewardItem)
-            }
-
-            override fun onAdDismissed() {
-                onAdDismissedListener.onAdDismissed()
-            }
-        })
     }
 
     /**
@@ -800,7 +756,7 @@ object RewardedAdManager {
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
 
                 notifyPendingLoadFailure(
-                    LoadAdError(error.code, error.message, error.domain, null, null)
+                    LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                 )
 
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
@@ -821,7 +777,7 @@ object RewardedAdManager {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onAdFailedToLoad(
-                LoadAdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN, null, null)
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
             return
         }
@@ -861,7 +817,7 @@ object RewardedAdManager {
                 }
                 firebaseAnalytics?.logEvent("ad_failed_to_load", params)
 
-                val loadAdError = LoadAdError(error.code, error.message, error.domain, null, null)
+                val loadAdError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                 callback.onAdFailedToLoad(loadAdError)
                 notifyPendingLoadFailure(loadAdError)
             }
@@ -876,7 +832,7 @@ object RewardedAdManager {
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             callback.onAdFailedToLoad(
-                LoadAdError(AdManager.PURCHASED_APP_ERROR_CODE, AdManager.PURCHASED_APP_ERROR_MESSAGE, AdManager.PURCHASED_APP_ERROR_DOMAIN, null, null)
+                LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
             return
         }
@@ -906,7 +862,7 @@ object RewardedAdManager {
             override fun onAdFailedToLoad(error: AdKitAdError) {
                 isLoading = false
                 rewardedWaterfall = null
-                val loadAdError = LoadAdError(error.code, error.message, error.domain, null, null)
+                val loadAdError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                 notifyPendingLoadFailure(loadAdError)
                 if (!callbackCalled) {
                     callbackCalled = true
@@ -920,7 +876,7 @@ object RewardedAdManager {
                 callbackCalled = true
                 isLoading = false
                 callback.onAdFailedToLoad(
-                    LoadAdError(-1, "Ad loading timed out", "com.i2hammad.admanagekit", null, null)
+                    LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad loading timed out", null)
                 )
             }
         }, timeoutMillis)
@@ -976,9 +932,7 @@ object RewardedAdManager {
                 if (autoReload) {
                     loadViaWaterfall(activity)
                 }
-                callback.onAdFailedToShow(
-                    com.google.android.gms.ads.AdError(error.code, error.message, error.domain)
-                )
+                callback.onAdFailedToShow(error)
                 callback.onAdDismissed()
             }
 

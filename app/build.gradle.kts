@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.sample"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.i2hammad.admanagekit.sample"
@@ -44,5 +44,9 @@ dependencies {
     implementation(project(":admanagekit-billing"))
     implementation(project(":admanagekit-yandex"))
     implementation(libs.androidx.work.runtime)
-//    implementation(libs.play.services.ads)
+}
+
+configurations.configureEach {
+    exclude(group = "com.google.android.gms", module = "play-services-ads")
+    exclude(group = "com.google.android.gms", module = "play-services-ads-lite")
 }
