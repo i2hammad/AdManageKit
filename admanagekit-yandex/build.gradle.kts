@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.yandex"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -55,7 +55,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-yandex"
-                version = "3.6.0"
+                version = "4.2.0"
             }
         }
     }

@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -57,7 +57,7 @@ dependencies {
     implementation(libs.androidx.appcompat)
     api(libs.material)
     api(libs.user.messaging.platform)
-    api(libs.play.services.ads)
+    api(libs.ads.mobile.sdk)
     api(libs.shimmer)
     implementation(libs.androidx.lifecycle.process)
     api(platform(libs.firebase.bom))
@@ -78,7 +78,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit"
-                version = "3.6.0"
+                version = "4.2.0"
             }
 
 

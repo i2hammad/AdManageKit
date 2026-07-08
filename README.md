@@ -1,89 +1,49 @@
 # AdManageKit
 [![JitPack](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
-![API](https://img.shields.io/badge/API-21%2B-brightgreen.svg?style=flat)
+![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `3.6.0`** makes the native-ad waterfall first-class: Yandex now renders the **same AdMob template** you select on `NativeTemplateView`, and the programmatic native loader (`loadNativeAdProgrammatically` and friends) now **falls back through the provider chain** on AdMob no-fill. Also adds cancellable loads and fixes a container leak and a cache-vs-chain ordering bug.
+**Latest Version `4.2.0`** moves the library onto the Google Mobile Ads **Next-Gen SDK** (`ads-mobile-sdk`, now stable) and Google Play Billing Library **9.1.0**. There is only one supported version of AdManageKit — the `nextgen` branch that previously hosted this SDK separately is retired; everything lives on `main` now. See [Next-Gen GMA SDK](#next-gen-gma-sdk) below for what changed and [Migrating to 4.2.0](#migrating-to-420) for upgrade steps.
 
 ---
 
-## Next-Gen GMA SDK Version
+## Next-Gen GMA SDK
 
-> **Beta Notice:** The Next-Gen GMA SDK (`com.google.android.libraries.ads.mobile.sdk`) is currently in **beta by Google**, and AdManageKit's nextgen branch is also in **beta**. The underlying Google SDK may receive breaking changes until it reaches stable release. For production use, the **main branch** is the stable option.
+As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.2.1`) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
 
-AdManageKit offers a **Next-Gen GMA SDK** version on the `nextgen` branch, featuring Google's modern preloader-based ad loading system.
+### Why the move
 
-### Why Next-Gen?
+The legacy Google Mobile Ads SDK is in maintenance mode; new AdMob features (Ad Inspector improvements, mediation updates, in-app price-increase messaging, etc.) land on the Next-Gen SDK first, and Google's own guidance is to move new integrations there. AdManageKit had a separate `nextgen` branch exploring this since it was in beta and diverging from `main`'s waterfall/Yandex/billing work — now that the SDK is stable, that split is gone.
 
-| Feature | Main Branch (GMS SDK) | Next-Gen Branch |
-|---------|----------------------|-----------------|
-| SDK | `play-services-ads` (stable) | `ads-mobile-sdk` (beta) |
-| Ad Loading | Traditional load/show | Preloader-based with auto-refill |
-| Threading | Manual main thread dispatch | Automatic background thread safety |
-| Buffer System | N/A | Configurable ad buffers per type |
-| Background Handling | Basic | Smart pending ad queue |
+### What's different under the hood
 
-### Next-Gen Features
+- **Threading**: Next-Gen SDK callbacks fire on a background thread (the legacy SDK guaranteed main thread). Every ad manager, provider, and view in this library already wraps its callback bodies in `Handler(Looper.getMainLooper()).post {}` — this is transparent to you as a consumer.
+- **Initialization**: `MobileAds.initialize()` must be called explicitly once, before any ad request — the legacy SDK's silent lazy-init on first use no longer exists. AdManageKit doesn't call this for you (it doesn't own your app's consent flow); see the sample app's `MyApplication.kt` for the recommended pattern.
+- **Callback types**: Where AdManageKit exposes ad-network error/value types through `AdKitError`, `AdKitLoadError`, and `AdKitValue` (used by `AdManagerCallback`, `AdLoadCallback`, `AdCallback`, and friends), those aliases now resolve to Next-Gen SDK types instead of legacy ones. Your callback *implementations* (`onFailedToLoad(error)`, `onPaidEvent(value)`, etc.) don't need to change — only code that reads legacy-only members of those objects does. See [Migrating to 4.2.0](#migrating-to-420).
 
-- **Preloader System**: SDK automatically loads next ad after one is consumed
-- **Background-Aware Ads**: App open ads won't show when app is in background
-- **Pending Ad Queue**: Ads that load while backgrounded are saved for return
-- **Configurable Buffers**: Set how many ads to keep ready per type
+## What's New in 4.2.0
 
-```kotlin
-// Next-Gen preloader configuration
-AdManageKitConfig.apply {
-    enableInterstitialPreloader = true
-    enableAppOpenPreloader = true
-    interstitialPreloaderBufferSize = 2
-}
-```
+### Google Mobile Ads Next-Gen SDK
+`com.google.android.gms:play-services-ads` is replaced by the stable **Next-Gen SDK** (`ads-mobile-sdk:1.2.1`) across every ad manager, provider, native view, and the Compose module. This is the change described in [Next-Gen GMA SDK](#next-gen-gma-sdk) above — read that section first if you're upgrading.
 
-### Migration Compatibility
+### Google Play Billing Library 9.1.0
+Upgraded from 8.3.0. No code changes were needed in `AppPurchase` — the wrapper was already on v8+ patterns. Source- and behavior-compatible.
 
-Both branches use the same callback signatures via type aliases:
-- `AdKitError` → resolves to appropriate SDK error type
-- `AdKitLoadError` → resolves to appropriate SDK load error type
-- `AdKitValue` → resolves to appropriate SDK value type
-
-Your callback implementations work on both branches without changes.
-
-### Which Version Should I Use?
-
-| Use Case | Recommended |
-|----------|-------------|
-| Production apps (stable) | **Main branch** (v3.6.0) |
-| New projects wanting latest features | **Nextgen branch** (v4.1.1) |
-| Testing preloader system | **Nextgen branch** |
-| Risk-averse production | **Main branch** |
-
----
-
-## What's New in 3.6.0
-
-### Yandex native ads match AdMob templates
-When a `NativeTemplateView` falls back to Yandex through the waterfall, `YandexNativeProvider` now renders the **exact AdMob template** you selected (all 37 templates) instead of a generic placeholder — the same layout is inflated and Yandex assets are bound to it (the Google `MediaView` is swapped for a Yandex one, plus the mandatory Yandex compliance row). It falls back to the built-in size-based view only if a template can't be bound.
-
-### Programmatic native loader respects the waterfall
-`loadNativeAdProgrammatically`, `loadSmall|Medium|LargeNativeAd`, and `loadNativeAdIntoContainer` now route through the chain configured via `AdProviderConfig.setNativeChain`, so AdMob no-fill falls back to other providers (e.g. Yandex). With no chain configured, the pure-AdMob path is unchanged.
-- New `ProgrammaticAdCallback.onProviderAdLoaded(...)` hook delivers non-AdMob views (AdMob fills still arrive via the typed `onAdLoaded`); the container and Compose helpers display them automatically
-- `onNativeAdOpened()` / `onNativeAdClosed()` now fire consistently whether or not a chain is configured
-
-### Cancellable loads
-The programmatic native load methods return a `NativeAdLoadHandle` — call `handle.cancel()` (e.g. in `onDestroy`) to stop further callbacks; a fill that arrives late is destroyed instead of pushed into a dead view. `ProgrammaticNativeAdCompose` cancels automatically on dispose.
+### compileSdk 37
+Required transitively by `androidx-core-ktx` 1.19.0+. Bump your app's `compileSdk` to 37+.
 
 ### Fixes
-- `loadNativeAdIntoContainer` no longer leaks the previously displayed `NativeAd` on reload
-- An AdMob cached ad no longer short-circuits a Yandex-first waterfall (configured provider order is honoured)
-- Non-AdMob fills through the raw `loadNativeAd` callback no longer fail silently (a warning points you to `onProviderAdLoaded`)
+- Native ad `MediaView` rendering blank in `NativeTemplateView` and the programmatic native provider (a leftover legacy-SDK pattern was interfering with the Next-Gen SDK's automatic media rendering)
+- `NativeAdView.mediaView` returning `null` for dynamically-inflated templates (the getter's auto-discovery needs the view to be window-attached; affected views now use `findViewById()` directly)
+- A Native Validator false-positive risk on deeply-nested templates like `CARD_MODERN`, caused by registering the ad before the view had been through a layout pass
 
-> **Compatibility:** source-compatible with 3.5.9. One binary-incompatible change — the programmatic native load methods now return `NativeAdLoadHandle` instead of `Unit`; recompile against 3.6.0 (JitPack builds from source, so consumers are unaffected).
+> **Compatibility:** **not** fully source-compatible — see [Migrating to 4.2.0](#migrating-to-420). Most consumers (anyone who only calls methods on AdManageKit's own callback types, without custom native XML layouts) are unaffected.
 
-See [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md) for details.
+See [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md) for full details.
 
-For the 3.5.9 release (Compose adaptive banner fix, CI, and test/lint health), see [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md).
+For the 3.6.0 release (Yandex template matching, waterfall-aware programmatic loader), see [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md).
 
 For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
 
@@ -117,43 +77,21 @@ dependencyResolutionManagement {
 
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
-<table>
-<tr>
-<th>Main Branch (Stable GMS SDK)</th>
-<th>Next-Gen Branch (Beta GMA SDK)</th>
-</tr>
-<tr>
-<td>
-
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v3.6.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.6.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.2.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v3.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.2.0'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.2.0'
 ```
 
-</td>
-<td>
+**Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
 
-```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-nextgen:v4.1.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing-nextgen:v4.1.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core-nextgen:v4.1.1'
-
-// For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose-nextgen:v4.1.1'
-```
-
-</td>
-</tr>
-</table>
-
-**Step 3:** Sync your project with Gradle.
+**Step 4:** Sync your project with Gradle.
 
 ## Features
 
@@ -612,6 +550,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md)
 - [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md)
 - [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md)
 - [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md)
@@ -713,6 +652,74 @@ See [mcp-server/](mcp-server/) for more details.
 ---
 
 ## Migration Guide
+
+### Migrating to 4.2.0
+
+The Next-Gen GMA SDK swap (see [Next-Gen GMA SDK](#next-gen-gma-sdk)) is **source-compatible for most consumers**. It only affects you if your code does one of the following:
+
+**1. You read specific members of an error/value object, not just call the callback method.**
+
+`AdKitError`/`AdKitLoadError` now resolve to the Next-Gen SDK's `LoadAdError`, which drops the old `domain`/`cause` fields and replaces the free-form `Int` error code with a closed `LoadAdError.ErrorCode` enum:
+
+```kotlin
+// Before (4.1.x and earlier)
+override fun onFailedToLoad(error: AdKitError?) {
+    Log.e(TAG, "Failed: ${error?.code} / ${error?.domain}")  // .domain no longer exists
+}
+
+// After (4.2.0)
+override fun onFailedToLoad(error: AdKitError?) {
+    Log.e(TAG, "Failed: ${error?.code}")  // .code is now a LoadAdError.ErrorCode enum, still fine to log
+}
+```
+
+**2. You use the raw-callback overload of `AdManager.loadInterstitialAd`.**
+
+```kotlin
+// Before
+AdManager.getInstance().loadInterstitialAd(context, adUnitId,
+    object : com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback() {
+        override fun onAdLoaded(ad: com.google.android.gms.ads.interstitial.InterstitialAd) { }
+        override fun onAdFailedToLoad(error: com.google.android.gms.ads.LoadAdError) { }
+    })
+
+// After
+AdManager.getInstance().loadInterstitialAd(context, adUnitId,
+    object : com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback<
+        com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd> {
+        override fun onAdLoaded(ad: InterstitialAd) { }
+        override fun onAdFailedToLoad(adError: LoadAdError) { }
+    })
+```
+
+**3. You supply a custom native ad layout XML.**
+
+```xml
+<!-- Before -->
+<com.google.android.gms.ads.nativead.NativeAdView ...>
+    <com.google.android.gms.ads.nativead.MediaView android:id="@+id/ad_media" ... />
+    <com.google.android.gms.ads.nativead.AdChoicesView android:id="@+id/ad_choices_view" ... />
+</com.google.android.gms.ads.nativead.NativeAdView>
+
+<!-- After -->
+<com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView ...>
+    <com.google.android.libraries.ads.mobile.sdk.nativead.MediaView android:id="@+id/ad_media" ... />
+    <com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView android:id="@+id/ad_choices_view" ... />
+</com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView>
+```
+
+**4. Your Compose callback lambdas' parameter types are explicitly typed.**
+
+If you wrote `onAdFailedToLoad: (com.google.android.gms.ads.LoadAdError?) -> Unit = { ... }` explicitly rather than letting Kotlin infer the type from the composable's signature, update the import to `com.google.android.libraries.ads.mobile.sdk.common.LoadAdError`.
+
+**Everything else:**
+
+- Call `MobileAds.initialize()` once at app startup if you haven't already — see [Next-Gen GMA SDK](#next-gen-gma-sdk). AdManageKit doesn't do this for you.
+- Bump `compileSdk` to **37+**.
+- If you relied on `BannerAdView`/`BannerAdProvider`'s `pause()`/`resume()` actually pausing ad refresh, that's now a no-op — the Next-Gen SDK's `AdView` doesn't expose it.
+- Google Play Billing 9.1.0 needs no changes if you only use `AppPurchase`/`PurchaseItem`.
+
+See [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md) for the full technical writeup.
 
 ### Migrating to 3.0.0
 

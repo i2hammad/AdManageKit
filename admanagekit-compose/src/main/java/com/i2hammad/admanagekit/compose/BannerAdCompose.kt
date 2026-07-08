@@ -17,9 +17,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdValue
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 
 /**
  * Computes the height of the anchored adaptive banner that AdMob will return
@@ -29,7 +29,7 @@ import com.google.android.gms.ads.AdValue
  */
 private fun adaptiveBannerHeightDp(context: android.content.Context, availableWidthDp: Int): Int {
     if (availableWidthDp <= 0) return 50
-    val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
+    val adSize = AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
     return if (adSize.height > 0) adSize.height else 50
 }
 
@@ -81,7 +81,7 @@ fun BannerAdCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -114,7 +114,7 @@ fun BannerAdCompose(
                     currentOnAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 
@@ -203,7 +203,7 @@ fun BannerAdCompose(
     height: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -232,7 +232,7 @@ fun BannerAdCompose(
                     currentOnAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 
@@ -322,7 +322,7 @@ fun CollapsibleBannerAdCompose(
     placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
     modifier: Modifier = Modifier,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -352,7 +352,7 @@ fun CollapsibleBannerAdCompose(
                     currentOnAdLoaded?.invoke()
                 }
 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 

@@ -2,12 +2,16 @@ package com.i2hammad.admanagekit.admob.provider
 
 import android.app.Activity
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.FullScreenContentCallback
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
@@ -61,20 +65,24 @@ class AdMobAppOpenProvider : AppOpenAdProvider {
         adUnitId: String,
         callback: AppOpenAdProvider.AppOpenAdCallback
     ) {
-        val adRequest = AdRequest.Builder().build()
+        val adRequest = AdRequest.Builder(adUnitId).build()
 
-        AppOpenAd.load(context, adUnitId, adRequest, object : AppOpenAd.AppOpenAdLoadCallback() {
+        AppOpenAd.load(adRequest, object : AdLoadCallback<AppOpenAd> {
             override fun onAdLoaded(ad: AppOpenAd) {
-                loadedAds[adUnitId] = TimedAppOpenAd(ad, System.currentTimeMillis())
-                Log.d(TAG, "App open ad loaded: $adUnitId")
-                callback.onAdLoaded()
+                Handler(Looper.getMainLooper()).post {
+                    loadedAds[adUnitId] = TimedAppOpenAd(ad, System.currentTimeMillis())
+                    Log.d(TAG, "App open ad loaded: $adUnitId")
+                    callback.onAdLoaded()
+                }
             }
 
-            override fun onAdFailedToLoad(error: LoadAdError) {
-                // Do NOT discard a previously loaded ad for this (or any other) unit:
-                // the failure only concerns this load request.
-                Log.e(TAG, "App open ad failed to load: ${error.message}")
-                callback.onAdFailedToLoad(error.toAdKitError())
+            override fun onAdFailedToLoad(adError: LoadAdError) {
+                Handler(Looper.getMainLooper()).post {
+                    // Do NOT discard a previously loaded ad for this (or any other) unit:
+                    // the failure only concerns this load request.
+                    Log.e(TAG, "App open ad failed to load: ${adError.message}")
+                    callback.onAdFailedToLoad(adError.toAdKitError())
+                }
             }
         })
     }
@@ -108,36 +116,48 @@ class AdMobAppOpenProvider : AppOpenAdProvider {
 
         val ad = entry.ad
 
-        ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+        ad.adEventCallback = object : AppOpenAdEventCallback {
             override fun onAdShowedFullScreenContent() {
-                Log.d(TAG, "App open ad showed: $adUnitId")
-                callback.onAdShowed()
+                Handler(Looper.getMainLooper()).post {
+                    Log.d(TAG, "App open ad showed: $adUnitId")
+                    callback.onAdShowed()
+                }
             }
 
             override fun onAdDismissedFullScreenContent() {
-                Log.d(TAG, "App open ad dismissed: $adUnitId")
-                loadedAds.remove(adUnitId, entry)
-                callback.onAdDismissed()
+                Handler(Looper.getMainLooper()).post {
+                    Log.d(TAG, "App open ad dismissed: $adUnitId")
+                    loadedAds.remove(adUnitId, entry)
+                    callback.onAdDismissed()
+                }
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                Log.e(TAG, "App open ad failed to show: ${adError.message}")
-                loadedAds.remove(adUnitId, entry)
-                callback.onAdFailedToShow(adError.toAdKitError())
-                callback.onAdDismissed()
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
+                Handler(Looper.getMainLooper()).post {
+                    Log.e(TAG, "App open ad failed to show: ${adError.message}")
+                    loadedAds.remove(adUnitId, entry)
+                    callback.onAdFailedToShow(adError.toAdKitError())
+                    callback.onAdDismissed()
+                }
             }
 
             override fun onAdClicked() {
-                callback.onAdClicked()
+                Handler(Looper.getMainLooper()).post {
+                    callback.onAdClicked()
+                }
             }
 
             override fun onAdImpression() {
-                callback.onAdImpression()
+                Handler(Looper.getMainLooper()).post {
+                    callback.onAdImpression()
+                }
             }
-        }
 
-        ad.setOnPaidEventListener { adValue ->
-            callback.onPaidEvent(adValue.toAdKitValue())
+            override fun onAdPaid(value: AdValue) {
+                Handler(Looper.getMainLooper()).post {
+                    callback.onPaidEvent(value.toAdKitValue())
+                }
+            }
         }
 
         ad.show(activity)

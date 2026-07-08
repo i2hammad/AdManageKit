@@ -1,28 +1,28 @@
 [versions]
 activityCompose = "1.13.0"
-agp = "9.0.1"
-billing = "8.3.0"
-dokka = "2.1.0"
-composeBom = "2026.04.01"
-firebaseBom = "34.12.0"
+agp = "9.2.1"
+billing = "9.1.0"
+dokka = "2.2.0"
+composeBom = "2026.06.01"
+firebaseBom = "34.15.0"
 kotlin = "2.2.10"
-coreKtx = "1.18.0"
+coreKtx = "1.19.0"
 appcompat = "1.7.1"
-lifecycleProcess = "2.10.0"
-lifecycleViewmodelCompose = "2.10.0"
-lifecycleRuntimeCompose = "2.10.0"
-material = "1.13.0"
+lifecycleProcess = "2.11.0"
+lifecycleViewmodelCompose = "2.11.0"
+lifecycleRuntimeCompose = "2.11.0"
+material = "1.14.0"
 activity = "1.13.0"
 constraintlayout = "2.2.1"
-playServicesAds = "25.2.0"
+adsMobileSdk = "1.2.1"
 userMessagingPlatform = "4.0.0"
 shimmer = "0.5.0"
 workRuntime = "2.11.2"
 composeCompiler = "1.5.8"
-yandexMobileads = "8.0.0"
+yandexMobileads = "8.2.0"
 junit = "4.13.2"
-robolectric = "4.16"
-mockk = "1.14.2"
+robolectric = "4.16.1"
+mockk = "1.14.11"
 androidxTestCore = "1.7.0"
 
 [libraries]
@@ -47,7 +47,7 @@ firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "fir
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
-play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+ads-mobile-sdk = { module = "com.google.android.libraries.ads.mobile.sdk:ads-mobile-sdk", version.ref = "adsMobileSdk" }
 user-messaging-platform = { module = "com.google.android.ump:user-messaging-platform", version.ref = "userMessagingPlatform" }
 shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workRuntime" }

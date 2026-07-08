@@ -10,10 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
@@ -61,7 +58,7 @@ class InterstitialActivity : AppCompatActivity() {
                     Log.d("AdManageKit", "✅ NativeBannerMedium loaded in InterstitialActivity")
                 }
                 
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e("InterstitialActivity", "❌ NativeBannerMedium failed in InterstitialActivity: ${error?.message}")
                 }
             })
@@ -104,7 +101,7 @@ class InterstitialActivity : AppCompatActivity() {
             this,
             "ca-app-pub-3940256099942544/9214589741",
             object : AdLoadCallback() {
-                override fun onFailedToLoad(error: AdError?) {
+                override fun onFailedToLoad(error: LoadAdError?) {
                     super.onFailedToLoad(error)
                     bannerContainer.visibility = View.GONE
 
@@ -116,7 +113,7 @@ class InterstitialActivity : AppCompatActivity() {
         // for Collapsible Banner Ad
 //        bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-3940256099942544/2014213617", true,object :
 //            AdLoadCallback(){
-//            override fun onFailedToLoad(error: AdError?) {
+//            override fun onFailedToLoad(error: LoadAdError?) {
 //                super.onFailedToLoad(error)
 //                bannerContainer.visibility= View.GONE
 //

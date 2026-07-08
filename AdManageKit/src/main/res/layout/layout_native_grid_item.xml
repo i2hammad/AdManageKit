@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Grid Item layout - Optimized for 2-column grid display (A4-like 1:1.4 ratio) -->
-<com.google.android.gms.ads.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/native_ad_view"
     android:layout_width="match_parent"
@@ -122,7 +122,7 @@
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <!-- Media View - Fills remaining space above content -->
-        <com.google.android.gms.ads.nativead.MediaView
+        <com.google.android.libraries.ads.mobile.sdk.nativead.MediaView
             android:id="@+id/ad_media"
             android:layout_width="0dp"
             android:layout_height="0dp"
@@ -143,7 +143,7 @@
             app:layout_constraintTop_toTopOf="parent" />
 
         <!-- Ad Choices Overlay - top right of media -->
-        <com.google.android.gms.ads.nativead.AdChoicesView
+        <com.google.android.libraries.ads.mobile.sdk.common.AdChoicesView
             android:id="@+id/ad_choices_view"
             android:layout_width="18dp"
             android:layout_height="18dp"
@@ -153,4 +153,4 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
-</com.google.android.gms.ads.nativead.NativeAdView>
+</com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView>

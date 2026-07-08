@@ -1,9 +1,11 @@
 package com.i2hammad.admanagekit.sample
 
 import android.app.Application
+import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
-import com.google.android.gms.ads.MobileAds
-import com.google.android.gms.ads.RequestConfiguration
+import com.google.android.libraries.ads.mobile.sdk.MobileAds
+import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
+import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig
 import com.i2hammad.admanagekit.admob.AppOpenManager
 import com.i2hammad.admanagekit.admob.InterstitialAdBuilder
 import com.i2hammad.admanagekit.billing.AppPurchase
@@ -29,11 +31,21 @@ class MyApplication : Application() {
     override fun onCreate() {
         super.onCreate()
 
+        // MobileAds.initialize() is policy-compliant to call at app launch, before UMP
+        // consent - it doesn't request ads or process personal data; only the actual ad
+        // request needs to wait for consent (see SplashActivity's canRequestAds() gate).
+        // It must also run before AppOpenManager is constructed below: ProcessLifecycleOwner
+        // fires AppOpenManager.onStart() as soon as any activity starts, which can race
+        // ahead of SplashActivity's async consent flow and fetch an app-open ad before
+        // MobileAds.initialize() ever runs - the Next-Gen SDK throws in that case instead
+        // of silently self-initializing like the legacy SDK did.
+        initAds()
+
         //If you want to use billing feature must use billing provider
 //        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
 //        If you do not want to use billing library for it
         BillingConfig.setPurchaseProvider(NoPurchaseProvider())
-        
+
         // Configure AdManageKit with comprehensive settings
         configureAdManageKit()
 
@@ -228,15 +240,31 @@ class MyApplication : Application() {
 
 
     fun initAds() {
-
+        val applicationId = readApplicationIdFromManifest()
         val testDeviceIds: List<String> = mutableListOf(
             "EC60C39375F6619F5C03850A0E440646"
         )
-        val configuration: RequestConfiguration =
-            RequestConfiguration.Builder().setTestDeviceIds(testDeviceIds).build()
-        MobileAds.setRequestConfiguration(configuration)
-        MobileAds.initialize(this)
+        val requestConfiguration = RequestConfiguration.Builder()
+            .setTestDeviceIds(testDeviceIds)
+            .build()
+        val initializationConfig = InitializationConfig.Builder(applicationId)
+            .setRequestConfiguration(requestConfiguration)
+            .build()
 
+        // MobileAds.initialize() must run off the main thread or it can ANR.
+        Thread {
+            MobileAds.initialize(this, initializationConfig)
+        }.start()
+    }
+
+    /**
+     * The Next-Gen SDK doesn't auto-read the manifest tag like the legacy SDK
+     * did, so InitializationConfig needs it supplied explicitly.
+     */
+    private fun readApplicationIdFromManifest(): String {
+        val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+        return appInfo.metaData.getString("com.google.android.gms.ads.APPLICATION_ID")
+            ?: error("Missing com.google.android.gms.ads.APPLICATION_ID meta-data in AndroidManifest.xml")
     }
 
     companion object {

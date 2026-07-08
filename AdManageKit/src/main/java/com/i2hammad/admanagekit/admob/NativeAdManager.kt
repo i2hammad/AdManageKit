@@ -3,7 +3,7 @@ package com.i2hammad.admanagekit.admob
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.google.android.gms.ads.nativead.NativeAd
+import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAd
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.config.AdManageKitConfig

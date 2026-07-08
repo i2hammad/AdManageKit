@@ -19,8 +19,16 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.google.android.gms.ads.*
-import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
+import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+// Aliased to avoid colliding with this package's own project-local AdLoadCallback
+// abstract class (see AdLoadCallback.kt), which is used throughout this file for the
+// SDK-agnostic public/internal callback surface (pendingFetchCallback, fetchAd(...), etc).
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback as GmaAdLoadCallback
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.BillingConfig
@@ -503,11 +511,10 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 return@postDelayed
             }
 
-            val fullScreenContentCallback = createFullScreenContentCallback("regular", null)
+            val eventCallback = createAdEventCallback("regular", null)
 
             appOpenAd?.apply {
-                setOnPaidEventListener(createPaidEventListener())
-                setFullScreenContentCallback(fullScreenContentCallback)
+                adEventCallback = eventCallback
                 show(activity)
             } ?: run {
                 isShowingAd.set(false)
@@ -661,10 +668,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         AdDebugUtils.logEvent(adUnitId, "loading", "App open ad loading with dialog", true)
         val request = getAdRequest()
         AppOpenAd.load(
-            myApplication,
-            adUnitId,
             request,
-            object : AppOpenAd.AppOpenAdLoadCallback() {
+            object : GmaAdLoadCallback<AppOpenAd> {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     Handler(Looper.getMainLooper()).post {
                         if (!hasTimedOut) {
@@ -756,10 +761,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         AdDebugUtils.logEvent(adUnitId, "loading", "App open ad loading fresh (no dialog)", true)
         val request = getAdRequest()
         AppOpenAd.load(
-            myApplication,
-            adUnitId,
             request,
-            object : AppOpenAd.AppOpenAdLoadCallback() {
+            object : GmaAdLoadCallback<AppOpenAd> {
                 override fun onAdLoaded(ad: AppOpenAd) {
                     Handler(Looper.getMainLooper()).post {
                         appOpenAd = ad
@@ -813,14 +816,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         // This prevents another showLoadedAd call from starting while we're about to show
         isShowingAd.set(true)
 
-        val fullScreenContentCallback = createFullScreenContentCallback(
+        val eventCallback = createAdEventCallback(
             if (callback != null) "forced" else "regular",
             callback
         )
 
         appOpenAd?.apply {
-            setOnPaidEventListener(createPaidEventListener())
-            setFullScreenContentCallback(fullScreenContentCallback)
+            adEventCallback = eventCallback
             show(activity)
         } ?: run {
             // Ad became null (shouldn't happen but handle it)
@@ -965,11 +967,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Create reusable full screen content callback
-     * All callbacks are posted to main thread to ensure UI operations are safe
+     * Create reusable ad event callback (full screen content events + paid events).
+     * All callbacks are posted to main thread to ensure UI operations are safe.
      */
-    private fun createFullScreenContentCallback(type: String, callback: AdManagerCallback?): FullScreenContentCallback {
-        return object : FullScreenContentCallback() {
+    private fun createAdEventCallback(type: String, callback: AdManagerCallback?): AppOpenAdEventCallback {
+        return object : AppOpenAdEventCallback {
             override fun onAdDismissedFullScreenContent() {
                 Handler(Looper.getMainLooper()).post {
                     appOpenAd = null
@@ -994,7 +996,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 }
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
                 Handler(Looper.getMainLooper()).post {
                     // Reset isShowingAd since we set it to true before show()
                     isShowingAd.set(false)
@@ -1037,28 +1039,42 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     logAdImpressionEvent()
                 }
             }
-        }
-    }
 
-    /**
-     * Create reusable paid event listener
-     */
-    private fun createPaidEventListener(): OnPaidEventListener {
-        return OnPaidEventListener { adValue ->
-            val adValueInStandardUnits = adValue.valueMicros / 1_000_000.0
-            val revenueParams = Bundle().apply {
-                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
-                putString(FirebaseAnalytics.Param.CURRENCY, adValue.currencyCode)
+            override fun onAdPaid(value: AdValue) {
+                val adValueInStandardUnits = value.valueMicros / 1_000_000.0
+                val revenueParams = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putDouble(FirebaseAnalytics.Param.VALUE, adValueInStandardUnits)
+                    putString(FirebaseAnalytics.Param.CURRENCY, value.currencyCode)
+                }
+                firebaseAnalytics.logEvent("ad_paid_event", revenueParams)
             }
-            firebaseAnalytics.logEvent("ad_paid_event", revenueParams)
         }
     }
 
     /**
      * Log Firebase analytics for failed ad loads
      */
-    private fun logFailedToLoadEvent(adError: AdError) {
+    private fun logFailedToLoadEvent(adError: LoadAdError) {
+        val params = Bundle().apply {
+            putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+            putString("ad_error_code", adError.code.toString())
+            if (AdManageKitConfig.enablePerformanceMetrics) {
+                putString("error_message", adError.message)
+            }
+        }
+        firebaseAnalytics.logEvent("ad_failed_to_load", params)
+    }
+
+    /**
+     * Log Firebase analytics for failed ad shows.
+     * Overload of [logFailedToLoadEvent] for FullScreenContentError: the Next-Gen SDK's
+     * show-failure type is unrelated to LoadAdError (unlike the legacy SDK, where
+     * LoadAdError extended AdError and a single overload sufficed). Firebase event name
+     * intentionally kept identical to the load-failure overload to preserve existing
+     * analytics behavior exactly.
+     */
+    private fun logFailedToLoadEvent(adError: FullScreenContentError) {
         val params = Bundle().apply {
             putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
             putString("ad_error_code", adError.code.toString())
@@ -1119,14 +1135,14 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 isLoading.set(false)
                 appOpenWaterfall = null
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open waterfall failed: ${error.message}", false)
-                logFailedToLoadEvent(AdError(error.code, error.message, error.domain))
+                logFailedToLoadEvent(LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null))
 
                 // Notify any pending callback
                 val pending = pendingFetchCallback
                 pendingFetchCallback = null
                 pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
                 pendingFetchTimeoutRunnable = null
-                pending?.onFailedToLoad(AdError(error.code, error.message, error.domain))
+                pending?.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null))
 
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && !AdRetryManager.getInstance().hasActiveRetry(adUnitId)) {
@@ -1159,7 +1175,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                     override fun onAdLoaded() { adLoadCallback.onAdLoaded() }
                     override fun onFailedToLoad(error: AdKitError?) { adLoadCallback.onFailedToLoad(error) }
                     override fun onNextAction() {}
-                    override fun onAdTimedOut() { adLoadCallback.onFailedToLoad(AdError(3, "Ad load timed out", "waterfall")) }
+                    override fun onAdTimedOut() { adLoadCallback.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad load timed out", null)) }
                 }
             } else {
                 // Background no-callback fetch is running (e.g. excluded-activity preload).
@@ -1171,7 +1187,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 pendingFetchTimeoutRunnable = scheduleTimeout(timeoutMillis) {
                     pendingFetchCallback = null
                     pendingFetchTimeoutRunnable = null
-                    adLoadCallback.onFailedToLoad(AdError(3, "Ad load timed out", "waterfall"))
+                    adLoadCallback.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad load timed out", null))
                 }
             }
             return
@@ -1187,7 +1203,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             pendingFetchCallback = null
             pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
             pendingFetchTimeoutRunnable = null
-            adLoadCallback.onFailedToLoad(LoadAdError(3, "Ad load timed out", "waterfall", null, null))
+            adLoadCallback.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad load timed out", null))
         }
 
         val waterfall = createAppOpenWaterfall()
@@ -1220,13 +1236,13 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 pendingFetchCallback = null
                 pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
                 pendingFetchTimeoutRunnable = null
-                pending?.onFailedToLoad(AdError(error.code, error.message, error.domain))
+                pending?.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null))
 
                 if (!hasTimedOut) {
                     cancelTimeout(timeoutRunnable)
                     AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open waterfall failed with timeout: ${error.message}", false)
                     adLoadCallback.onFailedToLoad(
-                        LoadAdError(error.code, error.message, error.domain, null, null)
+                        LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                     )
                 }
             }
@@ -1379,7 +1395,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         isFetchingWithDialog = false
                         val failedCallback = dialogFetchCallback
                         dialogFetchCallback = null
-                        val adError = AdError(error.code, error.message, error.domain)
+                        val adError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                         AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open waterfall failed with dialog: ${error.message}", false)
                         logFailedToLoadEvent(adError)
                         animateDialogDismissal(dialogViews) {
@@ -1564,58 +1580,64 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         lastLoadStartTime = System.currentTimeMillis()
         val request = getAdRequest()
 
-        AppOpenAd.load(myApplication,
-            adUnitId,
+        AppOpenAd.load(
             request,
-            object : AppOpenAd.AppOpenAdLoadCallback() {
+            object : GmaAdLoadCallback<AppOpenAd> {
                 override fun onAdLoaded(ad: AppOpenAd) {
-                    isLoading.set(false)  // Reset loading state
-                    appOpenAd = ad
-                            adLoadTime = System.currentTimeMillis()
+                    // Next-Gen SDK callbacks are not guaranteed main-thread; this can cascade
+                    // into dialog UI work via pendingFetchCallback (e.g. a dialogPendingCallback
+                    // attached by showAdWithWelcomeDialog's in-flight-load path), so post to main.
+                    Handler(Looper.getMainLooper()).post {
+                        isLoading.set(false)  // Reset loading state
+                        appOpenAd = ad
+                                adLoadTime = System.currentTimeMillis()
 
-                    // Track loading performance
-                    val loadTime = System.currentTimeMillis() - lastLoadStartTime
-                    synchronized(loadTimes) {
-                        loadTimes.add(loadTime)
-                        if (loadTimes.size > 100) {
-                            loadTimes.removeAt(0)
+                        // Track loading performance
+                        val loadTime = System.currentTimeMillis() - lastLoadStartTime
+                        synchronized(loadTimes) {
+                            loadTimes.add(loadTime)
+                            if (loadTimes.size > 100) {
+                                loadTimes.removeAt(0)
+                            }
                         }
-                    }
 
-                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded successfully (${loadTime}ms, retry: $retryCount)", true)
+                        AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open ad loaded successfully (${loadTime}ms, retry: $retryCount)", true)
 
-                    // Notify any pending callback (e.g. splash fetchAd that arrived while this load was running)
-                    val pending = pendingFetchCallback
-                    pendingFetchCallback = null
-                    pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
-                    pendingFetchTimeoutRunnable = null
-                    pending?.onAdLoaded()
-                }
-
-                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    Log.e(LOG_TAG, "onAdFailedToLoad: failed to load (retry: $retryCount)")
-                    AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open ad failed to load: ${loadAdError.message} (retry: $retryCount)", false)
-
-                    logFailedToLoadEvent(loadAdError)
-
-                    // Determine if we should retry based on error type and config
-                    if (AdManageKitConfig.autoRetryFailedAds && shouldRetryForError(loadAdError) && retryCount < AdManageKitConfig.maxRetryAttempts) {
-                        AdRetryManager.getInstance().scheduleRetry(
-                            adUnitId = adUnitId,
-                            attempt = retryCount,
-                            maxAttempts = AdManageKitConfig.maxRetryAttempts
-                        ) {
-                            fetchAdWithRetry(retryCount + 1)
-                        }
-                    } else {
-                        isLoading.set(false)  // Reset loading state only if not retrying
-
-                        // Notify any pending callback
+                        // Notify any pending callback (e.g. splash fetchAd that arrived while this load was running)
                         val pending = pendingFetchCallback
                         pendingFetchCallback = null
                         pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
                         pendingFetchTimeoutRunnable = null
-                        pending?.onFailedToLoad(loadAdError)
+                        pending?.onAdLoaded()
+                    }
+                }
+
+                override fun onAdFailedToLoad(loadAdError: LoadAdError) {
+                    Handler(Looper.getMainLooper()).post {
+                        Log.e(LOG_TAG, "onAdFailedToLoad: failed to load (retry: $retryCount)")
+                        AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "App open ad failed to load: ${loadAdError.message} (retry: $retryCount)", false)
+
+                        logFailedToLoadEvent(loadAdError)
+
+                        // Determine if we should retry based on error type and config
+                        if (AdManageKitConfig.autoRetryFailedAds && shouldRetryForError(loadAdError) && retryCount < AdManageKitConfig.maxRetryAttempts) {
+                            AdRetryManager.getInstance().scheduleRetry(
+                                adUnitId = adUnitId,
+                                attempt = retryCount,
+                                maxAttempts = AdManageKitConfig.maxRetryAttempts
+                            ) {
+                                fetchAdWithRetry(retryCount + 1)
+                            }
+                        } else {
+                            isLoading.set(false)  // Reset loading state only if not retrying
+
+                            // Notify any pending callback
+                            val pending = pendingFetchCallback
+                            pendingFetchCallback = null
+                            pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
+                            pendingFetchTimeoutRunnable = null
+                            pending?.onFailedToLoad(loadAdError)
+                        }
                     }
                 }
             })
@@ -1626,9 +1648,9 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      */
     private fun shouldRetryForError(error: LoadAdError): Boolean {
         return when (error.code) {
-            AdRequest.ERROR_CODE_NETWORK_ERROR,
-            AdRequest.ERROR_CODE_NO_FILL -> true
-            AdRequest.ERROR_CODE_INTERNAL_ERROR -> true
+            LoadAdError.ErrorCode.NETWORK_ERROR,
+            LoadAdError.ErrorCode.NO_FILL -> true
+            LoadAdError.ErrorCode.INTERNAL_ERROR -> true
             else -> false
         }
     }
@@ -1673,7 +1695,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             pendingFetchTimeoutRunnable = scheduleTimeout(timeoutMillis) {
                 pendingFetchCallback = null
                 pendingFetchTimeoutRunnable = null
-                adLoadCallback.onFailedToLoad(LoadAdError(3, "Ad load timed out", "Google", null, null))
+                adLoadCallback.onFailedToLoad(LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad load timed out", null))
             }
             return
         }
@@ -1685,7 +1707,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
 
         lastLoadStartTime = System.currentTimeMillis()
-        val request = getAdRequest()
+        val request = getAdRequest(effectiveAdUnitId)
         var hasTimedOut = false
 
         // Use enhanced timeout handling
@@ -1696,63 +1718,68 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             pendingFetchCallback = null
             pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
             pendingFetchTimeoutRunnable = null
-            val loadAdError = LoadAdError(3, "Ad load timed out", "Google", null, null)
+            val loadAdError = LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad load timed out", null)
             Log.e(LOG_TAG, "onAdFailedToLoad: timeout after $timeoutMillis ms")
             adLoadCallback.onFailedToLoad(loadAdError)
         }
 
         AppOpenAd.load(
-            myApplication,
-            effectiveAdUnitId,
             request,
-            object : AppOpenAd.AppOpenAdLoadCallback() {
+            object : GmaAdLoadCallback<AppOpenAd> {
                 override fun onAdLoaded(ad: AppOpenAd) {
-                    // Always keep the ad for later use, even if timed out
-                    appOpenAd = ad
-                    adLoadTime = System.currentTimeMillis()
-                    isLoading.set(false)
+                    // Next-Gen SDK callbacks are not guaranteed main-thread; this can cascade
+                    // into dialog UI work via pendingFetchCallback / the caller-supplied
+                    // adLoadCallback, so post to main (mirrors showAdWithWelcomeDialog's own load).
+                    Handler(Looper.getMainLooper()).post {
+                        // Always keep the ad for later use, even if timed out
+                        appOpenAd = ad
+                        adLoadTime = System.currentTimeMillis()
+                        isLoading.set(false)
 
-                    // Notify any pending callback attached to this in-flight load
-                    val pending = pendingFetchCallback
-                    pendingFetchCallback = null
-                    pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
-                    pendingFetchTimeoutRunnable = null
-                    pending?.onAdLoaded()
+                        // Notify any pending callback attached to this in-flight load
+                        val pending = pendingFetchCallback
+                        pendingFetchCallback = null
+                        pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
+                        pendingFetchTimeoutRunnable = null
+                        pending?.onAdLoaded()
 
-                    // Track loading performance
-                    val loadTime = System.currentTimeMillis() - lastLoadStartTime
-                    synchronized(loadTimes) {
-                        loadTimes.add(loadTime)
-                        if (loadTimes.size > 100) { // Keep last 100 load times
-                            loadTimes.removeAt(0)
+                        // Track loading performance
+                        val loadTime = System.currentTimeMillis() - lastLoadStartTime
+                        synchronized(loadTimes) {
+                            loadTimes.add(loadTime)
+                            if (loadTimes.size > 100) { // Keep last 100 load times
+                                loadTimes.removeAt(0)
+                            }
                         }
-                    }
 
-                    if (!hasTimedOut) {
-                        cancelTimeout(timeoutRunnable)
-                        AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded with timeout (${loadTime}ms)", true)
-                        adLoadCallback.onAdLoaded()
-                    } else {
-                        AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded after timeout (${loadTime}ms), cached for later use", true)
+                        if (!hasTimedOut) {
+                            cancelTimeout(timeoutRunnable)
+                            AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded with timeout (${loadTime}ms)", true)
+                            adLoadCallback.onAdLoaded()
+                        } else {
+                            AdDebugUtils.logEvent(effectiveAdUnitId, "onAdLoaded", "App open ad loaded after timeout (${loadTime}ms), cached for later use", true)
+                        }
                     }
                 }
 
                 override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                    isLoading.set(false)
+                    Handler(Looper.getMainLooper()).post {
+                        isLoading.set(false)
 
-                    // Notify any pending callback attached to this in-flight load
-                    val pending = pendingFetchCallback
-                    pendingFetchCallback = null
-                    pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
-                    pendingFetchTimeoutRunnable = null
-                    pending?.onFailedToLoad(loadAdError)
+                        // Notify any pending callback attached to this in-flight load
+                        val pending = pendingFetchCallback
+                        pendingFetchCallback = null
+                        pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
+                        pendingFetchTimeoutRunnable = null
+                        pending?.onFailedToLoad(loadAdError)
 
-                    if (!hasTimedOut) {
-                        cancelTimeout(timeoutRunnable)
-                        Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
-                        AdDebugUtils.logEvent(effectiveAdUnitId, "onFailedToLoad", "App open ad failed with timeout: ${loadAdError.message}", false)
-                        logFailedToLoadEvent(loadAdError)
-                        adLoadCallback.onFailedToLoad(loadAdError)
+                        if (!hasTimedOut) {
+                            cancelTimeout(timeoutRunnable)
+                            Log.e(LOG_TAG, "onAdFailedToLoad: failed to load")
+                            AdDebugUtils.logEvent(effectiveAdUnitId, "onFailedToLoad", "App open ad failed with timeout: ${loadAdError.message}", false)
+                            logFailedToLoadEvent(loadAdError)
+                            adLoadCallback.onFailedToLoad(loadAdError)
+                        }
                     }
                 }
             }
@@ -1763,9 +1790,11 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
     /**
      * Creates and returns ad request.
+     * Ad unit ID is required by the Next-Gen SDK's AdRequest.Builder; defaults to this
+     * manager's configured ad unit but accepts an override (e.g. fetchAd's customAdUnitId).
      */
-    private fun getAdRequest(): AdRequest {
-        return AdRequest.Builder().build()
+    private fun getAdRequest(unitId: String = adUnitId): AdRequest {
+        return AdRequest.Builder(unitId).build()
     }
 
     /**

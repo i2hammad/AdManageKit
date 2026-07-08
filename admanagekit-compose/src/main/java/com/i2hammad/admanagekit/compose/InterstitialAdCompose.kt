@@ -5,9 +5,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.interstitial.InterstitialAd
-import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.i2hammad.admanagekit.admob.AdManager
 import com.i2hammad.admanagekit.admob.AdManagerCallback
 
@@ -174,7 +174,7 @@ fun InterstitialAdEffect(
                     AdManager.getInstance().loadInterstitialAd(
                         context,
                         adUnitId,
-                        object : InterstitialAdLoadCallback() {
+                        object : AdLoadCallback<InterstitialAd> {
                             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                                 if (completed) return
                                 completed = true

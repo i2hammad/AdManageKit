@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.i2hammad.admanagekit.billing"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24
@@ -60,7 +60,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-billing"
-                version = "3.6.0"
+                version = "4.2.0"
             }
         }
     }

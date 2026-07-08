@@ -11,8 +11,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdTemplate
 import com.i2hammad.admanagekit.admob.NativeTemplateView
@@ -44,7 +44,7 @@ fun NativeTemplateCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -69,7 +69,7 @@ fun NativeTemplateCompose(
                 currentOnAdLoaded?.invoke()
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 currentOnAdFailedToLoad?.invoke(error)
             }
 
@@ -142,7 +142,7 @@ fun NativeCardModernCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -167,7 +167,7 @@ fun NativeMaterial3Compose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -192,7 +192,7 @@ fun NativeMinimalCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -217,7 +217,7 @@ fun NativeCompactHorizontalCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -242,7 +242,7 @@ fun NativeListItemCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -267,7 +267,7 @@ fun NativeMagazineCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -292,7 +292,7 @@ fun NativeFeaturedCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -317,7 +317,7 @@ fun NativeVideoMediumCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -342,7 +342,7 @@ fun NativeVideoLargeCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {
@@ -370,7 +370,7 @@ fun NativeFlatInlineRowCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -385,7 +385,7 @@ fun NativeFlatCardRatingCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -400,7 +400,7 @@ fun NativeFlatMediaTopCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -415,7 +415,7 @@ fun NativeFlatTextMinimalCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -430,7 +430,7 @@ fun NativeFlatCompactPillCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -445,7 +445,7 @@ fun NativeFlatCarouselCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -460,7 +460,7 @@ fun NativeFlatBannerCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -475,7 +475,7 @@ fun NativeFlatFeatureListCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -490,7 +490,7 @@ fun NativeFlatSponsoredStoryCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -505,7 +505,7 @@ fun NativeFlatFooterSlimCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) = NativeTemplateCompose(
@@ -522,7 +522,7 @@ fun NativeVideoSquareCompose(
     modifier: Modifier = Modifier,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null
 ) {

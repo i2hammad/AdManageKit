@@ -19,8 +19,8 @@ import com.i2hammad.admanagekit.admob.NativeBannerSmall
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeLarge
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
-import com.google.android.gms.ads.AdError
-import com.google.android.gms.ads.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 
 /**
  * Native ad size types for Compose
@@ -60,7 +60,7 @@ fun NativeAdCompose(
     useCachedAd: Boolean = true,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -85,7 +85,7 @@ fun NativeAdCompose(
                 currentOnAdLoaded?.invoke()
             }
 
-            override fun onFailedToLoad(error: AdError?) {
+            override fun onFailedToLoad(error: LoadAdError?) {
                 currentOnAdFailedToLoad?.invoke(error)
             }
 
@@ -199,7 +199,7 @@ fun NativeBannerSmallCompose(
     useCachedAd: Boolean = true,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -235,7 +235,7 @@ fun NativeBannerMediumCompose(
     useCachedAd: Boolean = true,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
@@ -271,7 +271,7 @@ fun NativeLargeCompose(
     useCachedAd: Boolean = true,
     loadingStrategy: AdLoadingStrategy? = null,
     onAdLoaded: (() -> Unit)? = null,
-    onAdFailedToLoad: ((AdError?) -> Unit)? = null,
+    onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,

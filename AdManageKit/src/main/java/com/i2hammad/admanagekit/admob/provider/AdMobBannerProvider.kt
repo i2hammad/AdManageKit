@@ -8,15 +8,19 @@ import android.util.DisplayMetrics
 import android.util.Log
 import android.view.View
 import android.view.WindowMetrics
-import com.google.ads.mediation.admob.AdMobAdapter
-import com.google.android.gms.ads.AdListener
-import com.google.android.gms.ads.AdRequest
-import com.google.android.gms.ads.AdSize
-import com.google.android.gms.ads.AdView
-import com.google.android.gms.ads.LoadAdError
-import com.google.android.gms.ads.OnPaidEventListener
+import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
+import com.google.android.libraries.ads.mobile.sdk.banner.AdView
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
+import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
+import com.google.android.libraries.ads.mobile.sdk.common.AdValue
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.google.android.libraries.ads.mobile.sdk.common.PrecisionType
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
+import com.i2hammad.admanagekit.core.ad.AdKitAdError
+import com.i2hammad.admanagekit.core.ad.AdKitAdValue
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.BannerAdProvider
 
@@ -27,10 +31,12 @@ import com.i2hammad.admanagekit.core.ad.BannerAdProvider
  * Ownership: a successfully loaded AdView is handed to the caller via
  * [BannerAdProvider.BannerAdCallback.onBannerLoaded]; from that point the caller
  * owns the view (and its destruction). The provider keeps a reference to the most
- * recently loaded view only to service [pause]/[resume], and never destroys
- * handed-out views (they may be attached in another screen). Views whose load
- * fails — or that are still in flight when [destroy] is called — were never
- * handed out and are destroyed by the provider.
+ * recently loaded view, but [pause]/[resume] are no-ops under the Next-Gen SDK
+ * (its AdView no longer exposes pause()/resume() - banner lifecycle is managed
+ * internally by the SDK). The provider never destroys handed-out views (they may
+ * be attached in another screen). Views whose load fails — or that are still in
+ * flight when [destroy] is called — were never handed out and are destroyed by
+ * the provider.
  *
  * @param adSize Explicit ad size, or null to use adaptive full-width banner (default).
  * @param collapsible Whether to load collapsible banners.
@@ -71,8 +77,27 @@ class AdMobBannerProvider(
 
         val density = context.resources.displayMetrics.density
         val adWidth = (adWidthPixels / density).toInt()
-        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, adWidth)
+        return AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, adWidth)
     }
+
+    /** Map Next-Gen SDK [LoadAdError] to [AdKitAdError]. */
+    private fun LoadAdError.toAdKitError(): AdKitAdError = AdKitAdError(
+        code = code.value,
+        message = message,
+        domain = AdProvider.ADMOB.name
+    )
+
+    /** Map Next-Gen SDK [AdValue] to [AdKitAdValue]. */
+    private fun AdValue.toAdKitValue(): AdKitAdValue = AdKitAdValue(
+        valueMicros = valueMicros,
+        currencyCode = currencyCode,
+        precisionType = when (precisionType) {
+            PrecisionType.ESTIMATED -> AdKitAdValue.PrecisionType.ESTIMATED
+            PrecisionType.PUBLISHER_PROVIDED -> AdKitAdValue.PrecisionType.PUBLISHER_PROVIDED
+            PrecisionType.PRECISE -> AdKitAdValue.PrecisionType.PRECISE
+            else -> AdKitAdValue.PrecisionType.UNKNOWN
+        }
+    )
 
     override fun loadBanner(
         context: Context,
@@ -81,14 +106,20 @@ class AdMobBannerProvider(
     ) {
         val resolvedAdSize = adSize ?: getAdaptiveAdSize(context)
 
-        val bannerView = AdView(context).apply {
-            this.adUnitId = adUnitId
-            setAdSize(resolvedAdSize)
-        }
+        // Next-Gen SDK: ad unit id and size are no longer set on the AdView itself
+        // (setAdUnitId()/setAdSize() are gone) - both are now supplied via the request.
+        val bannerView = AdView(context)
         pendingViews.add(bannerView)
 
-        bannerView.adListener = object : AdListener() {
-            override fun onAdLoaded() {
+        val requestBuilder = BannerAdRequest.Builder(adUnitId, resolvedAdSize)
+        if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
+            val extras = Bundle()
+            extras.putString("collapsible", collapsiblePlacement.value)
+            requestBuilder.setGoogleExtrasBundle(extras)
+        }
+
+        bannerView.loadAd(requestBuilder.build(), object : AdLoadCallback<BannerAd> {
+            override fun onAdLoaded(bannerAd: BannerAd) {
                 if (!pendingViews.remove(bannerView)) {
                     // destroy() already destroyed this in-flight view; do not hand it out.
                     Log.d(TAG, "Banner ad loaded after destroy, discarding: $adUnitId")
@@ -98,6 +129,24 @@ class AdMobBannerProvider(
                 // Do NOT destroy the previously stored view: it was handed to a
                 // consumer on its own onBannerLoaded and the consumer owns it.
                 adView = bannerView
+
+                // Next-Gen SDK exposes click/impression/paid events on the loaded
+                // BannerAd via adEventCallback, not on the AdView and not via a
+                // separate AdListener/OnPaidEventListener.
+                bannerAd.adEventCallback = object : BannerAdEventCallback {
+                    override fun onAdClicked() {
+                        callback.onBannerClicked()
+                    }
+
+                    override fun onAdImpression() {
+                        callback.onBannerImpression()
+                    }
+
+                    override fun onAdPaid(value: AdValue) {
+                        callback.onPaidEvent(value.toAdKitValue())
+                    }
+                }
+
                 callback.onBannerLoaded(bannerView)
             }
 
@@ -110,35 +159,19 @@ class AdMobBannerProvider(
                 }
                 callback.onBannerFailedToLoad(error.toAdKitError())
             }
-
-            override fun onAdClicked() {
-                callback.onBannerClicked()
-            }
-
-            override fun onAdImpression() {
-                callback.onBannerImpression()
-            }
-        }
-
-        bannerView.onPaidEventListener = OnPaidEventListener { adValue ->
-            callback.onPaidEvent(adValue.toAdKitValue())
-        }
-
-        val requestBuilder = AdRequest.Builder()
-        if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
-            val extras = Bundle()
-            extras.putString("collapsible", collapsiblePlacement.value)
-            requestBuilder.addNetworkExtrasBundle(AdMobAdapter::class.java, extras)
-        }
-        bannerView.loadAd(requestBuilder.build())
+        })
     }
 
     override fun pause() {
-        adView?.pause()
+        // Next-Gen SDK's AdView has no pause() - banner lifecycle is managed
+        // internally by the SDK now.
+        Log.d(TAG, "pause: no-op under Next-Gen SDK (AdView.pause() no longer exists)")
     }
 
     override fun resume() {
-        adView?.resume()
+        // Next-Gen SDK's AdView has no resume() - banner lifecycle is managed
+        // internally by the SDK now.
+        Log.d(TAG, "resume: no-op under Next-Gen SDK (AdView.resume() no longer exists)")
     }
 
     override fun destroy() {
