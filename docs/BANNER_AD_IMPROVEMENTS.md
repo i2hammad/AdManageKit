@@ -128,6 +128,55 @@ val attempt = bannerAdView.getCurrentAttempt()
 bannerAdView.refreshAd() // Manually refresh current ad
 ```
 
+### Banner Ad Sizes (v4.3.0)
+
+All standard AdMob banner sizes are supported via the `BannerAdSize` enum
+(`com.i2hammad.admanagekit.config.BannerAdSize`):
+
+| Value              | Size (dp)  | Description          | Availability       |
+|--------------------|------------|----------------------|--------------------|
+| `ADAPTIVE`         | full width | Anchored adaptive    | Phones and tablets |
+| `BANNER`           | 320x50     | Banner               | Phones and tablets |
+| `LARGE_BANNER`     | 320x100    | Large banner         | Phones and tablets |
+| `MEDIUM_RECTANGLE` | 300x250    | IAB medium rectangle | Phones and tablets |
+| `FULL_BANNER`      | 468x60     | IAB full-size banner | Tablets            |
+| `LEADERBOARD`      | 728x90     | IAB leaderboard      | Tablets            |
+
+`ADAPTIVE` (the default) keeps the previous full-width adaptive behavior.
+
+```kotlin
+// Programmatic
+bannerAdView.loadBanner(this, "your-ad-unit-id", BannerAdSize.MEDIUM_RECTANGLE)
+
+// Or set a default for subsequent loads
+bannerAdView.setBannerAdSize(BannerAdSize.LARGE_BANNER)
+bannerAdView.loadBanner(this, "your-ad-unit-id")
+
+// Compose
+BannerAdCompose(
+    adUnitId = "your-ad-unit-id",
+    adSize = BannerAdSize.MEDIUM_RECTANGLE
+)
+```
+
+```xml
+<!-- XML -->
+<com.i2hammad.admanagekit.admob.BannerAdView
+    android:id="@+id/bannerAdView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:bannerAdSize="medium_rectangle" />
+```
+
+Notes:
+- Collapsible banners require `ADAPTIVE` (AdMob policy); a fixed size logs a debug warning.
+- The size is preserved across retries and auto-refresh.
+- In multi-provider waterfalls, fixed sizes are applied to the AdMob providers in the chain.
+- The shimmer placeholder reserves the exact requested size (centered horizontally,
+  matching the loaded ad), so tall formats like `MEDIUM_RECTANGLE` don't cause a
+  layout jump when the ad arrives.
+- `FULL_BANNER` and `LEADERBOARD` are wider than phone screens — use them on tablets only.
+
 ## 📈 **Performance Benefits**
 
 ### Memory Usage

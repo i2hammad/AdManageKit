@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.RatingBar
 import android.widget.TextView
+import androidx.annotation.LayoutRes
 import androidx.core.view.doOnNextLayout
 import com.facebook.shimmer.ShimmerFrameLayout
 import com.google.android.libraries.ads.mobile.sdk.common.AdChoicesPlacement
@@ -72,6 +73,13 @@ import kotlinx.coroutines.withContext
  *
  * // Load ad
  * nativeTemplateView.loadNativeAd(activity, "ca-app-pub-xxx/yyy")
+ *
+ * // Supply your own layout instead of a built-in preset. The layout's root must be
+ * // (or inflate as) a NativeAdView and reuse the standard asset ids - ad_headline,
+ * // ad_body, ad_call_to_action, ad_app_icon, ad_advertiser, ad_media, ad_stars,
+ * // ad_choices_view - all optional except ad_headline.
+ * nativeTemplateView.setCustomTemplate(R.layout.my_native_ad, R.layout.my_native_ad_shimmer)
+ * nativeTemplateView.loadNativeAd(activity, adUnitId)
  * ```
  */
 class NativeTemplateView @JvmOverloads constructor(
@@ -90,6 +98,21 @@ class NativeTemplateView @JvmOverloads constructor(
 
     private var currentTemplate: NativeAdTemplate = NativeAdTemplate.CARD_MODERN
     private var shimmerInflated = false
+
+    // Custom (non-preset) template support. When customLayoutResId is set, it takes
+    // precedence over currentTemplate.layoutResId everywhere a template layout is
+    // inflated - see effectiveLayoutResId/effectiveShimmerResId.
+    private var customLayoutResId: Int? = null
+    private var customShimmerResId: Int? = null
+    private var customSizeHint: NativeAdSize? = null
+
+    /** Layout actually inflated for the ad content - a custom override, or the selected preset. */
+    private val effectiveLayoutResId: Int
+        get() = customLayoutResId ?: currentTemplate.layoutResId
+
+    /** Layout actually inflated for the shimmer placeholder - a custom override, or the selected preset's. */
+    private val effectiveShimmerResId: Int
+        get() = customShimmerResId ?: currentTemplate.shimmerResId
 
     // Currently displayed native ad, destroyed when replaced or via destroy()
     private var currentNativeAd: NativeAd? = null
@@ -123,6 +146,14 @@ class NativeTemplateView @JvmOverloads constructor(
                 val templateIndex = typedArray.getInt(R.styleable.NativeTemplateView_adTemplate, 0)
                 currentTemplate = NativeAdTemplate.fromIndex(templateIndex)
 
+                // Custom template layout takes precedence over adTemplate when supplied
+                val customLayout = typedArray.getResourceId(R.styleable.NativeTemplateView_customAdLayout, 0)
+                if (customLayout != 0) {
+                    customLayoutResId = customLayout
+                    val customShimmer = typedArray.getResourceId(R.styleable.NativeTemplateView_customAdShimmerLayout, 0)
+                    customShimmerResId = customShimmer.takeIf { it != 0 }
+                }
+
                 // Read AdChoices placement
                 adChoicesPlacement = typedArray.getInt(
                     R.styleable.NativeTemplateView_adChoicesPlacement,
@@ -152,7 +183,7 @@ class NativeTemplateView @JvmOverloads constructor(
 
             // Inflate the actual template layout
             val templateView = LayoutInflater.from(context)
-                .inflate(currentTemplate.layoutResId, binding.flAdPlaceholder, false)
+                .inflate(effectiveLayoutResId, binding.flAdPlaceholder, false)
 
             binding.flAdPlaceholder.removeAllViews()
             binding.flAdPlaceholder.addView(templateView)
@@ -205,8 +236,11 @@ class NativeTemplateView @JvmOverloads constructor(
      * Set the template style programmatically using enum
      */
     fun setTemplate(template: NativeAdTemplate) {
-        if (currentTemplate != template) {
-            currentTemplate = template
+        val changed = currentTemplate != template || customLayoutResId != null
+        currentTemplate = template
+        // Switching to a built-in preset always overrides a previously set custom template
+        clearCustomTemplateState()
+        if (changed) {
             inflateShimmerPlaceholder()
         }
     }
@@ -223,6 +257,57 @@ class NativeTemplateView @JvmOverloads constructor(
      * Get the current template
      */
     fun getTemplate(): NativeAdTemplate = currentTemplate
+
+    /**
+     * Supply a fully custom native ad layout instead of one of the built-in [NativeAdTemplate]
+     * presets. Takes effect immediately (or on the next [loadNativeAd]/[displayAd] call) and
+     * overrides the currently selected [NativeAdTemplate] until [clearCustomTemplate] or
+     * [setTemplate] is called.
+     *
+     * The layout's root must be (or inflate as) a
+     * `com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView` and reuse the
+     * standard asset ids so the SDK can bind the ad's assets to it:
+     * `ad_headline` (required), `ad_body`, `ad_call_to_action`, `ad_app_icon`,
+     * `ad_advertiser`, `ad_media` (a `MediaView`), `ad_stars` (a `RatingBar`),
+     * `ad_choices_view` (an `AdChoicesView`) - all optional except `ad_headline`.
+     *
+     * @param layoutResId Layout resource for the actual ad content.
+     * @param shimmerResId Optional loading placeholder layout. Falls back to the currently
+     *        selected template's shimmer (default `CARD_MODERN`) if omitted or 0.
+     * @param sizeHint Used for cache-key/screen-type classification and as the Yandex
+     *        waterfall fallback size hint, since a custom layout has no built-in size bucket.
+     *        Defaults to [NativeAdSize.MEDIUM].
+     */
+    fun setCustomTemplate(
+        @LayoutRes layoutResId: Int,
+        @LayoutRes shimmerResId: Int = 0,
+        sizeHint: NativeAdSize = NativeAdSize.MEDIUM
+    ) {
+        customLayoutResId = layoutResId
+        customShimmerResId = shimmerResId.takeIf { it != 0 }
+        customSizeHint = sizeHint
+        inflateShimmerPlaceholder()
+    }
+
+    /**
+     * Clear a previously set [setCustomTemplate] override and revert to the currently
+     * selected [NativeAdTemplate] preset.
+     */
+    fun clearCustomTemplate() {
+        if (customLayoutResId != null) {
+            clearCustomTemplateState()
+            inflateShimmerPlaceholder()
+        }
+    }
+
+    /** True if a custom (non-preset) template set via [setCustomTemplate] is currently active. */
+    fun isUsingCustomTemplate(): Boolean = customLayoutResId != null
+
+    private fun clearCustomTemplateState() {
+        customLayoutResId = null
+        customShimmerResId = null
+        customSizeHint = null
+    }
 
     /**
      * Set AdChoices placement position programmatically.
@@ -270,7 +355,7 @@ class NativeTemplateView @JvmOverloads constructor(
 
         try {
             val shimmerView = LayoutInflater.from(context)
-                .inflate(currentTemplate.shimmerResId, shimmerContent, false)
+                .inflate(effectiveShimmerResId, shimmerContent, false)
             shimmerContent.addView(shimmerView)
             shimmerInflated = true
         } catch (e: Exception) {
@@ -419,6 +504,16 @@ class NativeTemplateView @JvmOverloads constructor(
     }
 
     private fun getScreenTypeForTemplate(): NativeAdIntegrationManager.ScreenType {
+        // Custom templates have no enum entry to classify by - use the hint supplied to
+        // setCustomTemplate() (defaults to MEDIUM) instead of falling through to currentTemplate,
+        // which for a custom template is just the last/default preset and unrelated to its size.
+        customSizeHint?.let {
+            return when (it) {
+                NativeAdSize.SMALL -> NativeAdIntegrationManager.ScreenType.SMALL
+                NativeAdSize.MEDIUM -> NativeAdIntegrationManager.ScreenType.MEDIUM
+                NativeAdSize.LARGE -> NativeAdIntegrationManager.ScreenType.LARGE
+            }
+        }
         return when (currentTemplate) {
             // Small/Compact templates
             NativeAdTemplate.COMPACT_HORIZONTAL,
@@ -506,7 +601,7 @@ class NativeTemplateView @JvmOverloads constructor(
                         trackDisplayedAd(nativeAd)
 
                         val nativeAdView = LayoutInflater.from(context)
-                            .inflate(currentTemplate.layoutResId, null) as NativeAdView
+                            .inflate(effectiveLayoutResId, null) as NativeAdView
 
                         // Setup view references based on template
                         setupNativeAdViewReferences(nativeAdView)
@@ -764,7 +859,7 @@ class NativeTemplateView @JvmOverloads constructor(
         trackDisplayedAd(preloadedAd)
 
         val nativeAdView = LayoutInflater.from(context)
-            .inflate(currentTemplate.layoutResId, null) as NativeAdView
+            .inflate(effectiveLayoutResId, null) as NativeAdView
         val adPlaceholder: FrameLayout = binding.flAdPlaceholder
 
         setupNativeAdViewReferences(nativeAdView)
@@ -884,7 +979,7 @@ class NativeTemplateView @JvmOverloads constructor(
             }
             // Pass the selected template layout so non-AdMob providers (e.g. Yandex) can
             // render the same template instead of a generic size-based view.
-        }, sizeHint = getNativeAdSizeForTemplate(), templateLayoutResId = currentTemplate.layoutResId)
+        }, sizeHint = getNativeAdSizeForTemplate(), templateLayoutResId = effectiveLayoutResId)
     }
 
     /**

@@ -5,83 +5,82 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="bottom"
-    android:paddingTop="3dp"
-    android:paddingBottom="3dp"
-    app:shimmer_auto_start="true"
-    app:shimmer_base_color="#ccc">
+    app:shimmer_auto_start="true">
 
+    <!-- BannerAdView resizes this placeholder at runtime to the exact requested
+         BannerAdSize (adjustShimmerLayout). The media block below absorbs any
+         extra height on tall formats (LARGE_BANNER, MEDIUM_RECTANGLE) and
+         collapses to zero on 50dp banners, so one layout fits every size. -->
     <androidx.cardview.widget.CardView
         android:id="@+id/cvLoadingAdContainer"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="3dp"
-        android:layout_marginBottom="3dp"
-        android:background="@color/colorWhite">
+        android:layout_height="match_parent"
+        android:layout_marginTop="2dp"
+        android:layout_marginBottom="2dp"
+        app:cardBackgroundColor="@color/dn_card_background"
+        app:cardCornerRadius="10dp"
+        app:cardElevation="0dp">
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="6dp">
 
-            <ImageView
-                android:layout_width="50dip"
-                android:layout_height="50dip"
-                android:background="@color/lightTransparent"
-                android:padding="5dip"
-                android:scaleType="centerCrop" />
-
-            <LinearLayout
-                android:layout_width="0dip"
-                android:layout_height="match_parent"
-                android:layout_gravity="center"
-                android:layout_marginLeft="5dip"
-                android:layout_marginRight="5dip"
+            <!-- Media placeholder: takes all height not used by the bottom row -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
                 android:layout_weight="1"
-                android:gravity="center"
-                android:orientation="vertical">
+                android:background="@drawable/bg_shimmer_placeholder" />
 
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="5dip"
-                    android:background="@color/lightTransparent"
-                    android:ellipsize="end"
-                    android:lines="1"
-                    android:textColor="@android:color/black"
-                    android:textSize="15.0sp" />
+            <!-- Icon + headline/body lines + CTA, sized to fit a 50dp banner -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="4dp">
 
-                <TextView
-                    android:layout_width="match_parent"
+                <View
+                    android:layout_width="30dp"
+                    android:layout_height="30dp"
+                    android:background="@drawable/bg_shimmer_placeholder" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="5dip"
-                    android:background="@color/lightTransparent"
-                    android:ellipsize="end"
-                    android:lines="1"
-                    android:textColor="@android:color/darker_gray"
-                    android:textSize="14.0sp" />
+                    android:layout_marginStart="8dp"
+                    android:layout_marginEnd="8dp"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="11dp"
+                        android:background="@drawable/bg_shimmer_placeholder" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="9dp"
+                        android:layout_marginTop="5dp"
+                        android:layout_marginEnd="48dp"
+                        android:background="@drawable/bg_shimmer_placeholder" />
+
+                </LinearLayout>
+
+                <View
+                    android:layout_width="72dp"
+                    android:layout_height="30dp"
+                    android:background="@drawable/bg_shimmer_placeholder_pill" />
 
             </LinearLayout>
-
-            <Button
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_marginTop="5dip"
-                android:layout_marginRight="10dip"
-                android:layout_marginBottom="5dip"
-                android:background="@color/lightTransparent"
-                android:gravity="center"
-                android:paddingLeft="5dip"
-                android:paddingRight="5dip"
-                android:textColor="@android:color/white"
-                android:textSize="12.0sp"
-                android:textStyle="bold" />
 
         </LinearLayout>
 
         <TextView
             style="@style/AdsTheme"
-            android:layout_gravity="start" />
+            android:layout_gravity="start|top" />
 
     </androidx.cardview.widget.CardView>
 </com.facebook.shimmer.ShimmerFrameLayout>

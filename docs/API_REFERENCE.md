@@ -155,6 +155,12 @@ Custom view for banner ads with shimmer loading.
 // Loading Methods
 fun loadBanner(context: Activity?, adUnitId: String?)
 fun loadBanner(context: Activity?, adUnitId: String?, callback: AdLoadCallback?)
+fun loadBanner(
+    context: Activity?,
+    adUnitId: String?,
+    adSize: BannerAdSize,           // v4.3.0: ADAPTIVE (default), BANNER, LARGE_BANNER,
+    callback: AdLoadCallback? = null //         MEDIUM_RECTANGLE, FULL_BANNER, LEADERBOARD
+)
 fun loadCollapsibleBanner(context: Activity?, adUnitId: String?, collapsible: Boolean)
 fun loadCollapsibleBanner(
     context: Activity?, 
@@ -162,6 +168,18 @@ fun loadCollapsibleBanner(
     collapsible: Boolean, 
     callback: AdLoadCallback?
 )
+fun loadCollapsibleBanner(
+    context: Activity?,
+    adUnitId: String?,
+    collapsible: Boolean,
+    placement: CollapsibleBannerPlacement,
+    callback: AdLoadCallback? = null,
+    adSize: BannerAdSize? = null    // v4.3.0: null keeps XML/previous size
+)
+
+// Configuration Methods
+fun setBannerAdSize(adSize: BannerAdSize) // v4.3.0: default size for subsequent loads;
+                                          // also settable in XML via app:bannerAdSize
 
 // Control Methods
 fun hideAd()
@@ -171,6 +189,23 @@ fun resumeAd()
 fun pauseAd()
 fun setAdCallback(callback: AdLoadCallback?)
 ```
+
+#### Banner Sizes (v4.3.0)
+
+`com.i2hammad.admanagekit.config.BannerAdSize`:
+
+| Value              | Size (dp)  | Description          | Availability       |
+|--------------------|------------|----------------------|--------------------|
+| `ADAPTIVE`         | full width | Anchored adaptive    | Phones and tablets |
+| `BANNER`           | 320x50     | Banner               | Phones and tablets |
+| `LARGE_BANNER`     | 320x100    | Large banner         | Phones and tablets |
+| `MEDIUM_RECTANGLE` | 300x250    | IAB medium rectangle | Phones and tablets |
+| `FULL_BANNER`      | 468x60     | IAB full-size banner | Tablets            |
+| `LEADERBOARD`      | 728x90     | IAB leaderboard      | Tablets            |
+
+The shimmer placeholder reserves the exact requested size, collapsible banners
+require `ADAPTIVE`, and the size carries through retries, auto-refresh, and the
+multi-provider waterfall (applied to AdMob providers in the chain).
 
 ### Native Ad Views
 

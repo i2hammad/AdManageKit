@@ -152,6 +152,30 @@ fun BannerExample() {
 }
 ```
 
+### Banner Sizes (v4.3.0)
+
+`BannerAdCompose` accepts an `adSize` parameter (`com.i2hammad.admanagekit.config.BannerAdSize`).
+The default `ADAPTIVE` fills the available width; fixed sizes reserve their exact
+height and are centered horizontally, so the layout never jumps when the ad loads.
+
+```kotlin
+// 300x250 medium rectangle — good for in-feed placements
+BannerAdCompose(
+    adUnitId = "ca-app-pub-xxx/yyy",
+    adSize = BannerAdSize.MEDIUM_RECTANGLE
+)
+
+// 320x100 large banner
+BannerAdCompose(
+    adUnitId = "ca-app-pub-xxx/yyy",
+    adSize = BannerAdSize.LARGE_BANNER
+)
+```
+
+Available sizes: `ADAPTIVE` (default), `BANNER` (320x50), `LARGE_BANNER` (320x100),
+`MEDIUM_RECTANGLE` (300x250), `FULL_BANNER` (468x60, tablets), `LEADERBOARD` (728x90, tablets).
+`CollapsibleBannerAdCompose` always uses the adaptive size (AdMob policy).
+
 ---
 
 ## Native Ads (Traditional Sizes)

@@ -143,12 +143,28 @@ class SplashActivity : AppCompatActivity() {
 
 
 
-   private fun forceLoadAppOpen() {
+   private fun forceLoadAppOpen(retriesLeft: Int = 20) {
         val appOpenManager = MyApplication.instance.appOpenManager
+        if (appOpenManager == null) {
+            // AppOpenManager is constructed right after MobileAds.initialize() completes
+            // (see MyApplication.initAds), so on a very fast cold start it can still be
+            // null here. Wait briefly for it instead of hanging on the ?. no-op below,
+            // but never stall the splash for more than ~5s.
+            if (retriesLeft > 0 && !isFinishing && !isDestroyed) {
+                Log.d("SplashActivity", "forceLoadAppOpen: waiting for MobileAds initialization ($retriesLeft)")
+                statusTextView.text = "Waiting for ads SDK initialization..."
+                statusTextView.postDelayed({ forceLoadAppOpen(retriesLeft - 1) }, 250)
+            } else {
+                Log.w("SplashActivity", "forceLoadAppOpen: AppOpenManager unavailable, proceeding without ad")
+                onNextActionCalled()
+            }
+            return
+        }
+
         Log.d("SplashActivity", "forceLoadAppOpen: Loading app open ad")
         statusTextView.text = "Loading app open ad..."
 
-        appOpenManager?.fetchAd(object : AdLoadCallback() {
+        appOpenManager.fetchAd(object : AdLoadCallback() {
             override fun onAdLoaded() {
                 super.onAdLoaded()
                 Log.d("SplashActivity", "forceLoadAppOpen: App open ad loaded")

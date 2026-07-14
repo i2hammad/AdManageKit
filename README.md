@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.2.0`** moves the library onto the Google Mobile Ads **Next-Gen SDK** (`ads-mobile-sdk`, now stable) and Google Play Billing Library **9.1.0**. There is only one supported version of AdManageKit — the `nextgen` branch that previously hosted this SDK separately is retired; everything lives on `main` now. See [Next-Gen GMA SDK](#next-gen-gma-sdk) below for what changed and [Migrating to 4.2.0](#migrating-to-420) for upgrade steps.
+**Latest Version `4.3.0`** adds all standard AdMob banner sizes (`BannerAdSize`), fully custom native ad templates on `NativeTemplateView`, and a redesigned size-adaptive banner shimmer with night-mode support. See [What's New in 4.3.0](#whats-new-in-430).
+
+Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads-mobile-sdk`, stable) and Google Play Billing Library **9.1.0** — see [Next-Gen GMA SDK](#next-gen-gma-sdk) below and [Migrating to 4.2.0](#migrating-to-420) if you're upgrading from 3.x/4.1.
 
 ---
 
@@ -22,6 +24,24 @@ The legacy Google Mobile Ads SDK is in maintenance mode; new AdMob features (Ad 
 - **Threading**: Next-Gen SDK callbacks fire on a background thread (the legacy SDK guaranteed main thread). Every ad manager, provider, and view in this library already wraps its callback bodies in `Handler(Looper.getMainLooper()).post {}` — this is transparent to you as a consumer.
 - **Initialization**: `MobileAds.initialize()` must be called explicitly once, before any ad request — the legacy SDK's silent lazy-init on first use no longer exists. AdManageKit doesn't call this for you (it doesn't own your app's consent flow); see the sample app's `MyApplication.kt` for the recommended pattern.
 - **Callback types**: Where AdManageKit exposes ad-network error/value types through `AdKitError`, `AdKitLoadError`, and `AdKitValue` (used by `AdManagerCallback`, `AdLoadCallback`, `AdCallback`, and friends), those aliases now resolve to Next-Gen SDK types instead of legacy ones. Your callback *implementations* (`onFailedToLoad(error)`, `onPaidEvent(value)`, etc.) don't need to change — only code that reads legacy-only members of those objects does. See [Migrating to 4.2.0](#migrating-to-420).
+
+## What's New in 4.3.0
+
+### All Standard Banner Sizes
+`BannerAdView` and `BannerAdCompose` now support every standard AdMob banner size via the new `BannerAdSize` enum — `ADAPTIVE` (default, unchanged behavior), `BANNER` (320x50), `LARGE_BANNER` (320x100), `MEDIUM_RECTANGLE` (300x250), `FULL_BANNER` (468x60), `LEADERBOARD` (728x90). Select programmatically (`loadBanner(activity, adUnitId, BannerAdSize.MEDIUM_RECTANGLE)`), in XML (`app:bannerAdSize="medium_rectangle"`), or in Compose (`adSize = BannerAdSize.MEDIUM_RECTANGLE`). The size carries through retries, auto-refresh, and the multi-provider waterfall. See the [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md).
+
+### Custom Native Ad Templates
+If none of the 37 built-in `NativeTemplateView` presets fit your design, supply your own layout: `setCustomTemplate(layoutResId, shimmerResId, sizeHint)` programmatically, `app:customAdLayout`/`app:customAdShimmerLayout` in XML, or `customLayoutResId` on `NativeTemplateCompose`. The layout's root must be a Next-Gen SDK `NativeAdView` reusing the standard asset ids. See the [NativeTemplateView guide](docs/NATIVE_TEMPLATE_VIEW.md#custom-templates).
+
+### Redesigned Banner Shimmer + Night Mode
+The banner loading placeholder now adapts to the requested size (a 300x250 request shows a proper media-block placeholder, not a lone 50dp row), reserves the exact ad size on every path including waterfalls (no layout jump), centers to match the loaded ad, and follows the system dark theme instead of rendering a hardcoded white card.
+
+### App Open Ads: Late MobileAds Initialization Support
+`AppOpenManager` no longer crashes if constructed before `MobileAds.initialize()` completes: every load path is guarded, callback-driven flows (splash screens) wait for the SDK within their existing timeout and always receive a terminal callback, and the new `isMobileAdsReady()` confirms the SDK can accept requests. See the [App Open Ads guide](docs/app-open-ads.md#initialization-order--late-initialization).
+
+> **Compatibility:** source-compatible; `ADAPTIVE` keeps pre-4.3.0 behavior everywhere. Recompile against 4.3.0 rather than hot-swapping the AAR (Compose composables gained default parameters).
+
+See [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md) for full details.
 
 ## What's New in 4.2.0
 
@@ -78,15 +98,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.2.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.2.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.0'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.2.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.0'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -115,7 +135,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.2.0'
 - ConditionalAd, CacheWarmingEffect utilities
 
 ### AdMob Ads Management
-- **Banner Ads**: Auto-refresh, collapsible banners, smart retry
+- **Banner Ads**: All standard sizes (adaptive, 320x50, 320x100, 300x250, 468x60, 728x90), auto-refresh, collapsible banners, smart retry
 - **Native Ads**: Small, Medium, Large formats with caching
 - **Interstitial Ads**: Time/count-based triggers, dialog support
 - **App Open Ads**: Lifecycle-aware with activity exclusion
@@ -282,14 +302,21 @@ nativeTemplateView.loadNativeAd(activity, adUnitId, callback, AdLoadingStrategy.
 <com.i2hammad.admanagekit.admob.BannerAdView
     android:id="@+id/bannerAdView"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content" />
+    android:layout_height="wrap_content"
+    app:bannerAdSize="adaptive" />
 ```
 
 ```kotlin
 bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy")
-// Collapsible banner
+// Fixed size (BANNER, LARGE_BANNER, MEDIUM_RECTANGLE, FULL_BANNER, LEADERBOARD)
+bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy", BannerAdSize.MEDIUM_RECTANGLE)
+// Collapsible banner (adaptive size only)
 bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-xxx/yyy", true)
 ```
+
+All standard AdMob banner sizes are supported via `BannerAdSize` (v4.3.0); the
+default `ADAPTIVE` is the Google-recommended full-width anchored adaptive banner.
+See [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md) for the full size table.
 
 ### Native Ads (Traditional Views)
 
@@ -550,6 +577,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md)
 - [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md)
 - [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md)
 - [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md)

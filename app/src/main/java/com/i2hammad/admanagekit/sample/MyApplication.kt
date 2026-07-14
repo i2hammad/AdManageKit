@@ -2,6 +2,8 @@ package com.i2hammad.admanagekit.sample
 
 import android.app.Application
 import android.content.pm.PackageManager
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.ViewModelProvider.NewInstanceFactory.Companion.instance
 import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.common.RequestConfiguration
@@ -34,11 +36,12 @@ class MyApplication : Application() {
         // MobileAds.initialize() is policy-compliant to call at app launch, before UMP
         // consent - it doesn't request ads or process personal data; only the actual ad
         // request needs to wait for consent (see SplashActivity's canRequestAds() gate).
-        // It must also run before AppOpenManager is constructed below: ProcessLifecycleOwner
-        // fires AppOpenManager.onStart() as soon as any activity starts, which can race
-        // ahead of SplashActivity's async consent flow and fetch an app-open ad before
-        // MobileAds.initialize() ever runs - the Next-Gen SDK throws in that case instead
-        // of silently self-initializing like the legacy SDK did.
+        // AppOpenManager is constructed inside initAds(), AFTER initialize() returns:
+        // constructing it is what arms its ProcessLifecycleOwner observer, and onStart()
+        // fires as soon as any activity starts - creating it earlier lets that observer
+        // race ahead of the background-thread initialization and fetch an app-open ad
+        // before MobileAds.initialize() completes, which the Next-Gen SDK rejects with
+        // an exception instead of silently self-initializing like the legacy SDK did.
         initAds()
 
         //If you want to use billing feature must use billing provider
@@ -53,9 +56,6 @@ class MyApplication : Application() {
         configureMultiProvider()
 
         initBilling()
-        appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921")
-        appOpenManager?.disableAppOpenWithActivity(SplashActivity::class.java)
-
     }
 
     /**
@@ -254,6 +254,17 @@ class MyApplication : Application() {
         // MobileAds.initialize() must run off the main thread or it can ANR.
         Thread {
             MobileAds.initialize(this, initializationConfig)
+
+            // Guard against the ProcessLifecycleOwner race: only construct AppOpenManager
+            // once the SDK is ready, so its onStart() can never issue a load that the
+            // Next-Gen SDK would reject as "not initialized". initialize() is synchronous
+            // on this thread, so ordering is deterministic; construction happens on the
+            // main thread because it registers lifecycle observers.
+            Handler(Looper.getMainLooper()).post {
+                appOpenManager = AppOpenManager(this, "ca-app-pub-3940256099942544/9257395921").apply {
+                    disableAppOpenWithActivity(SplashActivity::class.java)
+                }
+            }
         }.start()
     }
 

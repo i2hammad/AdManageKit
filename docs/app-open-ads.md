@@ -51,13 +51,60 @@ class MyApp : Application() {
         // Set up billing
         BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
 
-        // Initialize app open manager
-        appOpenManager = AppOpenManager(this, "ca-app-pub-xxx/yyy")
+        // Initialize the Google Mobile Ads SDK, then the app open manager.
+        // Constructing AppOpenManager only after MobileAds.initialize() returns
+        // is the recommended order — see "Initialization Order" below.
+        Thread {
+            MobileAds.initialize(this, InitializationConfig.Builder(APPLICATION_ID).build())
+            Handler(Looper.getMainLooper()).post {
+                appOpenManager = AppOpenManager(this, "ca-app-pub-xxx/yyy")
+            }
+        }.start()
     }
 }
 ```
 
 That's it! Ads will **automatically load and show** when users open or return to your app.
+
+---
+
+## Initialization Order & Late Initialization
+
+The Next-Gen Google Mobile Ads SDK **rejects ad requests made before
+`MobileAds.initialize()` completes** (the legacy SDK silently self-initialized on
+first use). Constructing `AppOpenManager` arms a `ProcessLifecycleOwner` observer
+that fires as soon as the first activity starts — so a manager created in
+`Application.onCreate()` while initialization runs on a background thread can race
+ahead of it.
+
+**Recommended pattern** — construct the manager after initialization returns, as in
+the Quick Start above (and the sample app's `MyApplication`). `MobileAds.initialize()`
+is synchronous on its background thread, so the ordering is deterministic.
+
+**Built-in protection (v4.3.0)** — even if the manager is constructed early (late
+initialization), it now guards every load path instead of crashing:
+
+- `showAdIfAvailable()` (the automatic on-foreground show) skips the show and
+  defers a single background prefetch until the SDK is ready, so the cache is
+  still warmed for the next opportunity.
+- `fetchAd()` parks the prefetch and replays it when initialization completes
+  (bounded by `AdManageKitConfig.appOpenAdTimeout`).
+- `fetchAd(callback)` and `forceShowAdIfAvailable(activity, callback)` wait for
+  the SDK **within their existing timeout budget**, then proceed with the time
+  remaining. If initialization never completes, the callback still receives a
+  terminal failure / `onNextAction()`, so a splash screen gating navigation on
+  the callback is never stranded.
+
+```kotlin
+// Confirmation that the SDK is initialized and ads can be requested
+if (appOpenManager.isMobileAdsReady()) {
+    // Safe to load/show — MobileAds.initialize() has completed
+}
+```
+
+Note the distinction: `isMobileAdsReady()` = the SDK can *accept requests*;
+`isAdAvailable()` = an ad is *loaded and ready to show*. Waterfall chains without
+an AdMob provider (e.g. Yandex-only) report ready regardless of MobileAds state.
 
 ---
 
@@ -194,6 +241,11 @@ startActivityForResult(cameraIntent, REQUEST_CODE)
 ### Check Status
 
 ```kotlin
+// Check if the ads SDK is initialized and can accept requests (v4.3.0)
+if (appOpenManager.isMobileAdsReady()) {
+    // MobileAds.initialize() has completed
+}
+
 // Check if ad is loaded and ready
 if (appOpenManager.isAdAvailable()) {
     // Ad is ready to show
