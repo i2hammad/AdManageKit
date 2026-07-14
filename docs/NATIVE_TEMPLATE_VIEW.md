@@ -206,6 +206,73 @@ val videoTemplates = NativeTemplateView.getVideoTemplates()
 val standardTemplates = NativeTemplateView.getStandardTemplates()
 ```
 
+## Custom Templates
+
+**New in v4.3.0** - If none of the built-in presets fit your design, supply your own layout
+instead of picking one of the `NativeAdTemplate` enum values.
+
+### Requirements
+
+Your layout's root must be (or inflate as) a
+`com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView` and reuse the standard
+asset ids so the SDK can bind the loaded ad's assets to it:
+
+| Id | View type | Required |
+|----|-----------|----------|
+| `ad_headline` | `TextView` | Yes |
+| `ad_body` | `TextView` | No |
+| `ad_call_to_action` | `Button`/`TextView` | No |
+| `ad_app_icon` | `ImageView` | No |
+| `ad_advertiser` | `TextView` | No |
+| `ad_media` | `MediaView` | No |
+| `ad_stars` | `RatingBar` | No |
+| `ad_choices_view` | `AdChoicesView` | No |
+| `advertiser_container` | Any `ViewGroup` | No - auto-hidden when advertiser & rating are both missing |
+
+### Programmatic Usage
+
+```kotlin
+// layoutResId: your ad layout. shimmerResId: optional loading placeholder
+// (falls back to the current template's shimmer if omitted).
+nativeTemplateView.setCustomTemplate(
+    layoutResId = R.layout.my_native_ad,
+    shimmerResId = R.layout.my_native_ad_shimmer,
+    sizeHint = NativeAdSize.MEDIUM // used for cache classification & Yandex waterfall fallback
+)
+nativeTemplateView.loadNativeAd(activity, adUnitId)
+
+// Revert to the currently selected NativeAdTemplate preset
+nativeTemplateView.clearCustomTemplate()
+
+// Check which mode is active
+val usingCustom = nativeTemplateView.isUsingCustomTemplate()
+```
+
+Calling `setTemplate(...)` also clears any active custom template and reverts to the built-in preset system.
+
+### XML Usage
+
+```xml
+<com.i2hammad.admanagekit.admob.NativeTemplateView
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:customAdLayout="@layout/my_native_ad"
+    app:customAdShimmerLayout="@layout/my_native_ad_shimmer" />
+```
+
+`app:customAdLayout` takes precedence over `app:adTemplate` when both are present.
+
+### Compose Usage
+
+```kotlin
+NativeTemplateCompose(
+    adUnitId = "ca-app-pub-xxx/yyy",
+    customLayoutResId = R.layout.my_native_ad,
+    customShimmerResId = R.layout.my_native_ad_shimmer,
+    customSizeHint = NativeAdSize.MEDIUM
+)
+```
+
 ## Jetpack Compose Usage
 
 NativeTemplateView is also available as a Compose component via the `ad-manage-kit-compose` module.

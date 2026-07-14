@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
@@ -109,6 +110,9 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
 
     companion object {
         private const val LOG_TAG = "AppOpenManager"
+
+        /** Re-check cadence while waiting for MobileAds.initialize() to complete. */
+        private const val INIT_CHECK_INTERVAL_MS = 250L
 
         // Thread-safe static state
         private val isShowingAd = AtomicBoolean(false)
@@ -384,6 +388,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             Log.d(LOG_TAG, "User has purchased, skipping app open ad.")
+            return
+        }
+
+        // Late-initialization guard: don't defer the show itself (a full-screen ad
+        // popping up seconds after the foreground event is bad UX) — skip it and
+        // warm the cache for the next opportunity instead. fetchAd() parks the
+        // prefetch until MobileAds is ready.
+        if (!isMobileAdsReady()) {
+            Log.d(LOG_TAG, "showAdIfAvailable: MobileAds not initialized, skipping show and prefetching once ready")
+            fetchAd()
             return
         }
 
@@ -841,6 +855,34 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         if (purchaseProvider.isPurchased()) {
             Log.d(LOG_TAG, "User has purchased, skipping app open ad.")
             adManagerCallback.onNextAction()
+            return
+        }
+
+        // Late-initialization guard: the caller (typically a splash screen) is
+        // explicitly waiting on this callback, so wait for MobileAds within the
+        // configured ad timeout instead of failing instantly — and fire
+        // onNextAction() if initialization never completes, so navigation is
+        // never stranded.
+        if (!isMobileAdsReady()) {
+            Log.d(LOG_TAG, "forceShowAdIfAvailable: MobileAds not initialized, waiting up to ${AdManageKitConfig.appOpenAdTimeout}")
+            val activityRef = WeakReference(activity)
+            val deadline = System.currentTimeMillis() +
+                AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
+            awaitMobileAdsReady(
+                deadline,
+                onTimedOut = {
+                    adManagerCallback.onAdTimedOut()
+                    adManagerCallback.onNextAction()
+                },
+                onReady = {
+                    val act = activityRef.get()
+                    if (act != null && !act.isFinishing && !act.isDestroyed) {
+                        forceShowAdIfAvailable(act, adManagerCallback)
+                    } else {
+                        adManagerCallback.onNextAction()
+                    }
+                }
+            )
             return
         }
 
@@ -1451,10 +1493,16 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
     }
 
     /**
-     * Enhanced timeout handling with proper cleanup
+     * Enhanced timeout handling with proper cleanup.
+     * The runnable removes itself from the bookkeeping set when it fires, so
+     * one-shot timeouts (and the short init re-check steps) don't accumulate.
      */
     private fun scheduleTimeout(timeoutMillis: Long, onTimeout: () -> Unit): Runnable {
-        val timeoutRunnable = Runnable {
+        lateinit var timeoutRunnable: Runnable
+        timeoutRunnable = Runnable {
+            synchronized(pendingTimeouts) {
+                pendingTimeouts.remove(timeoutRunnable)
+            }
             onTimeout()
         }
 
@@ -1477,6 +1525,65 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         }
     }
 
+    // =================== LATE MOBILEADS INITIALIZATION SUPPORT ===================
+
+    /**
+     * Confirmation that ads can be requested/served right now: true once
+     * MobileAds.initialize() has completed. The Next-Gen SDK rejects ad requests
+     * made before initialization (the legacy SDK silently self-initialized), so
+     * every load entry point of this manager checks this guard first.
+     *
+     * A waterfall chain with no AdMob provider (e.g. Yandex-only) doesn't touch
+     * the Google SDK and reports ready regardless of MobileAds state.
+     *
+     * Note this is "SDK ready to accept requests" — for "an ad is loaded and
+     * ready to show", use [isAdAvailable].
+     *
+     * @since 4.3.0
+     */
+    fun isMobileAdsReady(): Boolean {
+        if (useWaterfall && AdProviderConfig.getAppOpenChain().none { it.provider == AdProvider.ADMOB }) {
+            return true
+        }
+        return try {
+            MobileAds.isInitialized
+        } catch (t: Throwable) {
+            // Defensive: a broken readiness check must never permanently block ads;
+            // worst case is the pre-guard behavior.
+            Log.w(LOG_TAG, "MobileAds readiness check failed, assuming ready: ${t.message}")
+            true
+        }
+    }
+
+    /**
+     * Re-checks [isMobileAdsReady] every [INIT_CHECK_INTERVAL_MS] until it flips
+     * true (→ [onReady]) or [deadlineAtMillis] passes (→ [onTimedOut]), so
+     * callback-driven flows started before MobileAds.initialize() completed are
+     * replayed instead of crashing, and are never stranded if it never completes.
+     * Steps run through [scheduleTimeout], so [cleanup] cancels any pending wait.
+     */
+    private fun awaitMobileAdsReady(
+        deadlineAtMillis: Long,
+        onTimedOut: () -> Unit,
+        onReady: () -> Unit
+    ) {
+        if (isMobileAdsReady()) {
+            onReady()
+            return
+        }
+        if (System.currentTimeMillis() >= deadlineAtMillis) {
+            Log.w(LOG_TAG, "MobileAds not initialized within wait window; giving up this attempt")
+            onTimedOut()
+            return
+        }
+        scheduleTimeout(INIT_CHECK_INTERVAL_MS) {
+            awaitMobileAdsReady(deadlineAtMillis, onTimedOut, onReady)
+        }
+    }
+
+    /** Dedupes the background wait-then-prefetch spawned by [fetchAd]/[showAdIfAvailable]. */
+    private val isAwaitingInitForPrefetch = AtomicBoolean(false)
+
     /**
      * Request an ad
      */
@@ -1485,6 +1592,24 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             Log.d(LOG_TAG, "User has purchased, skipping ad fetch.")
+            return
+        }
+        if (!isMobileAdsReady()) {
+            // Park a single prefetch until initialization completes so the ad is
+            // still warmed up for the next show opportunity instead of dropped.
+            if (isAwaitingInitForPrefetch.compareAndSet(false, true)) {
+                Log.d(LOG_TAG, "fetchAd: MobileAds not initialized, deferring prefetch until ready")
+                val deadline = System.currentTimeMillis() +
+                    AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
+                awaitMobileAdsReady(
+                    deadline,
+                    onTimedOut = { isAwaitingInitForPrefetch.set(false) },
+                    onReady = {
+                        isAwaitingInitForPrefetch.set(false)
+                        fetchAd()
+                    }
+                )
+            }
             return
         }
         if (useWaterfall) { fetchViaWaterfall(); return }
@@ -1668,6 +1793,28 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         timeoutMillis: Long = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds,
         customAdUnitId: String? = null
     ) {
+        // Late-initialization guard: wait for MobileAds within the caller's own
+        // timeout budget, then run the real fetch with the time that remains.
+        // If initialization never completes, the callback still gets a terminal
+        // failure so splash flows gating on it aren't stranded.
+        if (!isMobileAdsReady()) {
+            Log.d(LOG_TAG, "fetchAd(callback): MobileAds not initialized, waiting up to ${timeoutMillis}ms")
+            val deadline = System.currentTimeMillis() + timeoutMillis
+            awaitMobileAdsReady(
+                deadline,
+                onTimedOut = {
+                    adLoadCallback.onFailedToLoad(
+                        LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "MobileAds not initialized within timeout", null)
+                    )
+                },
+                onReady = {
+                    val remaining = (deadline - System.currentTimeMillis()).coerceAtLeast(1000L)
+                    fetchAd(adLoadCallback, remaining, customAdUnitId)
+                }
+            )
+            return
+        }
+
         if (useWaterfall) { fetchViaWaterfall(adLoadCallback, timeoutMillis); return }
 
         // Don't fetch ads if user has purchased

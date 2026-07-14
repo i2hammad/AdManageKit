@@ -36,6 +36,7 @@ import com.i2hammad.admanagekit.core.ad.AdProviderConfig
 import com.i2hammad.admanagekit.core.ad.AdUnitMapping
 import com.i2hammad.admanagekit.core.ad.BannerAdProvider
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.config.BannerAdSize
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.waterfall.BannerWaterfall
@@ -73,6 +74,7 @@ class BannerAdView @JvmOverloads constructor(
     // Original load configuration, preserved so auto-refresh reloads keep the same behavior
     private var currentCollapsible: Boolean = false
     private var currentPlacement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM
+    private var currentBannerSize: BannerAdSize = BannerAdSize.ADAPTIVE
     private var isAdLoading = AtomicBoolean(false)
     private var loadAttempt = AtomicInteger(0)
     private var refreshHandler: Handler? = null
@@ -92,6 +94,12 @@ class BannerAdView @JvmOverloads constructor(
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
 
     init {
+        attrs?.let {
+            val typedArray = context.obtainStyledAttributes(it, R.styleable.BannerAdView, defStyleAttr, 0)
+            val sizeOrdinal = typedArray.getInt(R.styleable.BannerAdView_bannerAdSize, BannerAdSize.ADAPTIVE.ordinal)
+            currentBannerSize = BannerAdSize.entries.getOrElse(sizeOrdinal) { BannerAdSize.ADAPTIVE }
+            typedArray.recycle()
+        }
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true)
         shimmerFrameLayout = findViewById(R.id.shimmer_frame_layout)
         layBannerAd = findViewById(R.id.fl_ad_container)
@@ -128,6 +136,36 @@ class BannerAdView @JvmOverloads constructor(
 
     fun loadBanner(context: Activity?, adUnitId: String?) {
         loadCollapsibleBanner(context, adUnitId, false, CollapsibleBannerPlacement.BOTTOM, callback)
+    }
+
+    /**
+     * Load a banner ad with an explicit size.
+     *
+     * @param context Activity context
+     * @param adUnitId Ad unit ID
+     * @param adSize Banner size to request; [BannerAdSize.ADAPTIVE] matches the default
+     *        full-width adaptive behavior of the other overloads
+     * @param adLoadCallback Optional callback for ad lifecycle events
+     * @since 4.3.0
+     */
+    @JvmOverloads
+    fun loadBanner(
+        context: Activity?,
+        adUnitId: String?,
+        adSize: BannerAdSize,
+        adLoadCallback: AdLoadCallback? = null
+    ) {
+        loadCollapsibleBanner(context, adUnitId, false, CollapsibleBannerPlacement.BOTTOM, adLoadCallback, adSize)
+    }
+
+    /**
+     * Sets the banner size used by subsequent loads that don't pass an explicit size.
+     * Can also be set from XML via the `bannerAdSize` attribute.
+     *
+     * @since 4.3.0
+     */
+    fun setBannerAdSize(adSize: BannerAdSize) {
+        currentBannerSize = adSize
     }
 
     fun setAdCallback(callback: AdLoadCallback?) {
@@ -169,13 +207,17 @@ class BannerAdView @JvmOverloads constructor(
      * @param collapsible Whether the banner should be collapsible
      * @param placement Direction from which the banner collapses (TOP or BOTTOM)
      * @param callback Optional callback for ad lifecycle events
+     * @param adSize Banner size to request; null keeps the current size
+     *        (XML `bannerAdSize` attribute, [setBannerAdSize], or ADAPTIVE default).
+     *        Collapsible banners require an adaptive size per AdMob policy.
      */
     fun loadCollapsibleBanner(
         context: Activity?,
         adUnitId: String?,
         collapsible: Boolean,
         placement: CollapsibleBannerPlacement,
-        callback: AdLoadCallback? = null
+        callback: AdLoadCallback? = null,
+        adSize: BannerAdSize? = null
     ) {
         if (isInEditMode || context == null || adUnitId == null) return
 
@@ -184,7 +226,17 @@ class BannerAdView @JvmOverloads constructor(
         this.currentAdUnitId = adUnitId
         this.currentCollapsible = collapsible
         this.currentPlacement = placement
+        adSize?.let { this.currentBannerSize = it }
         this.callback = callback
+
+        if (collapsible && !currentBannerSize.isAdaptive) {
+            // AdMob only serves collapsible banners for anchored adaptive requests;
+            // a fixed size would silently drop the collapsible behavior.
+            AdDebugUtils.logDebug(
+                "BannerAdView",
+                "Collapsible banners require ADAPTIVE size; requested $currentBannerSize may not collapse"
+            )
+        }
 
         // Register lifecycle observer if possible
         if (context is LifecycleOwner) {
@@ -300,6 +352,9 @@ class BannerAdView @JvmOverloads constructor(
         val density = resources.displayMetrics.density
         params.height = (density * adSize.height).toInt()
         params.width = (density * adSize.width).toInt()
+        // Fixed sizes (e.g. 300x250) can be narrower than the container; center
+        // the placeholder to match the centered ad (see centeredBannerLayoutParams)
+        (params as? FrameLayout.LayoutParams)?.gravity = Gravity.CENTER_HORIZONTAL
         shimmerFrameLayout.layoutParams = params
     }
 
@@ -513,8 +568,11 @@ class BannerAdView @JvmOverloads constructor(
     )
 
     private fun getAdSize(): AdSize {
+        // Fixed sizes (BANNER, MEDIUM_RECTANGLE, ...) don't depend on the window width
+        currentBannerSize.toFixedAdMobAdSize()?.let { return it }
+
         val displayMetrics = DisplayMetrics()
-        
+
         return activityRef?.get()?.let { activity ->
             val windowManager = activity.windowManager
             val adWidthPixels = if (layBannerAd.width > 0) {
@@ -579,16 +637,21 @@ class BannerAdView @JvmOverloads constructor(
         visibility = View.VISIBLE
         shimmerFrameLayout.visibility = View.VISIBLE
         shimmerFrameLayout.startShimmer()
+        // Reserve the requested ad size so tall formats (e.g. MEDIUM_RECTANGLE)
+        // don't jump from the ~56dp default placeholder when the ad arrives
+        adjustShimmerLayout()
         loadStartTime = System.currentTimeMillis()
 
         bannerWaterfall?.destroy()
         val providers = AdProviderConfig.getBannerChain()
 
-        // Configure collapsible on AdMob providers before loading
+        // Configure collapsible and size on AdMob providers before loading
         providers.filterIsInstance<com.i2hammad.admanagekit.admob.provider.AdMobBannerProvider>()
             .forEach {
                 it.collapsible = collapsible
                 it.collapsiblePlacement = placement
+                // null (ADAPTIVE) lets the provider compute its own adaptive size
+                it.adSize = currentBannerSize.toFixedAdMobAdSize()
             }
 
         val waterfall = BannerWaterfall(

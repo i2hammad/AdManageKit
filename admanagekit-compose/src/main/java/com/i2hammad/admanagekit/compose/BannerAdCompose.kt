@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.BannerAdView
+import com.i2hammad.admanagekit.config.BannerAdSize
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
@@ -66,6 +67,9 @@ private fun loadWhenMeasured(view: View, load: () -> Unit): View.OnLayoutChangeL
  *
  * @param adUnitId The AdMob ad unit ID
  * @param modifier Modifier for styling the ad container
+ * @param adSize Banner size to request; [BannerAdSize.ADAPTIVE] (default) fills the
+ *        available width, fixed sizes (e.g. [BannerAdSize.MEDIUM_RECTANGLE]) reserve
+ *        their exact height and center horizontally
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked
@@ -80,6 +84,7 @@ private fun loadWhenMeasured(view: View, load: () -> Unit): View.OnLayoutChangeL
 fun BannerAdCompose(
     adUnitId: String,
     modifier: Modifier = Modifier,
+    adSize: BannerAdSize = BannerAdSize.ADAPTIVE,
     onAdLoaded: (() -> Unit)? = null,
     onAdFailedToLoad: ((LoadAdError?) -> Unit)? = null,
     onAdClicked: (() -> Unit)? = null,
@@ -100,13 +105,13 @@ fun BannerAdCompose(
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
     // Remember the BannerAdView to prevent recreation on recomposition
-    val bannerAdView = remember(adUnitId) {
+    val bannerAdView = remember(adUnitId, adSize) {
         BannerAdView(context)
     }
 
     // Load once the view is measured so the adaptive ad is sized to the
     // actual slot width (parent padding included), not the full window
-    DisposableEffect(adUnitId) {
+    DisposableEffect(adUnitId, adSize) {
         var pendingLoad: View.OnLayoutChangeListener? = null
         if (context is androidx.activity.ComponentActivity) {
             val callback = object : AdLoadCallback() {
@@ -139,7 +144,7 @@ fun BannerAdCompose(
                 }
             }
             pendingLoad = loadWhenMeasured(bannerAdView) {
-                bannerAdView.loadBanner(context, adUnitId, callback)
+                bannerAdView.loadBanner(context, adUnitId, adSize, callback)
             }
         }
         onDispose {
@@ -149,22 +154,22 @@ fun BannerAdCompose(
         }
     }
 
-    // Reserve the real anchored-adaptive height for the available width —
-    // adaptive banners are 50-90dp tall depending on the device, so a fixed
-    // 50dp box would clip them
+    // Reserve the real ad height up front so the layout doesn't jump on load:
+    // fixed sizes know their height, adaptive banners are 50-90dp tall
+    // depending on the device, so a hardcoded 50dp box would clip them
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val availableWidthDp = if (constraints.hasBoundedWidth) {
             maxWidth.value.toInt()
         } else {
             context.resources.configuration.screenWidthDp
         }
-        val adHeight = remember(availableWidthDp) {
-            adaptiveBannerHeightDp(context, availableWidthDp).dp
+        val adHeight = remember(availableWidthDp, adSize) {
+            (adSize.heightDp ?: adaptiveBannerHeightDp(context, availableWidthDp)).dp
         }
 
         // key() ensures the AndroidView node is recreated when a new view instance
-        // is created for a new adUnitId, so the new view actually gets attached
-        key(adUnitId) {
+        // is created for new keys, so the new view actually gets attached
+        key(adUnitId, adSize) {
             AndroidView(
                 factory = { bannerAdView },
                 modifier = Modifier

@@ -55,6 +55,36 @@
             <enum name="bottom_right" value="2" />
             <enum name="bottom_left" value="3" />
         </attr>
+
+        <!-- Optional fully custom native ad layout, overrides adTemplate when set.
+             Root must be (or inflate as) a NativeAdView reusing the standard asset ids
+             (ad_headline, ad_body, ad_call_to_action, ad_app_icon, ad_advertiser, ad_media,
+             ad_stars, ad_choices_view). See NativeTemplateView.setCustomTemplate(). -->
+        <attr name="customAdLayout" format="reference" />
+
+        <!-- Optional shimmer/loading placeholder layout for customAdLayout. Falls back to
+             the selected adTemplate's shimmer if omitted. -->
+        <attr name="customAdShimmerLayout" format="reference" />
+    </declare-styleable>
+
+    <!-- BannerAdView attributes -->
+    <declare-styleable name="BannerAdView">
+        <!-- Banner size to request. Values mirror com.i2hammad.admanagekit.config.BannerAdSize
+             (enum values must stay aligned with BannerAdSize ordinals). -->
+        <attr name="bannerAdSize" format="enum">
+            <!-- Full-width anchored adaptive banner (default, Google-recommended) -->
+            <enum name="adaptive" value="0" />
+            <!-- 320x50, phones and tablets -->
+            <enum name="banner" value="1" />
+            <!-- 320x100, phones and tablets -->
+            <enum name="large_banner" value="2" />
+            <!-- 300x250 IAB medium rectangle, phones and tablets -->
+            <enum name="medium_rectangle" value="3" />
+            <!-- 468x60 IAB full-size banner, tablets -->
+            <enum name="full_banner" value="4" />
+            <!-- 728x90 IAB leaderboard, tablets -->
+            <enum name="leaderboard" value="5" />
+        </attr>
     </declare-styleable>
 
 </resources>

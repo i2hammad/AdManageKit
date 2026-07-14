@@ -70,6 +70,12 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Setup button to open the Jetpack Compose ads sample
+        findViewById<Button>(R.id.btnOpenComposeAdsTest).setOnClickListener {
+            val intent = Intent(this, ComposeAdsTestActivity::class.java)
+            startActivity(intent)
+        }
+
         loadAds()
 
 

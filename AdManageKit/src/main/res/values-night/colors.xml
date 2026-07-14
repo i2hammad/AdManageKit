@@ -5,6 +5,7 @@
     <color name="dn_card_background">#22303C</color>
     <color name="dn_card_stroke">#5E58595A</color>
     <color name="dn_shimmer_base_color">#ccc</color>
+    <color name="dn_shimmer_placeholder">#3A4A56</color>
 
     <!-- Ad Loading Dialog Colors (Night Mode) -->
     <color name="ad_dialog_overlay">#CC000000</color>

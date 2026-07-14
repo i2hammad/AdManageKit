@@ -43,7 +43,7 @@ import com.i2hammad.admanagekit.core.ad.BannerAdProvider
  * @param collapsiblePlacement Collapsible direction (TOP or BOTTOM).
  */
 class AdMobBannerProvider(
-    private val adSize: AdSize? = null,
+    var adSize: AdSize? = null,
     var collapsible: Boolean = false,
     var collapsiblePlacement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM
 ) : BannerAdProvider {

@@ -17,6 +17,7 @@ import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.NativeAdTemplate
 import com.i2hammad.admanagekit.admob.NativeTemplateView
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
+import com.i2hammad.admanagekit.core.ad.NativeAdSize
 
 /**
  * A Jetpack Compose wrapper for NativeTemplateView.
@@ -34,6 +35,14 @@ import com.i2hammad.admanagekit.config.AdLoadingStrategy
  * @param onAdOpened Callback when the ad opens an overlay
  * @param onAdClosed Callback when the ad overlay is closed
  * @param onPaidEvent Callback when a paid event occurs (for revenue tracking)
+ * @param customLayoutResId Optional fully custom native ad layout, overrides [template] when set.
+ *        Root must be (or inflate as) a NativeAdView reusing the standard asset ids
+ *        (ad_headline, ad_body, ad_call_to_action, ad_app_icon, ad_advertiser, ad_media,
+ *        ad_stars, ad_choices_view). See [NativeTemplateView.setCustomTemplate].
+ * @param customShimmerResId Optional loading placeholder for [customLayoutResId]. Falls back
+ *        to [template]'s shimmer if omitted.
+ * @param customSizeHint Cache classification / Yandex waterfall fallback size for
+ *        [customLayoutResId], since a custom layout has no built-in size bucket.
  *
  * @since 2.6.0
  */
@@ -49,7 +58,10 @@ fun NativeTemplateCompose(
     onAdImpression: (() -> Unit)? = null,
     onAdOpened: (() -> Unit)? = null,
     onAdClosed: (() -> Unit)? = null,
-    onPaidEvent: ((AdValue) -> Unit)? = null
+    onPaidEvent: ((AdValue) -> Unit)? = null,
+    customLayoutResId: Int? = null,
+    customShimmerResId: Int? = null,
+    customSizeHint: NativeAdSize = NativeAdSize.MEDIUM
 ) {
     val context = LocalContext.current
 
@@ -63,7 +75,7 @@ fun NativeTemplateCompose(
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
     // Create callback
-    val callback = remember(adUnitId, template) {
+    val callback = remember(adUnitId, template, customLayoutResId) {
         object : AdLoadCallback() {
             override fun onAdLoaded() {
                 currentOnAdLoaded?.invoke()
@@ -96,14 +108,17 @@ fun NativeTemplateCompose(
     }
 
     // Create the NativeTemplateView
-    val nativeTemplateView = remember(adUnitId, template) {
+    val nativeTemplateView = remember(adUnitId, template, customLayoutResId) {
         NativeTemplateView(context).apply {
             setTemplate(template)
+            if (customLayoutResId != null) {
+                setCustomTemplate(customLayoutResId, customShimmerResId ?: 0, customSizeHint)
+            }
         }
     }
 
     // Load the ad
-    DisposableEffect(adUnitId, template, loadingStrategy) {
+    DisposableEffect(adUnitId, template, loadingStrategy, customLayoutResId) {
         if (context is androidx.activity.ComponentActivity) {
             if (loadingStrategy != null) {
                 nativeTemplateView.loadNativeAd(context, adUnitId, callback, loadingStrategy)
@@ -120,7 +135,7 @@ fun NativeTemplateCompose(
 
     // key() ensures the AndroidView node is recreated when a new view instance
     // is created for new keys, so the new view actually gets attached
-    key(adUnitId, template) {
+    key(adUnitId, template, customLayoutResId) {
         AndroidView(
             factory = { nativeTemplateView },
             modifier = modifier

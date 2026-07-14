@@ -5,6 +5,40 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-07-14
+
+Feature release: all standard AdMob banner sizes, custom native ad templates, and a redesigned size-adaptive banner shimmer with night-mode support.
+
+### Added
+
+#### Banner ad sizes
+- New `BannerAdSize` enum (`com.i2hammad.admanagekit.config`) covering every standard AdMob banner size: `ADAPTIVE` (default, previous behavior), `BANNER` (320x50), `LARGE_BANNER` (320x100), `MEDIUM_RECTANGLE` (300x250), `FULL_BANNER` (468x60, tablets), `LEADERBOARD` (728x90, tablets)
+- `BannerAdView.loadBanner(activity, adUnitId, adSize, callback)` overload, `setBannerAdSize()` for a per-view default, and an optional `adSize` parameter on the full `loadCollapsibleBanner` overload
+- `app:bannerAdSize` XML attribute on `BannerAdView`
+- `BannerAdCompose` gains an `adSize` parameter; fixed sizes reserve their exact height (no layout jump) and center horizontally
+- The selected size survives retries, auto-refresh, and manual `refreshAd()`; in multi-provider waterfalls it is applied to the AdMob providers in the chain (`AdMobBannerProvider.adSize` is now a settable `var`)
+- Collapsible banners require `ADAPTIVE` per AdMob policy; a fixed size logs a debug warning
+
+#### App open ads: late MobileAds initialization support
+- `AppOpenManager` no longer requires `MobileAds.initialize()` to have completed before it is constructed. Every load path is guarded: the automatic on-foreground show skips and defers a background prefetch until the SDK is ready; `fetchAd(callback)` / `forceShowAdIfAvailable(callback)` wait for initialization within their existing timeout budget and still deliver a terminal callback (`onFailedToLoad` / `onNextAction`) if it never completes, so splash flows are never stranded
+- New `AppOpenManager.isMobileAdsReady()` — confirmation that the SDK is initialized and ads can be requested (distinct from `isAdAvailable()`, which reports a loaded ad). Waterfall chains without an AdMob provider report ready regardless of MobileAds state
+- Sample app and `docs/app-open-ads.md` document the recommended construction order (create `AppOpenManager` after `MobileAds.initialize()` returns)
+
+#### Custom native ad templates
+- `NativeTemplateView.setCustomTemplate(layoutResId, shimmerResId, sizeHint)` / `clearCustomTemplate()` / `isUsingCustomTemplate()` — render a fully custom layout instead of one of the 37 built-in presets. The layout's root must be (or inflate as) a Next-Gen SDK `NativeAdView` reusing the standard asset ids
+- `app:customAdLayout` / `app:customAdShimmerLayout` XML attributes on `NativeTemplateView`
+- `NativeTemplateCompose` gains `customLayoutResId`, `customShimmerResId`, and `customSizeHint` parameters
+
+### Changed
+
+- **Banner shimmer redesigned**: one size-adaptive layout serves every `BannerAdSize` (a weighted media block absorbs extra height on tall formats); modern rounded card + placeholder bars consistent with the newer native shimmer templates
+- **Banner shimmer supports night mode**: previously a hardcoded white card in dark theme; now uses day/night colors (`dn_card_background`, new `dn_shimmer_placeholder`)
+
+### Fixed
+
+- Banner shimmer is now sized to the requested ad on the **waterfall path** too (previously always the ~56dp default row, causing a layout jump when the ad arrived — up to 250dp for `MEDIUM_RECTANGLE`)
+- Banner shimmer is horizontally **centered** to match the loaded ad's position (previously start-aligned while the ad rendered centered)
+
 ## [4.2.0] - 2026-07-08
 
 Major SDK migration: the Google Mobile Ads **Next-Gen SDK** replaces the legacy `play-services-ads` dependency on `main` (previously only available on a separate, now-retired `nextgen` branch), Google Play Billing Library is upgraded to 9.1.0, and `compileSdk` moves to 37. Includes two native-ad rendering fixes found while validating the migration.

@@ -106,6 +106,10 @@ nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-xxx/native")
 appOpenManager = AppOpenManager(this, "ca-app-pub-xxx/app-open")
 ```
 
+Banner size selection carries into the waterfall too: `loadBanner(activity, adUnitId,
+BannerAdSize.MEDIUM_RECTANGLE)` applies the fixed size to the AdMob providers in the
+chain (v4.3.0). Non-AdMob providers keep their own sizing behavior.
+
 ## How It Works
 
 ### Ad Unit ID Resolution

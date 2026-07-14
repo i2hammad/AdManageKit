@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -10,7 +11,7 @@ android {
     defaultConfig {
         applicationId = "com.i2hammad.admanagekit.sample"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 2
         versionName = "2.0"
 
@@ -31,6 +32,9 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    buildFeatures {
+        compose = true
+    }
 }
 
 dependencies {
@@ -43,7 +47,22 @@ dependencies {
     implementation(project(":AdManageKit"))
     implementation(project(":admanagekit-billing"))
     implementation(project(":admanagekit-yandex"))
+    implementation(project(":admanagekit-compose"))
     implementation(libs.androidx.work.runtime)
+
+    // Compose (used by ComposeAdsTestActivity - sample screen for the admanagekit-compose module)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.runtime)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }
 
 configurations.configureEach {
