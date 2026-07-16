@@ -63,6 +63,15 @@ class BannerWaterfall @JvmOverloads constructor(
         token: Int,
         callback: BannerAdProvider.BannerAdCallback
     ) {
+        // A provider's failure callback (e.g. AdMob's onAdFailedToLoad) fires on a background
+        // thread. Advancing the chain there would construct the next provider's banner View off
+        // the main thread and crash ("Can't create handler inside thread that has not called
+        // Looper.prepare()"). Always run the chain on the main thread.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { loadNext(context, index, token, callback) }
+            return
+        }
+
         if (token != generation.get()) {
             Log.d(TAG, "Load chain cancelled (stale token), aborting")
             return
@@ -110,7 +119,12 @@ class BannerWaterfall @JvmOverloads constructor(
                 }
                 Log.d(TAG, "Loaded from ${provider.provider.displayName}")
                 loadedProvider = provider
-                callback.onBannerLoaded(bannerView)
+                // Deliver on the main thread — the app adds bannerView to a ViewGroup.
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    callback.onBannerLoaded(bannerView)
+                } else {
+                    handler.post { callback.onBannerLoaded(bannerView) }
+                }
             }
 
             override fun onBannerFailedToLoad(error: AdKitAdError) {
