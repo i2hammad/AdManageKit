@@ -5,6 +5,19 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.1] - 2026-07-16
+
+Patch release: fixes crashes caused by Next-Gen SDK callbacks being delivered on background threads, plus a load-site guard for app open ads.
+
+### Fixed
+
+- **Interstitial callbacks now delivered on the main thread** — GMA fires the full-screen dismiss and failed-to-show callbacks on a background thread. `onNextAction()` is now marshalled to the main thread on both paths, preventing `CalledFromWrongThreadException` at every `InterstitialAdBuilder.show { }` call site whose handler touches views
+- **Interstitial `onAdLoaded` no longer risks an NPE** — the load callback now passes the non-null local ad instead of re-reading the shared `mInterstitialAd` field, which a concurrent show/dismiss/load on another thread could null between assignment and use
+- **Banner waterfall runs its chain on the main thread** — a provider's background-thread failure callback previously advanced the chain there, constructing the next provider's banner `View` off the main thread (`Can't create handler inside thread that has not called Looper.prepare()`). The chain and the `onBannerLoaded` delivery are now marshalled to the main thread
+- **Native waterfall runs its chain on the main thread** — same fix for `NativeWaterfall`: the chain advance and `onNativeAdLoaded` delivery are marshalled to the main thread so the next provider's native `View` is never built off-thread
+- **`NativeTemplateView` failure callback delivered on the main thread** — `onFailedToLoad` (and the placeholder/shimmer hide) now run together on the main thread; `NativeAdLoader` delivers this callback on a background thread and handlers commonly touch views
+- **App open ads: defense-in-depth load guard** — `fetchAdWithRetry` now skips the load if `MobileAds` is not yet initialized, protecting the load site regardless of which path reaches it (complements the existing `fetchAd` / `showAdIfAvailable` guards)
+
 ## [4.3.0] - 2026-07-14
 
 Feature release: all standard AdMob banner sizes, custom native ad templates, and a redesigned size-adaptive banner shimmer with night-mode support.

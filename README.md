@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.3.0`** adds all standard AdMob banner sizes (`BannerAdSize`), fully custom native ad templates on `NativeTemplateView`, and a redesigned size-adaptive banner shimmer with night-mode support. See [What's New in 4.3.0](#whats-new-in-430).
+**Latest Version `4.3.1`** is a patch release fixing crashes from Next-Gen SDK callbacks delivered on background threads — interstitial `onNextAction`, banner/native waterfall chains, and `NativeTemplateView.onFailedToLoad` are now marshalled to the main thread — plus a load-site guard for app open ads. See [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md).
+
+**Version `4.3.0`** adds all standard AdMob banner sizes (`BannerAdSize`), fully custom native ad templates on `NativeTemplateView`, and a redesigned size-adaptive banner shimmer with night-mode support. See [What's New in 4.3.0](#whats-new-in-430).
 
 Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads-mobile-sdk`, stable) and Google Play Billing Library **9.1.0** — see [Next-Gen GMA SDK](#next-gen-gma-sdk) below and [Migrating to 4.2.0](#migrating-to-420) if you're upgrading from 3.x/4.1.
 
@@ -98,15 +100,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.1'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.1'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.1'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -577,6 +579,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md)
 - [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md)
 - [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md)
 - [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md)

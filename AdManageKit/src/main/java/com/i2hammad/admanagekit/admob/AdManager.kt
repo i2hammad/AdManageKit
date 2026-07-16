@@ -605,7 +605,10 @@ class AdManager() {
                 Log.d("AdManager", "Interstitial ad loaded")
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded with callback", true)
 
-                interstitialAdLoadCallback.onAdLoaded(mInterstitialAd!!)
+                // Use the non-null local parameter, not the shared mInterstitialAd field:
+                // a concurrent show/dismiss/load on another thread can null the field between
+                // the assignment above and here, making mInterstitialAd!! throw an NPE.
+                interstitialAdLoadCallback.onAdLoaded(interstitialAd)
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
@@ -1291,7 +1294,11 @@ class AdManager() {
                     mInterstitialAd = null
                 }
                 AdDebugUtils.logEvent(shownAdUnitId, "onAdDismissed", "Interstitial ad dismissed", true)
-                callback.onNextAction()
+                // GMA fires this dismiss callback on a background thread, and app onNextAction
+                // handlers touch views — always deliver it on the main thread to avoid
+                // CalledFromWrongThreadException across every InterstitialAdBuilder.show { } site.
+                if (Looper.myLooper() == Looper.getMainLooper()) callback.onNextAction()
+                else Handler(Looper.getMainLooper()).post { callback.onNextAction() }
 
                 // Log Firebase event for ad dismissed
                 val params = Bundle().apply {
@@ -1315,7 +1322,9 @@ class AdManager() {
                 }
                 Log.e("AdManager", "Failed to show full-screen content: ${adError.message}")
                 AdDebugUtils.logEvent(shownAdUnitId, "onFailedToShow", "Interstitial failed to show: ${adError.message}", false)
-                callback.onNextAction()
+                // Deliver on the main thread (GMA callback runs on a background thread).
+                if (Looper.myLooper() == Looper.getMainLooper()) callback.onNextAction()
+                else Handler(Looper.getMainLooper()).post { callback.onNextAction() }
 
                 // Log Firebase event for ad failed to show
                 val params = Bundle().apply {

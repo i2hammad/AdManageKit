@@ -1684,6 +1684,15 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             return
         }
 
+        // Defense-in-depth at the actual load site: never call AppOpenAd.load before
+        // MobileAds.initialize() has completed, regardless of caller. The outer entry points
+        // (fetchAd / showAdIfAvailable) already guard, but this protects fetchAdWithRetry if it
+        // is ever reached through another path, so it can't throw IllegalStateException.
+        if (!isMobileAdsReady()) {
+            Log.d(LOG_TAG, "fetchAdWithRetry: MobileAds not initialized yet, skipping load")
+            return
+        }
+
         // Prevent concurrent ad requests - only check on first attempt
         if (retryCount == 0 && !isLoading.compareAndSet(false, true)) {
             Log.d(LOG_TAG, "fetchAdWithRetry: Already loading, skipping duplicate request")

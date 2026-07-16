@@ -674,12 +674,6 @@ class NativeTemplateView @JvmOverloads constructor(
                     AdDebugUtils.logEvent(adUnitId, "onFailedToLoad",
                         "NativeTemplateView (${currentTemplate.name}) failed: ${adError.message}", false)
 
-                    // UI operations on main thread
-                    CoroutineScope(Dispatchers.Main).launch {
-                        adPlaceholder.visibility = GONE
-                        shimmerFrameLayout.visibility = GONE
-                    }
-
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                         putString("ad_error_code", adError.code.toString())
@@ -688,7 +682,15 @@ class NativeTemplateView @JvmOverloads constructor(
                         }
                     }
                     firebaseAnalytics?.logEvent("ad_failed_to_load", params)
-                    callback?.onFailedToLoad(adError)
+
+                    // UI ops AND the app callback on the main thread: onFailedToLoad handlers
+                    // commonly touch views (hide a spinner/container). NativeAdLoader delivers
+                    // this callback on a background thread, so deliver onFailedToLoad here too.
+                    CoroutineScope(Dispatchers.Main).launch {
+                        adPlaceholder.visibility = GONE
+                        shimmerFrameLayout.visibility = GONE
+                        callback?.onFailedToLoad(adError)
+                    }
                 }
             }
 

@@ -71,6 +71,14 @@ class NativeWaterfall @JvmOverloads constructor(
         sizeHint: NativeAdSize,
         templateLayoutResId: Int
     ) {
+        // Provider callbacks (GMA native load) fire on a background thread. Advancing the chain
+        // there would construct the next provider's native View off the main thread (crash).
+        // Always run the chain on the main thread.
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            handler.post { loadNext(context, index, token, callback, sizeHint, templateLayoutResId) }
+            return
+        }
+
         if (token != generation.get()) {
             Log.d(TAG, "Load chain cancelled (stale token), aborting")
             return
@@ -118,7 +126,12 @@ class NativeWaterfall @JvmOverloads constructor(
                 }
                 Log.d(TAG, "Loaded from ${provider.provider.displayName}")
                 loadedProvider = provider
-                callback.onNativeAdLoaded(adView, nativeAdRef)
+                // Deliver on the main thread — the consumer inflates/adds the native View.
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    callback.onNativeAdLoaded(adView, nativeAdRef)
+                } else {
+                    handler.post { callback.onNativeAdLoaded(adView, nativeAdRef) }
+                }
             }
 
             override fun onNativeAdFailedToLoad(error: AdKitAdError) {
