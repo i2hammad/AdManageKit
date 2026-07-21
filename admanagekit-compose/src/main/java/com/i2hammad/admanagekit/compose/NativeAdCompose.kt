@@ -2,7 +2,7 @@ package com.i2hammad.admanagekit.compose
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -163,7 +163,12 @@ fun NativeAdCompose(
         }
     }
 
-    // Determine height based on ad size
+    // Minimum height based on ad size. This is a floor, not a fixed height: the
+    // ad content is wrap_content and can grow taller (e.g. a 3-line body in the
+    // MEDIUM layout). Clamping to a fixed height clipped the CTA button off the
+    // bottom, which the native ad validator flags as a policy violation. Using a
+    // minimum lets short ads keep the intended size while tall ones expand so the
+    // CTA stays fully visible and tappable.
     val adHeight = when (size) {
         NativeAdSize.SMALL -> 80.dp
         NativeAdSize.MEDIUM -> 120.dp
@@ -177,7 +182,7 @@ fun NativeAdCompose(
             factory = { nativeAdView },
             modifier = modifier
                 .fillMaxWidth()
-                .height(adHeight),
+                .heightIn(min = adHeight),
             update = { view ->
                 // Update view if needed when recomposed
                 view.visibility = android.view.View.VISIBLE
