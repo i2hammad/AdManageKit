@@ -5,6 +5,22 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.2] - 2026-07-21
+
+Patch release: banner shimmer placeholder now reserves the real adaptive-banner height from the first frame (and in the layout preview), and the Compose native ad no longer clips its call-to-action button. Also bumps the Android Gradle Plugin to 9.3.0.
+
+### Fixed
+
+- **Banner shimmer reserves the real ad height immediately** — the placeholder is now sized in `init` and again on `setBannerAdSize()`, so it no longer collapses to the template's natural ~50dp (a small shimmer surrounded by empty space) on the first runtime frame and in the design/layout preview before a load resizes it
+- **Adaptive banner shimmer uses the SDK's resolved pixel height** — `adjustShimmerLayout` now measures via `AdSize.getHeightInPixels()` / `getWidthInPixels()` rather than `density * nominal-dp`. An anchored-adaptive banner's nominal dp height under-reports the real slot, which previously left the shimmer at ~50dp with empty space below while the taller ad loaded in; adaptive placeholders also fill the full width to line up edge-to-edge with the loaded ad
+- **Adaptive banner size resolves without an Activity** — `getAdSize()` now accepts a plain `Context` and falls back to the window/display width before layout, so the adaptive size computes correctly in the preview and during `init` instead of dropping to the 50dp `AdSize.BANNER` fallback
+- **Placeholder sizing can never break rendering** — `adjustShimmerLayout` is wrapped so an SDK call made before `MobileAds` is initialized (e.g. in the layout preview) is caught and logged; the shimmer keeps its XML height instead of crashing
+- **Compose `NativeAdCompose` no longer clips the CTA button** — the per-size height is now applied as a minimum (`heightIn(min = …)`) rather than a fixed `height()`. A tall ad (e.g. a 3-line body in the `MEDIUM` layout) could be clipped at the bottom, hiding the call-to-action — a native-ad policy violation. Short ads keep the intended size; tall ones expand so the CTA stays fully visible and tappable
+
+### Changed
+
+- Android Gradle Plugin bumped to **9.3.0** (from 9.2.1)
+
 ## [4.3.1] - 2026-07-16
 
 Patch release: fixes crashes caused by Next-Gen SDK callbacks being delivered on background threads, plus a load-site guard for app open ads.

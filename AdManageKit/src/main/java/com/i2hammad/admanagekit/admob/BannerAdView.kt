@@ -7,11 +7,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
-import android.util.DisplayMetrics
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.view.WindowMetrics
 import android.view.Gravity
 import android.widget.FrameLayout
@@ -103,6 +103,11 @@ class BannerAdView @JvmOverloads constructor(
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true)
         shimmerFrameLayout = findViewById(R.id.shimmer_frame_layout)
         layBannerAd = findViewById(R.id.fl_ad_container)
+        // Reserve the real ad height on the shimmer up front - in the design preview
+        // and on the first runtime frame (before a load resizes it) the template
+        // otherwise collapses to its natural ~50dp, showing a small banner shimmer
+        // with empty space around it until the taller adaptive ad arrives.
+        adjustShimmerLayout()
         if (!isInEditMode) {
             shimmerFrameLayout.startShimmer()
             firebaseAnalytics = FirebaseAnalytics.getInstance(context)
@@ -166,6 +171,9 @@ class BannerAdView @JvmOverloads constructor(
      */
     fun setBannerAdSize(adSize: BannerAdSize) {
         currentBannerSize = adSize
+        // Reflect the new size on the placeholder immediately so a shimmer that is
+        // already visible resizes to the requested height instead of waiting for load.
+        adjustShimmerLayout()
     }
 
     fun setAdCallback(callback: AdLoadCallback?) {
@@ -346,16 +354,39 @@ class BannerAdView @JvmOverloads constructor(
         }
     }
 
-    private fun adjustShimmerLayout() {
-        val params = shimmerFrameLayout.layoutParams
-        val adSize = getAdSize()
+    private fun adjustShimmerLayout() = try {
+        val ctx = activityRef?.get() ?: context
+        val adSize = getAdSize(ctx)
+        val params = shimmerFrameLayout.layoutParams as? FrameLayout.LayoutParams
+            ?: FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+
+        // Use the SDK's own resolved pixel height rather than density * adSize.height:
+        // for an anchored-adaptive banner the nominal dp height under-reports the real
+        // slot, which left the shimmer at ~50dp with empty space below while the taller
+        // ad loaded in. getHeightInPixels() is exactly what the rendered banner occupies.
         val density = resources.displayMetrics.density
-        params.height = (density * adSize.height).toInt()
-        params.width = (density * adSize.width).toInt()
-        // Fixed sizes (e.g. 300x250) can be narrower than the container; center
-        // the placeholder to match the centered ad (see centeredBannerLayoutParams)
-        (params as? FrameLayout.LayoutParams)?.gravity = Gravity.CENTER_HORIZONTAL
+        params.height = adSize.getHeightInPixels(ctx).takeIf { it > 0 }
+            ?: (density * adSize.height).toInt()
+
+        if (currentBannerSize.isAdaptive) {
+            // Anchored adaptive spans the full width; let the shimmer fill it too so it
+            // lines up edge-to-edge with the loaded ad.
+            params.width = FrameLayout.LayoutParams.MATCH_PARENT
+        } else {
+            // Fixed sizes (e.g. 300x250) are narrower than the container; center the
+            // placeholder to match the centered ad (see centeredBannerLayoutParams).
+            params.width = adSize.getWidthInPixels(ctx).takeIf { it > 0 }
+                ?: (density * adSize.width).toInt()
+        }
+        params.gravity = Gravity.CENTER_HORIZONTAL
         shimmerFrameLayout.layoutParams = params
+    } catch (e: Exception) {
+        // Never let placeholder sizing (e.g. an SDK call in the design preview before
+        // MobileAds is initialized) break rendering; the shimmer keeps its XML height.
+        AdDebugUtils.logDebug("BannerAdView", "adjustShimmerLayout skipped: ${e.message}")
     }
 
     /**
@@ -567,32 +598,28 @@ class BannerAdView @JvmOverloads constructor(
         Gravity.CENTER_HORIZONTAL
     )
 
-    private fun getAdSize(): AdSize {
+    private fun getAdSize(context: Context = activityRef?.get() ?: this.context): AdSize {
         // Fixed sizes (BANNER, MEDIUM_RECTANGLE, ...) don't depend on the window width
         currentBannerSize.toFixedAdMobAdSize()?.let { return it }
 
-        val displayMetrics = DisplayMetrics()
-
-        return activityRef?.get()?.let { activity ->
-            val windowManager = activity.windowManager
-            val adWidthPixels = if (layBannerAd.width > 0) {
-                layBannerAd.width.toFloat()
+        // Prefer the laid-out container width; before layout (init / design preview)
+        // fall back to the window/display width. A plain Context works here, so the
+        // adaptive size resolves even without an Activity (no 50dp BANNER fallback).
+        val adWidthPixels = if (layBannerAd.width > 0) {
+            layBannerAd.width.toFloat()
+        } else {
+            val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && windowManager != null) {
+                val windowMetrics: WindowMetrics = windowManager.currentWindowMetrics
+                windowMetrics.bounds.width().toFloat()
             } else {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    val windowMetrics: WindowMetrics = windowManager.currentWindowMetrics
-                    windowMetrics.bounds.width().toFloat()
-                } else {
-                    @Suppress("DEPRECATION") 
-                    val display = windowManager.defaultDisplay
-                    display?.getMetrics(displayMetrics)
-                    displayMetrics.widthPixels.toFloat()
-                }
+                resources.displayMetrics.widthPixels.toFloat()
             }
+        }
 
-            val density = resources.displayMetrics.density
-            val adWidth = (adWidthPixels / density).toInt()
-            AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, adWidth)
-        } ?: AdSize.BANNER // Fallback to standard banner size
+        val density = resources.displayMetrics.density
+        val adWidth = (adWidthPixels / density).toInt()
+        return AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, adWidth)
     }
     
     /**
