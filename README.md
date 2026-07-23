@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.3.2`** is a patch release that fixes banner shimmer sizing — the placeholder now reserves the real adaptive-banner height from the first frame and in the layout preview instead of collapsing to ~50dp — and stops the Compose native ad from clipping its call-to-action button. Also bumps the Android Gradle Plugin to 9.3.0. See [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md).
+**Latest Version `4.3.3`** is a patch release that improves native ad media quality: every native request now sends a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carries global `VideoOptions` (start-muted by default). New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior. See [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md).
+
+**Version `4.3.2`** is a patch release that fixes banner shimmer sizing — the placeholder now reserves the real adaptive-banner height from the first frame and in the layout preview instead of collapsing to ~50dp — and stops the Compose native ad from clipping its call-to-action button. Also bumps the Android Gradle Plugin to 9.3.0. See [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md).
 
 **Version `4.3.1`** is a patch release fixing crashes from Next-Gen SDK callbacks delivered on background threads — interstitial `onNextAction`, banner/native waterfall chains, and `NativeTemplateView.onFailedToLoad` are now marshalled to the main thread — plus a load-site guard for app open ads. See [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md).
 
@@ -102,15 +104,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.3'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.3'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.3'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -581,6 +583,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md)
 - [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md)
 - [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md)
 - [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md)

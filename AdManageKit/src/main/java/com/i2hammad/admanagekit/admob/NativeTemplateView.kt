@@ -43,6 +43,7 @@ import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdSize
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
+import com.i2hammad.admanagekit.config.NativeMediaAspect
 import com.i2hammad.admanagekit.databinding.LayoutNativeTemplatePreviewBinding
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.NativeAdIntegrationManager
@@ -137,6 +138,13 @@ class NativeTemplateView @JvmOverloads constructor(
      * When false: Removes custom view and uses SDK's setAdChoicesPlacement()
      */
     private var useCustomAdChoicesView: Boolean = false
+
+    /**
+     * Optional per-view override for the media-aspect-ratio hint sent with the ad request.
+     * When null (default), the hint is derived from the current template's slot shape via
+     * [mediaAspectForTemplate]. Set via [setMediaAspect].
+     */
+    private var mediaAspectOverride: NativeMediaAspect? = null
 
     init {
         // Read template from XML attributes
@@ -327,6 +335,25 @@ class NativeTemplateView @JvmOverloads constructor(
      * Get current AdChoices placement
      */
     fun getAdChoicesPlacement(): Int = adChoicesPlacement
+
+    /**
+     * Override the media-aspect-ratio *hint* sent with the ad request for this view, ignoring the
+     * shape inferred from the current template.
+     *
+     * Call before loading. This is a preference passed to the ad network, not a filter — see
+     * [NativeMediaAspect]. Pass [NativeMediaAspect.UNSPECIFIED] to send no hint, or `null` to
+     * revert to the per-template default ([mediaAspectForTemplate]).
+     *
+     * @param aspect the aspect hint to force, or null to use the template default.
+     */
+    fun setMediaAspect(aspect: NativeMediaAspect?) {
+        mediaAspectOverride = aspect
+    }
+
+    /**
+     * Get the current media-aspect override, or null when the per-template default is in effect.
+     */
+    fun getMediaAspect(): NativeMediaAspect? = mediaAspectOverride
 
     /**
      * Maps this view's public, legacy-NativeAdOptions-Int-based [adChoicesPlacement] to the
@@ -567,6 +594,68 @@ class NativeTemplateView @JvmOverloads constructor(
         }
     }
 
+    /**
+     * Preferred media-aspect-ratio hint for the current template, matching the shape of that
+     * layout's MediaView slot so served video/image fits without heavy cropping.
+     *
+     * Templates whose layout has no MediaView (icon + text + CTA only) return
+     * [NativeMediaAspect.UNSPECIFIED] — no hint is sent and any video creative simply doesn't
+     * render, the ad degrading gracefully. Custom templates fall back to the global default.
+     */
+    private fun mediaAspectForTemplate(): NativeMediaAspect {
+        mediaAspectOverride?.let { return it }
+        if (customSizeHint != null) return AdManageKitConfig.defaultNativeMediaAspect
+        return when (currentTemplate) {
+            // Tall / full-bleed media -> portrait
+            NativeAdTemplate.VIDEO_VERTICAL,
+            NativeAdTemplate.VIDEO_FULLSCREEN,
+            NativeAdTemplate.STORY_STYLE,
+            NativeAdTemplate.OVERLAY_DARK -> NativeMediaAspect.PORTRAIT
+
+            // Square media slots
+            NativeAdTemplate.VIDEO_SQUARE,
+            NativeAdTemplate.GRID_CARD,
+            NativeAdTemplate.GRID_ITEM -> NativeMediaAspect.SQUARE
+
+            // Wide media slots -> landscape
+            NativeAdTemplate.VIDEO_LARGE,
+            NativeAdTemplate.VIDEO_MEDIUM,
+            NativeAdTemplate.VIDEO_SMALL,
+            NativeAdTemplate.MEDIUM_HORIZONTAL,
+            NativeAdTemplate.COMPACT_HORIZONTAL,
+            NativeAdTemplate.TOP_ICON_MEDIA,
+            NativeAdTemplate.FEATURED,
+            NativeAdTemplate.MAGAZINE,
+            NativeAdTemplate.SOCIAL_FEED,
+            NativeAdTemplate.GRADIENT_CARD,
+            NativeAdTemplate.SPOTLIGHT,
+            NativeAdTemplate.MEDIA_CONTENT_SPLIT,
+            NativeAdTemplate.CARD_MODERN,
+            NativeAdTemplate.MATERIAL3,
+            NativeAdTemplate.MINIMAL,
+            NativeAdTemplate.APP_STORE,
+            NativeAdTemplate.ICON_LEFT,
+            NativeAdTemplate.FLEXIBLE,
+            NativeAdTemplate.LIST_ITEM,
+            NativeAdTemplate.FLAT_MEDIA_TOP,
+            NativeAdTemplate.FLAT_CAROUSEL -> NativeMediaAspect.LANDSCAPE
+
+            // Small media slot -> let the network decide
+            NativeAdTemplate.PILL_BANNER -> NativeMediaAspect.ANY
+
+            // Media-less templates (no MediaView in the layout) -> no hint
+            NativeAdTemplate.FULL_WIDTH_BANNER,
+            NativeAdTemplate.FLAT_BANNER,
+            NativeAdTemplate.FLAT_INLINE_ROW,
+            NativeAdTemplate.FLAT_COMPACT_PILL,
+            NativeAdTemplate.FLAT_FOOTER_SLIM,
+            NativeAdTemplate.FLAT_CARD_RATING,
+            NativeAdTemplate.FLAT_TEXT_MINIMAL,
+            NativeAdTemplate.FLAT_FEATURE_LIST,
+            NativeAdTemplate.FLAT_SPONSORED_STORY -> NativeMediaAspect.UNSPECIFIED
+        }
+    }
+
     private fun getNativeAdSizeForTemplate(): NativeAdSize {
         return when (getScreenTypeForTemplate()) {
             NativeAdIntegrationManager.ScreenType.SMALL -> NativeAdSize.SMALL
@@ -592,6 +681,7 @@ class NativeTemplateView @JvmOverloads constructor(
             // longer exists as a separate options object in the Next-Gen SDK).
             val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
                 .setAdChoicesPlacement(adChoicesPlacementForRequest())
+                .applyMediaConfig(mediaAspectForTemplate())
                 .build()
 
             val nativeAdLoaderCallback = object : NativeAdLoaderCallback {

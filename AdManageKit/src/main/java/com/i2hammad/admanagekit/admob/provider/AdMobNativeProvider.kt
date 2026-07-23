@@ -21,6 +21,7 @@ import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdSize
+import com.i2hammad.admanagekit.admob.applyMediaConfig
 import com.i2hammad.admanagekit.utils.ProgrammaticNativeAdLoader
 
 /**
@@ -55,7 +56,9 @@ class AdMobNativeProvider : NativeAdProvider {
         templateLayoutResId: Int
     ) {
         // Next-Gen native ads are requested via the static NativeAdLoader, never instantiated.
-        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE)).build()
+        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
+            .applyMediaConfig()
+            .build()
 
         NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
