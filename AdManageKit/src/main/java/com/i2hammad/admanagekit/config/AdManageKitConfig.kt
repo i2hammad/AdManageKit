@@ -414,6 +414,46 @@ object AdManageKitConfig {
      */
     var nativeLoadingStrategy: AdLoadingStrategy = AdLoadingStrategy.HYBRID
 
+    // =================== NATIVE MEDIA / VIDEO SETTINGS ===================
+
+    /**
+     * Default media-aspect-ratio hint applied to native ad requests that do not specify their
+     * own (e.g. the programmatic loader and the multi-provider waterfall). Per-template views
+     * such as [com.i2hammad.admanagekit.admob.NativeTemplateView] override this with a hint
+     * matching their own MediaView slot shape.
+     *
+     * This is a preference, not a filter — see [NativeMediaAspect].
+     *
+     * Default: [NativeMediaAspect.ANY]
+     */
+    var defaultNativeMediaAspect: NativeMediaAspect = NativeMediaAspect.ANY
+
+    /**
+     * Whether native *video* ads should start muted.
+     *
+     * Muted autoplay is the safe, policy-friendly default; set to false only if your placement
+     * genuinely warrants sound on autoplay.
+     *
+     * Applied via `VideoOptions.setStartMuted(...)` on every native request that can render media.
+     * Default: true
+     */
+    var nativeVideoStartMuted: Boolean = true
+
+    /**
+     * Request the "click to expand" behaviour for native video ads, allowing the user to expand
+     * the video to full screen. Honoured only when the served creative supports it.
+     * Default: false
+     */
+    var nativeVideoClickToExpand: Boolean = false
+
+    /**
+     * Request custom video controls (the app renders its own play/pause UI) instead of the
+     * SDK-provided controls. Only enable if you actually wire up custom controls; otherwise the
+     * video may render without any controls.
+     * Default: false
+     */
+    var nativeVideoCustomControls: Boolean = false
+
     // =================== CACHE MANAGEMENT ===================
     
     /**
@@ -500,6 +540,10 @@ object AdManageKitConfig {
         interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
         appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
         nativeLoadingStrategy = AdLoadingStrategy.HYBRID
+        defaultNativeMediaAspect = NativeMediaAspect.ANY
+        nativeVideoStartMuted = true
+        nativeVideoClickToExpand = false
+        nativeVideoCustomControls = false
         maxCacheMemoryMB = 200
         enableLRUEviction = true
         cacheCleanupInterval = 30.seconds * 60

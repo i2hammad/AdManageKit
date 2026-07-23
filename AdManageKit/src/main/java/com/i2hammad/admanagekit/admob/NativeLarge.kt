@@ -32,6 +32,7 @@ import com.i2hammad.admanagekit.core.ad.AdUnitMapping
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdSize
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.config.NativeMediaAspect
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.waterfall.NativeWaterfall
 import com.i2hammad.admanagekit.databinding.LayoutNativeLargeBinding
@@ -240,7 +241,9 @@ class NativeLarge @JvmOverloads constructor(
         // already-inflated hierarchy (binding.mediaView is a descendant) and used directly
         // at registerNativeAd() time inside populateNativeAdView().
 
-        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE)).build()
+        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
+            .applyMediaConfig(NativeMediaAspect.LANDSCAPE)
+            .build()
 
         NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {

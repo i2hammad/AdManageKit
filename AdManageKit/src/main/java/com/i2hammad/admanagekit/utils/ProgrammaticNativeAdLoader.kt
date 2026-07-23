@@ -23,6 +23,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.admob.AdKitError
+import com.i2hammad.admanagekit.admob.applyMediaConfig
 import com.i2hammad.admanagekit.admob.AdKitValue
 import com.i2hammad.admanagekit.admob.AdLoadCallback
 import com.i2hammad.admanagekit.admob.AdManager
@@ -501,7 +502,9 @@ object ProgrammaticNativeAdLoader {
         }
 
         val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
-        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE)).build()
+        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
+            .applyMediaConfig()
+            .build()
 
         NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
@@ -541,7 +544,9 @@ object ProgrammaticNativeAdLoader {
         handle: NativeAdLoadHandle
     ) {
         val firebaseAnalytics = FirebaseAnalytics.getInstance(activity)
-        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE)).build()
+        val nativeAdRequest = NativeAdRequest.Builder(adUnitId, listOf(NativeAd.NativeAdType.NATIVE))
+            .applyMediaConfig()
+            .build()
 
         NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {

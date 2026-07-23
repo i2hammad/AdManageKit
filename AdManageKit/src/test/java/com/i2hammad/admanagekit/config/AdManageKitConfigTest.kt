@@ -85,6 +85,12 @@ class AdManageKitConfigTest {
         assertEquals(AdLoadingStrategy.HYBRID, AdManageKitConfig.appOpenLoadingStrategy)
         assertEquals(AdLoadingStrategy.HYBRID, AdManageKitConfig.nativeLoadingStrategy)
 
+        // Native media / video
+        assertEquals(NativeMediaAspect.ANY, AdManageKitConfig.defaultNativeMediaAspect)
+        assertTrue(AdManageKitConfig.nativeVideoStartMuted)
+        assertFalse(AdManageKitConfig.nativeVideoClickToExpand)
+        assertFalse(AdManageKitConfig.nativeVideoCustomControls)
+
         // Cache management — maxCacheMemoryMB default was bug-fixed to 200
         assertEquals(200, AdManageKitConfig.maxCacheMemoryMB)
         assertTrue(AdManageKitConfig.enableLRUEviction)
@@ -138,6 +144,10 @@ class AdManageKitConfigTest {
             interstitialLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
             appOpenLoadingStrategy = AdLoadingStrategy.ON_DEMAND
             nativeLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
+            defaultNativeMediaAspect = NativeMediaAspect.PORTRAIT
+            nativeVideoStartMuted = false
+            nativeVideoClickToExpand = true
+            nativeVideoCustomControls = true
             maxCacheMemoryMB = 50
             enableLRUEviction = false
             cacheCleanupInterval = 5.seconds
@@ -186,6 +196,10 @@ class AdManageKitConfigTest {
         assertEquals(AdLoadingStrategy.HYBRID, AdManageKitConfig.interstitialLoadingStrategy)
         assertEquals(AdLoadingStrategy.HYBRID, AdManageKitConfig.appOpenLoadingStrategy)
         assertEquals(AdLoadingStrategy.HYBRID, AdManageKitConfig.nativeLoadingStrategy)
+        assertEquals(NativeMediaAspect.ANY, AdManageKitConfig.defaultNativeMediaAspect)
+        assertTrue(AdManageKitConfig.nativeVideoStartMuted)
+        assertFalse(AdManageKitConfig.nativeVideoClickToExpand)
+        assertFalse(AdManageKitConfig.nativeVideoCustomControls)
         // The bug fix: reset must restore maxCacheMemoryMB to 200
         assertEquals(200, AdManageKitConfig.maxCacheMemoryMB)
         assertTrue(AdManageKitConfig.enableLRUEviction)
