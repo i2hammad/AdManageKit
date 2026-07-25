@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.3.3`** is a patch release that improves native ad media quality: every native request now sends a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carries global `VideoOptions` (start-muted by default). New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior. See [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md).
+**Latest Version `4.3.4`** is a patch release that restores the pre-4.2.0 default adaptive banner height: `ADAPTIVE` again requests the standard anchored adaptive size (~50-90dp) instead of the taller *large anchored adaptive* format the Next-Gen migration had switched to. The taller format is now opt-in via `BannerAdSize.ADAPTIVE_LARGE` (`app:bannerAdSize="adaptive_large"` in XML). See [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md).
+
+**Version `4.3.3`** is a patch release that improves native ad media quality: every native request now sends a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carries global `VideoOptions` (start-muted by default). New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior. See [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md).
 
 **Version `4.3.2`** is a patch release that fixes banner shimmer sizing — the placeholder now reserves the real adaptive-banner height from the first frame and in the layout preview instead of collapsing to ~50dp — and stops the Compose native ad from clipping its call-to-action button. Also bumps the Android Gradle Plugin to 9.3.0. See [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md).
 
@@ -104,15 +106,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.4'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.4'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.4'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -321,7 +323,9 @@ bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-xxx/yyy", true)
 ```
 
 All standard AdMob banner sizes are supported via `BannerAdSize` (v4.3.0); the
-default `ADAPTIVE` is the Google-recommended full-width anchored adaptive banner.
+default `ADAPTIVE` is the Google-recommended full-width anchored adaptive banner
+(~50-90dp), and `ADAPTIVE_LARGE` (v4.3.4) opts into the taller Next-Gen *large
+anchored adaptive* format.
 See [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md) for the full size table.
 
 ### Native Ads (Traditional Views)
@@ -583,6 +587,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md)
 - [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md)
 - [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md)
 - [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md)

@@ -5,6 +5,23 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.4] - 2026-07-25
+
+Patch release: restores the pre-4.2.0 default adaptive banner height. The Next-Gen SDK migration (4.2.0) had silently switched every adaptive banner path to the taller *large anchored adaptive* format; `ADAPTIVE` now requests the standard anchored adaptive size (~50-90dp) again, and the taller format is opt-in via the new `BannerAdSize.ADAPTIVE_LARGE`.
+
+### Fixed
+
+- **Default adaptive banner height restored to standard** — `BannerAdView`, `AdMobBannerProvider` (waterfall), and `BannerAdCompose` all requested `AdSize.getLargeAnchoredAdaptiveBannerAdSize` since 4.2.0, making the default banner noticeably taller than 3.x/4.1. `ADAPTIVE` now maps back to `AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize` (~50-90dp, matching v3.6.0 behavior); the Compose height reservation and shimmer placeholder follow the requested variant
+- **`NativeMediaAspect.kt` missing from the published 4.3.3 sources** — the file was referenced by the 4.3.3 release commit but never committed, breaking CI and the JitPack `4.3.3` build; the file is now in the tree (the `v4.3.3` tag was also re-pointed to a buildable commit)
+
+### Added
+
+- **`BannerAdSize.ADAPTIVE_LARGE`** — opt-in large anchored adaptive banner (taller full-width slot for higher viewability). Select programmatically (`loadBanner(activity, adUnitId, BannerAdSize.ADAPTIVE_LARGE)` / `setBannerAdSize(...)`), in XML (`app:bannerAdSize="adaptive_large"`), or in Compose (`adSize = BannerAdSize.ADAPTIVE_LARGE`). Works with retries, auto-refresh, and the multi-provider waterfall; collapsible banners accept it (any anchored adaptive size qualifies)
+
+### Changed
+
+- The `bannerAdSize` XML attr gained `adaptive_large`; the attr's internal enum values were renumbered to match the new `BannerAdSize` ordinal order. XML uses named values only, so existing layouts are unaffected after a recompile — but code persisting raw `BannerAdSize.ordinal` values should migrate to names
+
 ## [4.3.3] - 2026-07-23
 
 Patch release: native ad requests now send a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carry global `VideoOptions` (start-muted by default), so served image/video media fits the slot with less cropping and video creatives play back consistently. New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior.
