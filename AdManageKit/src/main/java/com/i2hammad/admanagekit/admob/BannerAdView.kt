@@ -619,7 +619,13 @@ class BannerAdView @JvmOverloads constructor(
 
         val density = resources.displayMetrics.density
         val adWidth = (adWidthPixels / density).toInt()
-        return AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, adWidth)
+        // ADAPTIVE keeps the pre-4.2.0 standard anchored adaptive height (~50-90dp);
+        // the taller Next-Gen large variant is opt-in via ADAPTIVE_LARGE.
+        return if (currentBannerSize == BannerAdSize.ADAPTIVE_LARGE) {
+            AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, adWidth)
+        } else {
+            AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, adWidth)
+        }
     }
     
     /**
@@ -677,8 +683,11 @@ class BannerAdView @JvmOverloads constructor(
             .forEach {
                 it.collapsible = collapsible
                 it.collapsiblePlacement = placement
-                // null (ADAPTIVE) lets the provider compute its own adaptive size
-                it.adSize = currentBannerSize.toFixedAdMobAdSize()
+                // null (ADAPTIVE) lets the provider compute its own standard adaptive
+                // size; ADAPTIVE_LARGE must be resolved here since the provider's
+                // own fallback is the standard variant
+                it.adSize = if (currentBannerSize == BannerAdSize.ADAPTIVE_LARGE) getAdSize()
+                else currentBannerSize.toFixedAdMobAdSize()
             }
 
         val waterfall = BannerWaterfall(

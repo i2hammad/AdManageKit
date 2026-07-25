@@ -28,9 +28,17 @@ import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
  * space instead of guessing. Falls back to the legacy 50dp banner height when
  * the SDK cannot provide a size (e.g. zero width during the first pass).
  */
-private fun adaptiveBannerHeightDp(context: android.content.Context, availableWidthDp: Int): Int {
+private fun adaptiveBannerHeightDp(
+    context: android.content.Context,
+    availableWidthDp: Int,
+    large: Boolean = false
+): Int {
     if (availableWidthDp <= 0) return 50
-    val adSize = AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
+    val adSize = if (large) {
+        AdSize.getLargeAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
+    } else {
+        AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(context, availableWidthDp)
+    }
     return if (adSize.height > 0) adSize.height else 50
 }
 
@@ -68,8 +76,9 @@ private fun loadWhenMeasured(view: View, load: () -> Unit): View.OnLayoutChangeL
  * @param adUnitId The AdMob ad unit ID
  * @param modifier Modifier for styling the ad container
  * @param adSize Banner size to request; [BannerAdSize.ADAPTIVE] (default) fills the
- *        available width, fixed sizes (e.g. [BannerAdSize.MEDIUM_RECTANGLE]) reserve
- *        their exact height and center horizontally
+ *        available width, [BannerAdSize.ADAPTIVE_LARGE] requests the taller large
+ *        anchored adaptive format, fixed sizes (e.g. [BannerAdSize.MEDIUM_RECTANGLE])
+ *        reserve their exact height and center horizontally
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked
@@ -164,7 +173,9 @@ fun BannerAdCompose(
             context.resources.configuration.screenWidthDp
         }
         val adHeight = remember(availableWidthDp, adSize) {
-            (adSize.heightDp ?: adaptiveBannerHeightDp(context, availableWidthDp)).dp
+            (adSize.heightDp ?: adaptiveBannerHeightDp(
+                context, availableWidthDp, large = adSize == BannerAdSize.ADAPTIVE_LARGE
+            )).dp
         }
 
         // key() ensures the AndroidView node is recreated when a new view instance

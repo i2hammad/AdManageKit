@@ -5,11 +5,12 @@ import com.i2hammad.admanagekit.config.BannerAdSize
 
 /**
  * Maps a fixed [BannerAdSize] to the Next-Gen SDK [AdSize] constant, or null for
- * [BannerAdSize.ADAPTIVE] (adaptive sizes depend on the available width, so the
- * caller computes them at load time).
+ * [BannerAdSize.ADAPTIVE] / [BannerAdSize.ADAPTIVE_LARGE] (adaptive sizes depend
+ * on the available width, so the caller computes them at load time).
  */
 internal fun BannerAdSize.toFixedAdMobAdSize(): AdSize? = when (this) {
     BannerAdSize.ADAPTIVE -> null
+    BannerAdSize.ADAPTIVE_LARGE -> null
     BannerAdSize.BANNER -> AdSize.BANNER
     BannerAdSize.LARGE_BANNER -> AdSize.LARGE_BANNER
     BannerAdSize.MEDIUM_RECTANGLE -> AdSize.MEDIUM_RECTANGLE

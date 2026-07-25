@@ -5,10 +5,11 @@ package com.i2hammad.admanagekit.config
  *
  * Mirrors the standard AdMob banner sizes plus the recommended adaptive banner:
  *
- * | Size (dp)  | Description          | Availability       |
- * |------------|----------------------|--------------------|
- * | full width | Anchored adaptive    | Phones and tablets |
- * | 320x50     | Banner               | Phones and tablets |
+ * | Size (dp)  | Description              | Availability       |
+ * |------------|--------------------------|--------------------|
+ * | full width | Anchored adaptive        | Phones and tablets |
+ * | full width | Large anchored adaptive  | Phones and tablets |
+ * | 320x50     | Banner                   | Phones and tablets |
  * | 320x100    | Large banner         | Phones and tablets |
  * | 300x250    | IAB medium rectangle | Phones and tablets |
  * | 468x60     | IAB full-size banner | Tablets            |
@@ -30,6 +31,14 @@ enum class BannerAdSize(val widthDp: Int?, val heightDp: Int?) {
      * per device (typically 50-90dp). Required for collapsible banners.
      */
     ADAPTIVE(null, null),
+
+    /**
+     * Large anchored adaptive banner sized to the available width. Next-Gen SDK
+     * format that serves a taller slot than [ADAPTIVE] for higher viewability;
+     * height varies per device. Use only where the extra height is acceptable.
+     * @since 4.3.4
+     */
+    ADAPTIVE_LARGE(null, null),
 
     /** Standard banner, 320x50. Phones and tablets. */
     BANNER(320, 50),
