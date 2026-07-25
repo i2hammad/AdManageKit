@@ -74,16 +74,18 @@
         <attr name="bannerAdSize" format="enum">
             <!-- Full-width anchored adaptive banner (default, Google-recommended) -->
             <enum name="adaptive" value="0" />
+            <!-- Full-width large anchored adaptive banner (taller than adaptive) -->
+            <enum name="adaptive_large" value="1" />
             <!-- 320x50, phones and tablets -->
-            <enum name="banner" value="1" />
+            <enum name="banner" value="2" />
             <!-- 320x100, phones and tablets -->
-            <enum name="large_banner" value="2" />
+            <enum name="large_banner" value="3" />
             <!-- 300x250 IAB medium rectangle, phones and tablets -->
-            <enum name="medium_rectangle" value="3" />
+            <enum name="medium_rectangle" value="4" />
             <!-- 468x60 IAB full-size banner, tablets -->
-            <enum name="full_banner" value="4" />
+            <enum name="full_banner" value="5" />
             <!-- 728x90 IAB leaderboard, tablets -->
-            <enum name="leaderboard" value="5" />
+            <enum name="leaderboard" value="6" />
         </attr>
     </declare-styleable>
 

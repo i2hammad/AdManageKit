@@ -27,18 +27,22 @@ class BannerAdSizeTest {
     }
 
     @Test
-    fun `only ADAPTIVE is adaptive and has no fixed dimensions`() {
-        assertTrue(BannerAdSize.ADAPTIVE.isAdaptive)
-        assertNull(BannerAdSize.ADAPTIVE.widthDp)
-        assertNull(BannerAdSize.ADAPTIVE.heightDp)
-        BannerAdSize.entries.filter { it != BannerAdSize.ADAPTIVE }.forEach {
+    fun `only the adaptive sizes are adaptive and have no fixed dimensions`() {
+        val adaptiveSizes = setOf(BannerAdSize.ADAPTIVE, BannerAdSize.ADAPTIVE_LARGE)
+        adaptiveSizes.forEach {
+            assertTrue("$it must be adaptive", it.isAdaptive)
+            assertNull("$it width", it.widthDp)
+            assertNull("$it height", it.heightDp)
+        }
+        BannerAdSize.entries.filterNot { it in adaptiveSizes }.forEach {
             assertFalse("$it must not be adaptive", it.isAdaptive)
         }
     }
 
     @Test
-    fun `every size maps to the matching SDK constant, ADAPTIVE to null`() {
+    fun `every size maps to the matching SDK constant, adaptive sizes to null`() {
         assertNull(BannerAdSize.ADAPTIVE.toFixedAdMobAdSize())
+        assertNull(BannerAdSize.ADAPTIVE_LARGE.toFixedAdMobAdSize())
         assertEquals(AdSize.BANNER, BannerAdSize.BANNER.toFixedAdMobAdSize())
         assertEquals(AdSize.LARGE_BANNER, BannerAdSize.LARGE_BANNER.toFixedAdMobAdSize())
         assertEquals(AdSize.MEDIUM_RECTANGLE, BannerAdSize.MEDIUM_RECTANGLE.toFixedAdMobAdSize())
@@ -59,10 +63,11 @@ class BannerAdSizeTest {
     fun `XML attr enum values align with BannerAdSize ordinals`() {
         // attrs.xml bannerAdSize enum values are resolved via BannerAdSize.entries[ordinal]
         assertEquals(0, BannerAdSize.ADAPTIVE.ordinal)
-        assertEquals(1, BannerAdSize.BANNER.ordinal)
-        assertEquals(2, BannerAdSize.LARGE_BANNER.ordinal)
-        assertEquals(3, BannerAdSize.MEDIUM_RECTANGLE.ordinal)
-        assertEquals(4, BannerAdSize.FULL_BANNER.ordinal)
-        assertEquals(5, BannerAdSize.LEADERBOARD.ordinal)
+        assertEquals(1, BannerAdSize.ADAPTIVE_LARGE.ordinal)
+        assertEquals(2, BannerAdSize.BANNER.ordinal)
+        assertEquals(3, BannerAdSize.LARGE_BANNER.ordinal)
+        assertEquals(4, BannerAdSize.MEDIUM_RECTANGLE.ordinal)
+        assertEquals(5, BannerAdSize.FULL_BANNER.ordinal)
+        assertEquals(6, BannerAdSize.LEADERBOARD.ordinal)
     }
 }

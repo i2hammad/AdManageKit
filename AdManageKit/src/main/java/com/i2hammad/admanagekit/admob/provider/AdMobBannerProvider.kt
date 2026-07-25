@@ -38,7 +38,8 @@ import com.i2hammad.admanagekit.core.ad.BannerAdProvider
  * flight when [destroy] is called — were never handed out and are destroyed by
  * the provider.
  *
- * @param adSize Explicit ad size, or null to use adaptive full-width banner (default).
+ * @param adSize Explicit ad size, or null to use the standard anchored adaptive
+ *        full-width banner (default).
  * @param collapsible Whether to load collapsible banners.
  * @param collapsiblePlacement Collapsible direction (TOP or BOTTOM).
  */
@@ -77,7 +78,9 @@ class AdMobBannerProvider(
 
         val density = context.resources.displayMetrics.density
         val adWidth = (adWidthPixels / density).toInt()
-        return AdSize.getLargeAnchoredAdaptiveBannerAdSize(activity, adWidth)
+        // Standard anchored adaptive (~50-90dp), matching the library's ADAPTIVE
+        // default; callers wanting the taller large variant pass an explicit adSize.
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, adWidth)
     }
 
     /** Map Next-Gen SDK [LoadAdError] to [AdKitAdError]. */
