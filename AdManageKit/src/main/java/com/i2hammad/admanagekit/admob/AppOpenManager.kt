@@ -409,10 +409,18 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 return
             }
             if (currentActivity != null && !isShowingAd.get() && !skipNextAd.get()) {
-                if (appOpenWaterfall?.isAdReady() == true) {
+                val strategy = AdManageKitConfig.appOpenLoadingStrategy
+                // A cached waterfall ad is usable only while fresh (appOpenAdFreshnessThreshold)
+                val useCachedAd = appOpenWaterfall?.isAdReady() == true && isCachedAdFresh()
+                if (useCachedAd) {
                     showWaterfallCachedAd(currentActivity)
                 } else {
-                    val strategy = AdManageKitConfig.appOpenLoadingStrategy
+                    // Discard a stale cached ad so the fetch below replaces it
+                    if (appOpenWaterfall?.isAdReady() == true) {
+                        appOpenWaterfall?.destroy()
+                        appOpenWaterfall = null
+                        adLoadTime = 0L
+                    }
                     when (strategy) {
                         AdLoadingStrategy.ONLY_CACHE -> fetchViaWaterfall()
                         else -> showWaterfallWithWelcomeDialog(currentActivity, null)
@@ -466,28 +474,42 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
             }
 
             AdLoadingStrategy.ONLY_CACHE -> {
-                // Only show if cached ad available, never fetch with dialog
-                if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get() && currentActivity != null) {
+                // Only show if a fresh cached ad is available, never fetch with dialog
+                if (!isShowingAd.get() && isCachedAdFresh() && !skipNextAd.get() && currentActivity != null) {
                     Log.d(LOG_TAG, "ONLY_CACHE: Showing cached ad.")
                     showCachedAd(currentActivity)
                 } else {
-                    Log.d(LOG_TAG, "ONLY_CACHE: No cached ad, skipping.")
+                    // Discard a stale cached ad (past appOpenAdFreshnessThreshold)
+                    // so the prefetch below replaces it
+                    if (isAdAvailable() && !isCachedAdFresh()) {
+                        appOpenAd = null
+                        adLoadTime = 0L
+                    }
+                    Log.d(LOG_TAG, "ONLY_CACHE: No fresh cached ad, skipping.")
                     // Prefetch for next time
                     fetchAd()
                 }
             }
 
             AdLoadingStrategy.HYBRID, AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK -> {
-                // Use cached if available, fetch with dialog if not
-                if (!isShowingAd.get() && isAdAvailable() && !skipNextAd.get()) {
+                // Use cached only while fresh (appOpenAdFreshnessThreshold);
+                // otherwise fetch with dialog
+                val useCachedAd = isCachedAdFresh()
+                if (!isShowingAd.get() && useCachedAd && !skipNextAd.get()) {
                     if (currentActivity == null) {
                         Log.e(LOG_TAG, "HYBRID: Cannot show ad - activity is null")
                         return
                     }
                     Log.d(LOG_TAG, "HYBRID: Showing cached ad.")
                     showCachedAd(currentActivity)
-                } else if (!isAdAvailable() && currentActivity != null && !skipNextAd.get()) {
-                    Log.d(LOG_TAG, "HYBRID: No cached ad, showing welcome dialog.")
+                } else if (!useCachedAd && currentActivity != null && !skipNextAd.get() && !isShowingAd.get()) {
+                    // Drop a stale cached ad so the dialog fetch loads a
+                    // fresh one instead of re-showing the old ad
+                    if (isAdAvailable()) {
+                        appOpenAd = null
+                        adLoadTime = 0L
+                    }
+                    Log.d(LOG_TAG, "HYBRID: No fresh cached ad, showing welcome dialog.")
                     showAdWithWelcomeDialog(currentActivity, null)
                 } else {
                     Log.d(LOG_TAG, "HYBRID: Cannot show ad.")
@@ -1163,6 +1185,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         waterfall.load(myApplication, object : AppOpenAdProvider.AppOpenAdCallback {
             override fun onAdLoaded() {
                 isLoading.set(false)
+                adLoadTime = System.currentTimeMillis()
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open waterfall ad loaded", true)
 
                 // Notify any pending callback (e.g. splash fetchAd that arrived while this load was running)
@@ -1254,6 +1277,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         waterfall.load(myApplication, object : AppOpenAdProvider.AppOpenAdCallback {
             override fun onAdLoaded() {
                 isLoading.set(false)
+                adLoadTime = System.currentTimeMillis()
 
                 // Notify any pending callback attached by a later fetchViaWaterfall call
                 val pending = pendingFetchCallback
@@ -1405,6 +1429,7 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                         cancelTimeout(timeoutRunnable)
                         isLoading.set(false)
                         isFetchingWithDialog = false
+                        adLoadTime = System.currentTimeMillis()
                         val loadedCallback = dialogFetchCallback
                         dialogFetchCallback = null
                         AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open waterfall ad loaded with dialog", true)
@@ -1969,7 +1994,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
      * @return true if ad exists and is younger than the freshness threshold
      */
     private fun isCachedAdFresh(): Boolean {
-        if (appOpenAd == null || adLoadTime == 0L) return false
+        // isAdAvailable() covers both the direct AdMob ad and a ready waterfall ad
+        if (!isAdAvailable() || adLoadTime == 0L) return false
         val threshold = AdManageKitConfig.appOpenAdFreshnessThreshold.inWholeMilliseconds
         if (threshold == 0L) return false  // Duration.ZERO means always fetch fresh
         val adAge = System.currentTimeMillis() - adLoadTime
@@ -2196,11 +2222,23 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         Log.d(LOG_TAG, "onStop - app went to background")
 
         // Prefetch ad in background so it's ready when user returns
-        // Only when appOpenFetchFreshAd is false (not fetching fresh on start)
+        // Only when appOpenFetchFreshAd is false (not fetching fresh on start).
+        // Also refreshes a cached ad that has gone stale (appOpenAdFreshnessThreshold).
         if (!AdManageKitConfig.appOpenFetchFreshAd &&
             !BillingConfig.getPurchaseProvider().isPurchased() &&
-            !isAdAvailable() && !isLoading.get()
+            !isCachedAdFresh() && !isLoading.get()
         ) {
+            // Discard a stale cached ad so the prefetch actually replaces it
+            // (the fetch paths skip loading while an ad is present)
+            if (isAdAvailable()) {
+                if (useWaterfall) {
+                    appOpenWaterfall?.destroy()
+                    appOpenWaterfall = null
+                } else {
+                    appOpenAd = null
+                }
+                adLoadTime = 0L
+            }
             Log.d(LOG_TAG, "onStop - prefetching ad for next foreground")
             fetchAd()
         }

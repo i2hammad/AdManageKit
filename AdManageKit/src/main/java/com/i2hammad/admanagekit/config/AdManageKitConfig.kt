@@ -207,9 +207,16 @@ object AdManageKitConfig {
     
     /**
      * Default app open ad timeout before showing alternative content.
-     * Default: 4 seconds
+     *
+     * Bounds the welcome/loading dialog on the fetch-with-dialog paths
+     * ([AdLoadingStrategy.ON_DEMAND], [AdLoadingStrategy.HYBRID] with no fresh cached
+     * ad) and the wait for late `MobileAds` initialization. A fresh app open ad
+     * regularly needs more than a few seconds to load on slower connections — too
+     * short a timeout drops the impression before the ad arrives.
+     *
+     * Default: 10 seconds
      */
-    var appOpenAdTimeout: Duration = 4.seconds
+    var appOpenAdTimeout: Duration = 10.seconds
 
     /**
      * Delay before dismissing welcome dialog after app open ad is shown.
@@ -235,10 +242,14 @@ object AdManageKitConfig {
     var enableWelcomeBackDialog: Boolean = false
 
     /**
-     * Controls when app open ads are fetched.
+     * Controls *when* the app open ad is fetched — fetch timing only. It has no
+     * effect on whether a cached ad is shown; display is governed by
+     * [appOpenLoadingStrategy] and [appOpenAdFreshnessThreshold].
      *
-     * - `true`: Fetch fresh ad on foreground (onStart) — may show loading dialog while ad loads
-     * - `false`: Prefetch ad when app goes to background (onStop) — ad ready on return, no dialog needed
+     * - `true`: No background prefetch. The ad is fetched on foreground (onStart)
+     *   when no usable cached ad exists — may show the loading dialog while it loads.
+     * - `false`: Prefetch when the app goes to background (onStop) so the ad is
+     *   ready on return, no dialog needed.
      *
      * Default: false
      */
@@ -249,8 +260,10 @@ object AdManageKitConfig {
      * If the cached ad is younger than this threshold, it will be used instead of fetching fresh.
      * This prevents wasting already-loaded ads while still ensuring relatively fresh content.
      *
-     * Applies to ON_DEMAND strategy - if cached ad is still fresh, it will be used.
-     * Set to Duration.ZERO to always fetch fresh (never use cached ads in ON_DEMAND).
+     * Applies to every loading strategy: a cached ad older than this threshold is
+     * discarded instead of shown (ON_DEMAND/HYBRID then fetch fresh with the loading
+     * dialog; ONLY_CACHE silently prefetches a replacement).
+     * Set to Duration.ZERO to always fetch fresh (never use cached ads).
      *
      * Default: 4 hours (Google recommends not caching app open ads for more than 4 hours)
      */
@@ -523,7 +536,7 @@ object AdManageKitConfig {
         defaultBannerRefreshInterval = 60.seconds
         enableCollapsibleBannersByDefault = false
         defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM
-        appOpenAdTimeout = 4.seconds
+        appOpenAdTimeout = 10.seconds
         appOpenAdFreshnessThreshold = 4.hours
         enableWelcomeBackDialog = false
         appOpenFetchFreshAd = false

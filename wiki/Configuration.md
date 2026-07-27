@@ -124,9 +124,11 @@ AdManageKitConfig.apply {
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `defaultBannerRefreshInterval` | Banner refresh interval | 60 seconds |
+| `defaultBannerRefreshInterval` | Banner refresh interval (fallback when no per-view interval is set) | 60 seconds |
 | `enableCollapsibleBannersByDefault` | Enable collapsible | false |
 | `defaultCollapsiblePlacement` | Collapsible position | BOTTOM |
+
+Banner **size** is per-view rather than global — set it via `app:bannerAdSize` in XML, `setBannerAdSize()`, the `adSize` load parameter, or the `adSize` argument of `BannerAdCompose`. See [[Banner Ads]].
 
 ```kotlin
 AdManageKitConfig.apply {
@@ -140,17 +142,23 @@ AdManageKitConfig.apply {
 
 | Setting | Description | Default |
 |---------|-------------|---------|
-| `appOpenAdTimeout` | Load timeout | 4 seconds |
-| `appOpenFetchFreshAd` | Disable prefetching | false |
 | `appOpenLoadingStrategy` | Loading strategy | HYBRID |
+| `appOpenAdFreshnessThreshold` | Max age of a usable cached ad | 4 hours |
+| `appOpenAdTimeout` | Load timeout | 10 seconds |
+| `appOpenFetchFreshAd` | Disable background prefetch, fetch on foreground | false |
+| `appOpenAutoReload` | Reload after dismissal | true |
 
 ```kotlin
 AdManageKitConfig.apply {
-    appOpenAdTimeout = 4.seconds
-    appOpenFetchFreshAd = false
     appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
+    appOpenAdFreshnessThreshold = 4.hours
+    appOpenAdTimeout = 10.seconds
+    appOpenFetchFreshAd = false
+    appOpenAutoReload = true
 }
 ```
+
+`appOpenAdFreshnessThreshold` is enforced by **every** strategy as of v4.3.5 — a cached ad older than the threshold is discarded and replaced rather than shown. `appOpenFetchFreshAd` controls fetch *timing* only (background prefetch vs. foreground fetch), not whether a cached ad is used. See [[App Open Ads]].
 
 ### Dialog Customization
 

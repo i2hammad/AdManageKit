@@ -12,12 +12,12 @@ AdManageKit provides lifecycle-aware app open ad management through the `AppOpen
 ### Loading Strategy Support
 - **Full AdLoadingStrategy Integration**: AppOpenManager now properly uses `appOpenLoadingStrategy` config
 - **ON_DEMAND**: Fetches fresh ads with welcome dialog, uses cached if still fresh
-- **ONLY_CACHE**: Only shows cached ads instantly, silently loads new if unavailable
-- **HYBRID**: Shows cached if available, fetches with dialog otherwise (recommended)
+- **ONLY_CACHE**: Only shows a fresh cached ad instantly, silently loads new if unavailable
+- **HYBRID**: Shows cached if fresh, fetches with dialog otherwise (recommended)
 
 ### Ad Freshness Tracking
-- **Load Time Tracking**: Cached ads now track when they were loaded
-- **Freshness Threshold**: Configurable `appOpenAdFreshnessThreshold` (default: 4 hours)
+- **Load Time Tracking**: Cached ads track when they were loaded (direct and waterfall paths)
+- **Freshness Threshold**: Configurable `appOpenAdFreshnessThreshold` (default: 4 hours), enforced by every strategy as of v4.3.5
 - **Smart Cache Usage**: Prevents wasting pre-loaded ads while ensuring freshness
 
 ### Auto-Reload Configuration
@@ -115,8 +115,12 @@ Configure via `AdManageKitConfig.appOpenLoadingStrategy`:
 | Strategy | Behavior | Best For |
 |----------|----------|----------|
 | `ON_DEMAND` | Uses cached if fresh, otherwise fetches with welcome dialog | Maximum coverage |
-| `ONLY_CACHE` | Only shows cached ads instantly, no waiting | Seamless UX |
-| `HYBRID` | Shows cached if available, fetches with dialog if not | Balanced (recommended) |
+| `ONLY_CACHE` | Only shows a fresh cached ad instantly, no waiting | Seamless UX |
+| `HYBRID` | Shows cached if fresh, fetches with dialog if not | Balanced (recommended) |
+
+> All strategies honor `appOpenAdFreshnessThreshold` (default 4 hours). A cached ad
+> older than the threshold is discarded and replaced, never shown. Before v4.3.5 only
+> `ON_DEMAND` enforced this.
 
 ### ON_DEMAND Strategy
 
@@ -136,8 +140,8 @@ AdManageKitConfig.appOpenLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
 ```
 
 **Behavior:**
-1. If cached ad exists, shows it immediately
-2. If no cached ad, continues without showing (no waiting)
+1. If a cached ad exists and is fresh (within `appOpenAdFreshnessThreshold`), shows it immediately
+2. If the cached ad is stale or missing, continues without showing (no waiting) — a stale ad is discarded
 3. Silently loads new ad in background for next time
 
 ### HYBRID Strategy (Recommended)
@@ -147,8 +151,8 @@ AdManageKitConfig.appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
 ```
 
 **Behavior:**
-1. If cached ad exists, shows it immediately
-2. If no cached ad, shows welcome dialog and fetches
+1. If a cached ad exists and is fresh (within `appOpenAdFreshnessThreshold`), shows it immediately
+2. If the cached ad is stale or missing, discards it, shows the welcome dialog and fetches a fresh ad
 3. Best balance of coverage and user experience
 
 ---
@@ -169,7 +173,7 @@ AdManageKitConfig.apply {
     appOpenAutoReload = true  // default: true
 
     // Timeout for ad loading
-    appOpenAdTimeout = 4.seconds
+    appOpenAdTimeout = 10.seconds
 
     // Welcome dialog customization
     welcomeDialogAppIcon = R.mipmap.ic_launcher
@@ -367,7 +371,7 @@ AdManageKitConfig.appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
 | `appOpenLoadingStrategy` | Loading strategy | `HYBRID` |
 | `appOpenAdFreshnessThreshold` | Max age for "fresh" cached ad | 4 hours |
 | `appOpenAutoReload` | Auto-reload after dismissal | `true` |
-| `appOpenAdTimeout` | Load timeout | 4 seconds |
+| `appOpenAdTimeout` | Load timeout | 10 seconds |
 | `welcomeDialogAppIcon` | App icon resource | 0 |
 | `welcomeDialogTitle` | Dialog title | "Welcome Back!" |
 | `welcomeDialogSubtitle` | Dialog subtitle | "Loading..." |

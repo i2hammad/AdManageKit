@@ -86,7 +86,7 @@ class UtilityApplication : Application() {
 
             // Use shorter timeouts for faster flow
             defaultAdTimeout = 5.seconds
-            appOpenAdTimeout = 4.seconds
+            appOpenAdTimeout = 10.seconds
         }
     }
 }

@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.3.4`** is a patch release that restores the pre-4.2.0 default adaptive banner height: `ADAPTIVE` again requests the standard anchored adaptive size (~50-90dp) instead of the taller *large anchored adaptive* format the Next-Gen migration had switched to. The taller format is now opt-in via `BannerAdSize.ADAPTIVE_LARGE` (`app:bannerAdSize="adaptive_large"` in XML). See [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md).
+**Latest Version `4.3.5`** is a patch release that makes `appOpenAdFreshnessThreshold` (default 4 hours) actually enforced on every app open show path. Previously only `ON_DEMAND` consulted it — `HYBRID`, `ONLY_CACHE`, and the multi-provider waterfall checked only whether an ad object existed and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. It also settles the `appOpenAdTimeout` default at **10 seconds** (the property said 4s while `resetToDefaults()` said 10s — 4s was too short for the fetch-with-dialog paths). No API changes. See [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md).
+
+**Version `4.3.4`** is a patch release that restores the pre-4.2.0 default adaptive banner height: `ADAPTIVE` again requests the standard anchored adaptive size (~50-90dp) instead of the taller *large anchored adaptive* format the Next-Gen migration had switched to. The taller format is now opt-in via `BannerAdSize.ADAPTIVE_LARGE` (`app:bannerAdSize="adaptive_large"` in XML). See [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md).
 
 **Version `4.3.3`** is a patch release that improves native ad media quality: every native request now sends a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carries global `VideoOptions` (start-muted by default). New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior. See [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md).
 
@@ -106,15 +108,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.5'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.5'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.5'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -587,6 +589,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md)
 - [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md)
 - [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md)
 - [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md)

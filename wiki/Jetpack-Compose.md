@@ -21,12 +21,28 @@ dependencies {
 ```kotlin
 @Composable
 fun MyScreen() {
+    // Default adaptive banner
     BannerAdCompose(
         adUnitId = "ca-app-pub-xxx/yyy",
         modifier = Modifier.fillMaxWidth()
     )
+
+    // Explicit size (v4.3.0+)
+    BannerAdCompose(
+        adUnitId = "ca-app-pub-xxx/yyy",
+        adSize = BannerAdSize.MEDIUM_RECTANGLE
+    )
+
+    // Custom fixed dimensions
+    BannerAdCompose(
+        adUnitId = "ca-app-pub-xxx/yyy",
+        width = 320.dp,
+        height = 50.dp
+    )
 }
 ```
+
+`adSize` accepts any `BannerAdSize` — `ADAPTIVE` (default), `ADAPTIVE_LARGE`, `BANNER`, `LARGE_BANNER`, `MEDIUM_RECTANGLE`, `FULL_BANNER`, `LEADERBOARD`. The composable reserves the height for the requested size while loading, so content below doesn't shift. See [[Banner Ads]].
 
 ## Native Ads
 

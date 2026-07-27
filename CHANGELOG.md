@@ -5,6 +5,22 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.5] - 2026-07-27
+
+Patch release: `appOpenAdFreshnessThreshold` (default 4 hours) is now enforced on every app open show path. Only `ON_DEMAND` consulted it before — `HYBRID`, `FRESH_WITH_CACHE_FALLBACK`, `ONLY_CACHE`, and the multi-provider waterfall gated on "an ad object exists" and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. No API changes.
+
+### Fixed
+
+- **`appOpenAdFreshnessThreshold` honored by all loading strategies** — `HYBRID`/`FRESH_WITH_CACHE_FALLBACK` and `ONLY_CACHE` gated on `isAdAvailable()` and would show an arbitrarily old cached ad; both now gate on freshness and drop the stale ad before fetching a replacement (welcome dialog on `HYBRID`, silent background prefetch on `ONLY_CACHE`)
+- **Waterfall app open ads record their load time** — `adLoadTime` was stamped only on the direct AdMob load path, so `isCachedAdFresh()` could never return `true` for a waterfall-loaded ad; all three waterfall load paths (`fetchViaWaterfall`, splash fetch, dialog fetch) now stamp it, and `isCachedAdFresh()` recognizes a ready waterfall ad via `isAdAvailable()`
+- **Waterfall show path checks freshness** — `showAdIfAvailable()` used `appOpenWaterfall?.isAdReady()` alone; it now requires a fresh ad and destroys a stale chain before re-fetching
+- **`appOpenAdTimeout` default made consistent at 10 seconds** — the property initialized to `4.seconds` while `resetToDefaults()` set `10.seconds`, so the effective timeout depended on whether `resetToDefaults()` had ever run (and two config unit tests asserting `4.seconds` failed). 4s is too short for the fetch-with-dialog paths (`ON_DEMAND`, `HYBRID` without a fresh cached ad) — the dialog gave up before a fresh ad arrived; both paths and the docs/wiki tables now say 10 seconds
+- **Background prefetch refreshes stale ads** — the `onStop` prefetch (active when `appOpenFetchFreshAd = false`) skipped loading whenever any ad was cached, so a stale ad was never replaced while the app sat in the background; it now prefetches on staleness, discarding the old ad first so the fetch isn't short-circuited
+
+### Changed
+
+- **KDoc corrected for `appOpenFetchFreshAd` and `appOpenAdFreshnessThreshold`** — `appOpenFetchFreshAd` controls fetch *timing* only (background prefetch vs. foreground fetch), never whether a cached ad is shown; `appOpenAdFreshnessThreshold` is documented as applying to every strategy rather than only `ON_DEMAND`
+
 ## [4.3.4] - 2026-07-25
 
 Patch release: restores the pre-4.2.0 default adaptive banner height. The Next-Gen SDK migration (4.2.0) had silently switched every adaptive banner path to the taller *large anchored adaptive* format; `ADAPTIVE` now requests the standard anchored adaptive size (~50-90dp) again, and the taller format is opt-in via the new `BannerAdSize.ADAPTIVE_LARGE`.
