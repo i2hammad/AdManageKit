@@ -50,10 +50,11 @@ jobs:
           node-version: 20
           registry-url: "https://registry.npmjs.org"
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: mcp-server-build
-          path: mcp-server
+      # `npm publish` runs the prepublishOnly script, which re-runs `tsc` and
+      # bundle-docs. That needs node_modules in *this* job — downloading the
+      # build job's artifact is not enough, and without an install the publish
+      # fails with TS2307 "Cannot find module" for every import.
+      - run: npm ci
 
       - run: npm publish --access public
         env:
