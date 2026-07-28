@@ -7,6 +7,16 @@ import {
   generateComposeCode,
 } from "../utils/templates.js";
 
+// Mirrors config/AdLoadingStrategy.kt. All four values are valid for every
+// strategy field — the schema previously omitted FRESH_WITH_CACHE_FALLBACK
+// entirely and restricted native ads to two of the four.
+const AD_LOADING_STRATEGIES = [
+  "ON_DEMAND",
+  "ONLY_CACHE",
+  "HYBRID",
+  "FRESH_WITH_CACHE_FALLBACK",
+] as const;
+
 export function registerCodeGenerationTools(server: McpServer) {
   // Tool 7: generate_config
   server.tool(
@@ -37,13 +47,9 @@ export function registerCodeGenerationTools(server: McpServer) {
             .boolean()
             .optional()
             .describe("Enable performance tracking"),
-          interstitial_strategy: z
-            .enum(["ON_DEMAND", "ONLY_CACHE", "HYBRID"])
-            .optional(),
-          app_open_strategy: z
-            .enum(["ON_DEMAND", "ONLY_CACHE", "HYBRID"])
-            .optional(),
-          native_strategy: z.enum(["ON_DEMAND", "HYBRID"]).optional(),
+          interstitial_strategy: z.enum(AD_LOADING_STRATEGIES).optional(),
+          app_open_strategy: z.enum(AD_LOADING_STRATEGIES).optional(),
+          native_strategy: z.enum(AD_LOADING_STRATEGIES).optional(),
           interstitial_auto_reload: z.boolean().optional(),
           app_open_auto_reload: z.boolean().optional(),
           rewarded_auto_reload: z.boolean().optional(),
@@ -116,7 +122,7 @@ export function registerCodeGenerationTools(server: McpServer) {
             .optional()
             .describe("For interstitial: how to show the ad"),
           loading_strategy: z
-            .enum(["ON_DEMAND", "ONLY_CACHE", "HYBRID"])
+            .enum(AD_LOADING_STRATEGIES)
             .optional()
             .describe("Loading strategy to use"),
           use_caching: z
@@ -194,12 +200,18 @@ export function registerCodeGenerationTools(server: McpServer) {
           "setup",
           "purchase",
           "subscribe",
+          "offers",
           "consumable",
           "subscription_management",
+          "account_hold",
           "expiry_verification",
           "complete",
         ])
-        .describe("Which billing scenario to generate code for"),
+        .describe(
+          "Which billing scenario to generate code for. 'offers' covers multi-offer paywalls " +
+            "(enumerating offers, buying a specific one, savings badges, trial eligibility); " +
+            "'account_hold' covers declined-payment detection and Play's recovery flow."
+        ),
       products: z
         .array(
           z.object({
@@ -269,7 +281,7 @@ export function registerCodeGenerationTools(server: McpServer) {
               "For native_template: NativeAdTemplate value (e.g., MATERIAL3)"
             ),
           loading_strategy: z
-            .enum(["ON_DEMAND", "ONLY_CACHE", "HYBRID"])
+            .enum(AD_LOADING_STRATEGIES)
             .optional(),
           with_callbacks: z.boolean().optional(),
           show_mode: z

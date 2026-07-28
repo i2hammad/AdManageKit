@@ -80,6 +80,12 @@ function generateConfigKotlin(o: ConfigOptions): string {
 
   const imports = [
     "import android.app.Application",
+    "import android.content.pm.PackageManager",
+    "import android.os.Handler",
+    "import android.os.Looper",
+    "import com.google.android.libraries.ads.mobile.sdk.MobileAds",
+    "import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig",
+    "import com.i2hammad.admanagekit.admob.AppOpenManager",
     "import com.i2hammad.admanagekit.config.AdManageKitConfig",
   ];
 
@@ -93,21 +99,18 @@ function generateConfigKotlin(o: ConfigOptions): string {
     );
   }
   if (o.billing) {
-    imports.push("import com.i2hammad.admanagekit.core.BillingConfig");
+    imports.push("import com.i2hammad.admanagekit.billing.AppPurchase");
+    imports.push("import com.i2hammad.admanagekit.billing.PurchaseItem");
     imports.push(
       "import com.i2hammad.admanagekit.billing.BillingPurchaseProvider"
     );
-  }
-  if (o.app_open_ad_unit !== undefined || true) {
-    imports.push(
-      "import com.i2hammad.admanagekit.admob.AppOpenManager"
-    );
+    imports.push("import com.i2hammad.admanagekit.core.BillingConfig");
   }
 
-  return `${imports.join("\n")}
+  return `${imports.sort().join("\n")}
 
 class MyApp : Application() {
-    private lateinit var appOpenManager: AppOpenManager
+    private var appOpenManager: AppOpenManager? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -119,13 +122,63 @@ ${configLines.join("\n")}
 ${
   o.billing
     ? `
-        // Set up billing provider
-        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+        initBilling()
 `
     : ""
 }
-        // Initialize app open ads
-        appOpenManager = AppOpenManager(this, ${appOpenUnit})
+        initAds()
+    }
+
+    /**
+     * Since v4.2.0 AdManageKit runs on the Next-Gen Google Mobile Ads SDK, which
+     * removed the legacy SDK's silent lazy-init. MobileAds.initialize() must be
+     * called explicitly once before any ad request — AdManageKit does not do it
+     * for you, because it does not own your consent flow.
+     */
+    private fun initAds() {
+        val config = InitializationConfig.Builder(readApplicationIdFromManifest()).build()
+
+        // initialize() is blocking, so keep it off the main thread or it can ANR.
+        Thread {
+            MobileAds.initialize(this, config)
+
+            // Construct AppOpenManager only after initialize() returns. It registers
+            // a lifecycle observer that can fire a load immediately, and the Next-Gen
+            // SDK rejects requests made before initialization completes.
+            Handler(Looper.getMainLooper()).post {
+                appOpenManager = AppOpenManager(this, ${appOpenUnit})
+            }
+        }.start()
+    }
+
+    /**
+     * The Next-Gen SDK does not read the manifest tag automatically like the
+     * legacy SDK did, so the application id must be supplied explicitly.
+     */
+    private fun readApplicationIdFromManifest(): String {
+        val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+        return appInfo.metaData.getString("com.google.android.gms.ads.APPLICATION_ID")
+            ?: error("Missing com.google.android.gms.ads.APPLICATION_ID meta-data in AndroidManifest.xml")
+    }${
+      o.billing
+        ? `
+
+    private fun initBilling() {
+        // A library AAR is always compiled with BuildConfig.DEBUG = false, so the
+        // host app must inject its own build state. Call this BEFORE initBilling().
+        AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG)
+
+        val products = listOf(
+            PurchaseItem("remove_ads", AppPurchase.TYPE_IAP.PURCHASE, PurchaseItem.PurchaseCategory.REMOVE_ADS),
+            PurchaseItem("premium_monthly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
+            PurchaseItem("premium_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION)
+        )
+        AppPurchase.getInstance().initBilling(this, products)
+
+        // Lets every ad component skip loading for paying users.
+        BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+    }`
+        : ""
     }
 }`;
 }
@@ -165,10 +218,17 @@ function generateConfigJava(o: ConfigOptions): string {
   const appOpenUnit = o.app_open_ad_unit || TEST_AD_UNITS.app_open;
 
   return `import android.app.Application;
+import android.content.pm.PackageManager;
+import android.os.Handler;
+import android.os.Looper;
+import java.util.Arrays;
+import java.util.List;
+import com.google.android.libraries.ads.mobile.sdk.MobileAds;
+import com.google.android.libraries.ads.mobile.sdk.initialization.InitializationConfig;
 import com.i2hammad.admanagekit.config.AdManageKitConfig;
 import com.i2hammad.admanagekit.config.AdLoadingStrategy;
 import com.i2hammad.admanagekit.admob.AppOpenManager;
-${o.billing ? "import com.i2hammad.admanagekit.core.BillingConfig;\nimport com.i2hammad.admanagekit.billing.BillingPurchaseProvider;\n" : ""}
+${o.billing ? "import com.i2hammad.admanagekit.billing.AppPurchase;\nimport com.i2hammad.admanagekit.billing.PurchaseItem;\nimport com.i2hammad.admanagekit.billing.BillingPurchaseProvider;\nimport com.i2hammad.admanagekit.core.BillingConfig;\n" : ""}
 public class MyApp extends Application {
     private AppOpenManager appOpenManager;
 
@@ -178,9 +238,68 @@ public class MyApp extends Application {
 
         // Configure AdManageKit
 ${configLines.join("\n")}
-${o.billing ? "\n        // Set up billing provider\n        BillingConfig.INSTANCE.setPurchaseProvider(new BillingPurchaseProvider());\n" : ""}
-        // Initialize app open ads
-        appOpenManager = new AppOpenManager(this, "${appOpenUnit}");
+${o.billing ? "\n        initBilling();\n" : ""}
+        initAds();
+    }
+
+    /**
+     * Since v4.2.0 AdManageKit runs on the Next-Gen Google Mobile Ads SDK, which
+     * removed the legacy SDK's silent lazy-init. MobileAds.initialize() must be
+     * called explicitly once before any ad request.
+     */
+    private void initAds() {
+        InitializationConfig config =
+                new InitializationConfig.Builder(readApplicationIdFromManifest()).build();
+
+        // initialize() is blocking, so keep it off the main thread or it can ANR.
+        new Thread(() -> {
+            MobileAds.initialize(this, config);
+
+            // Construct AppOpenManager only after initialize() returns — it registers a
+            // lifecycle observer that can request an ad immediately, and the Next-Gen SDK
+            // rejects requests made before initialization completes.
+            new Handler(Looper.getMainLooper()).post(() ->
+                    appOpenManager = new AppOpenManager(this, "${appOpenUnit}"));
+        }).start();
+    }
+
+    /**
+     * The Next-Gen SDK does not read the manifest tag automatically like the
+     * legacy SDK did, so the application id must be supplied explicitly.
+     */
+    private String readApplicationIdFromManifest() {
+        try {
+            android.content.pm.ApplicationInfo info = getPackageManager()
+                    .getApplicationInfo(getPackageName(), PackageManager.GET_META_DATA);
+            String id = info.metaData.getString("com.google.android.gms.ads.APPLICATION_ID");
+            if (id == null) {
+                throw new IllegalStateException(
+                        "Missing com.google.android.gms.ads.APPLICATION_ID meta-data in AndroidManifest.xml");
+            }
+            return id;
+        } catch (PackageManager.NameNotFoundException e) {
+            throw new IllegalStateException(e);
+        }
+    }${
+      o.billing
+        ? `
+
+    private void initBilling() {
+        // A library AAR is always compiled with BuildConfig.DEBUG = false, so the
+        // host app must inject its own build state. Call this BEFORE initBilling().
+        AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG);
+
+        List<PurchaseItem> products = Arrays.asList(
+                new PurchaseItem("remove_ads", AppPurchase.TYPE_IAP.PURCHASE,
+                        PurchaseItem.PurchaseCategory.REMOVE_ADS),
+                new PurchaseItem("premium_monthly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
+                new PurchaseItem("premium_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION));
+        AppPurchase.getInstance().initBilling(this, products);
+
+        // Lets every ad component skip loading for paying users.
+        BillingConfig.INSTANCE.setPurchaseProvider(new BillingPurchaseProvider());
+    }`
+        : ""
     }
 }`;
 }
@@ -598,18 +717,24 @@ export function generateBillingCode(options: BillingOptions): string {
       return generateBillingPurchase();
     case "subscribe":
       return generateBillingSubscribe();
+    case "offers":
+      return generateBillingOffers();
     case "consumable":
       return generateBillingConsumable();
     case "subscription_management":
       return generateBillingSubscriptionMgmt();
+    case "account_hold":
+      return generateBillingAccountHold();
     case "expiry_verification":
       return generateBillingExpiryVerification();
     case "complete":
       return [
         generateBillingSetup(options),
         generateBillingPurchase(),
+        generateBillingOffers(),
         generateBillingConsumable(),
         generateBillingSubscriptionMgmt(),
+        generateBillingAccountHold(),
       ].join("\n\n// ---\n\n");
     default:
       return `// Unknown billing scenario: ${scenario}`;
@@ -639,6 +764,12 @@ function generateBillingSetup(o: BillingOptions): string {
     .join(",\n");
 
   return `import com.i2hammad.admanagekit.billing.*
+import com.i2hammad.admanagekit.core.BillingConfig
+
+// A library AAR is always compiled with BuildConfig.DEBUG = false, so the host
+// app must inject its own build state. In debug builds this routes purchase()/
+// subscribe() to the dev bottom sheet. Call this BEFORE initBilling().
+AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG)
 
 // Define products
 val products = listOf(
@@ -649,12 +780,39 @@ ${productLines}
 AppPurchase.getInstance().initBilling(application, products)
 
 // Set up billing provider for ad suppression
-BillingConfig.setPurchaseProvider(BillingPurchaseProvider())`;
+BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
+
+// Optional but recommended: hashed identifiers Google uses for fraud detection.
+// Never pass raw emails or user ids; max 64 characters.
+AppPurchase.getInstance().setObfuscatedAccountId(sha256(userId))
+
+// Diagnose an empty paywall — reports which product ids Play declined and why.
+// Register BEFORE initBilling().
+AppPurchase.getInstance().setProductDetailsListener(object : ProductDetailsListener {
+    override fun onProductDetailsLoaded(
+        productType: String,
+        loaded: List<ProductDetails>,
+        unfetched: List<UnfetchedProduct>,
+    ) {
+        unfetched.forEach { Log.e("Billing", "\${it.productId}: status \${it.statusCode}") }
+    }
+
+    override fun onProductDetailsFailed(productType: String, responseCode: Int, debugMessage: String?) {
+        Log.e("Billing", "\$productType query failed: \$responseCode \$debugMessage")
+    }
+})`;
 }
 
 function generateBillingPurchase(): string {
   return `// Purchase a product
 AppPurchase.getInstance().purchase(activity, "remove_ads")
+
+// If the product has multiple offers (a launch discount, a rental, a
+// limited-quantity drop), buy the specific one instead — see the
+// "offers" scenario.
+AppPurchase.getInstance().getBestOneTimeOffer("remove_ads")?.let { offer ->
+    AppPurchase.getInstance().purchase(activity, offer)
+}
 
 // Check purchase status
 if (AppPurchase.getInstance().isPurchased()) {
@@ -673,15 +831,117 @@ AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryLis
 }
 
 function generateBillingSubscribe(): string {
-  return `// Subscribe
-AppPurchase.getInstance().subscribe(activity, "premium_monthly")
+  return `val billing = AppPurchase.getInstance()
+
+// Simple case — one offer on the product. The library picks the offer for you:
+// the id configured as PurchaseItem.trialId, otherwise Play's LAST offer.
+billing.subscribe(activity, "premium_monthly")
+
+// If the product has more than one offer (base plan + free trial + intro offer),
+// the line above can charge for a plan the user did not pick. Pass the offer
+// explicitly instead — see the "offers" scenario for a full paywall.
+val offers = billing.getOffers("premium_monthly")
+billing.subscribe(activity, offers[selectedIndex])
 
 // Check subscription state
-val state = AppPurchase.getInstance().getSubscriptionState("premium_monthly")
-when (state) {
+when (billing.getSubscriptionState("premium_monthly")) {
     SubscriptionState.ACTIVE -> showPremiumUI()
-    SubscriptionState.CANCELLED -> showRenewalPrompt()
+    SubscriptionState.CANCELLED -> showRenewalPrompt()   // Still has access
+    SubscriptionState.ON_HOLD -> showFixPaymentPrompt()  // Payment declined — no access
     SubscriptionState.EXPIRED -> showSubscribeButton()
+    else -> showSubscribeButton()
+}`;
+}
+
+function generateBillingOffers(): string {
+  return `val billing = AppPurchase.getInstance()
+
+// A subscription product usually carries several offers — a base plan, a free
+// trial, an introductory discount. Play returns only the ones THIS account is
+// eligible for, so the list is already personalized.
+for (offer in billing.getOffers("premium_monthly")) {
+    Log.d("IAP", "\${offer.basePlanId}/\${offer.offerId} " +
+            "trial=\${offer.isFreeTrial} intro=\${offer.introPrice} base=\${offer.basePrice}")
+}
+
+// Find a specific offer rather than relying on list order
+billing.getIntroOffer("premium_monthly")                    // first with an intro price
+billing.getTrialOffer("premium_monthly")                    // first with a free trial
+billing.getOfferByBasePlanId("premium_yearly", "yearly")    // by base plan id
+billing.getOfferByTag("premium_yearly", "popular")          // by Play Console offer tag
+billing.getBestValueOffer("premium_yearly")                 // lowest cost per month
+billing.getCheapestFirstCycleOffer("premium_yearly")        // cheapest way in
+
+// Render an offer without hand-parsing ProductDetails or ISO-8601 periods
+val offer = billing.getBaseOffer("premium_yearly") ?: return
+
+priceLabel.text    = offer.basePrice                        // "\$59.99"
+cycleLabel.text    = BillingPeriod.formatOf(offer.billingPeriod)  // "1 year"
+perMonthLabel.text = AppPurchase.formatPrice(offer.pricePerMonthMicros, offer.currencyCode)
+todayLabel.text    = offer.firstCyclePrice                  // "Free", "\$1.99" or "\$59.99"
+
+// "Save 50%" badge — compares BASE offers, so trial/intro phases don't distort it
+val savings = billing.getSavingsPercent("premium_monthly", "premium_yearly")
+savingsBadge.isVisible = savings > 0
+savingsBadge.text = "Save \$savings%"
+
+// Only promise a trial this account can actually claim, or Play charges immediately
+subscribeButton.text = if (billing.isEligibleForFreeTrial("premium_monthly")) {
+    "Start free trial"
+} else {
+    "Subscribe"
+}
+
+// Buy exactly the offer the user tapped
+subscribeButton.setOnClickListener { billing.subscribe(activity, offer) }
+
+// One-time products can carry multiple offers too (discounts, rentals,
+// pre-orders, limited quantity)
+billing.getBestOneTimeOffer("remove_ads")?.let { oneTime ->
+    price.text = oneTime.formattedPrice
+    badge.isVisible = oneTime.isDiscounted
+    badge.text = "-\${oneTime.effectiveDiscountPercent}%"
+    buyButton.isEnabled = !oneTime.isSoldOut && oneTime.isValidAt()
+    buyButton.setOnClickListener { billing.purchase(activity, oneTime) }
+}
+
+// NOTE: localize periods with BillingPeriod.parse(iso) and pair unit + count with
+// your own plurals resources. BillingPeriod.formatOf() is English-only.`;
+}
+
+function generateBillingAccountHold(): string {
+  return `val billing = AppPurchase.getInstance()
+
+// When Play cannot charge a subscriber, the subscription enters ACCOUNT HOLD.
+// The purchase record still exists, but the user has NOT paid.
+// Detected client-side since v4.4.0 — it used to need server-side verification.
+if (billing.hasSubscriptionOnHold()) {
+    // Play shows the user an in-app flow to fix their payment method.
+    // Google recommends calling this on foreground entry for subscription apps.
+    billing.showInAppMessages(activity, object : InAppMessageListener {
+        override fun onSubscriptionRecovered(purchaseToken: String) {
+            // AppPurchase already refreshed its state — isPurchased() is correct here.
+            refreshPremiumUi()
+        }
+
+        override fun onNoActionNeeded() { }
+    })
+}
+
+// Per-subscription check
+val subscription = billing.getSubscription("premium_monthly")
+if (subscription?.isSuspended == true) {
+    showFixPaymentPrompt()
+}
+
+// IMPORTANT: isSubscriptionActive() returns false during account hold, which is
+// what Google requires — an on-hold user must not keep premium access. If your
+// app deliberately keeps serving these users, check isSuspended() explicitly.
+
+// A plan change the user started but has not paid for yet. The CURRENT plan
+// remains the entitlement in force until it completes.
+if (billing.hasPendingSubscriptionChange()) {
+    showPlanChangePendingBanner()
 }`;
 }
 
@@ -701,27 +961,44 @@ AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryLis
 }
 
 function generateBillingSubscriptionMgmt(): string {
-  return `// Check subscription state
-val state = AppPurchase.getInstance().getSubscriptionState("premium_monthly")
-when (state) {
+  return `val billing = AppPurchase.getInstance()
+
+// Check subscription state
+when (billing.getSubscriptionState("premium_monthly")) {
     SubscriptionState.ACTIVE -> showPremiumUI()
-    SubscriptionState.CANCELLED -> showRenewalPrompt() // Still has access until period ends
+    SubscriptionState.CANCELLED -> showRenewalPrompt()   // Still has access until period ends
+    SubscriptionState.ON_HOLD -> showFixPaymentPrompt()  // Payment declined — no access (v4.4.0+)
     SubscriptionState.EXPIRED -> showSubscribeButton()
+    else -> showSubscribeButton()
 }
 
 // Upgrade subscription
-AppPurchase.getInstance().upgradeSubscription(activity, "premium_yearly")
+billing.upgradeSubscription(activity, "premium_yearly")
 
 // Downgrade subscription
-AppPurchase.getInstance().downgradeSubscription(activity, "premium_basic")
+billing.downgradeSubscription(activity, "premium_basic")
 
 // Full control with proration mode
-AppPurchase.getInstance().changeSubscription(
+billing.changeSubscription(
     activity,
     "premium_monthly",         // from
     "premium_yearly",          // to
     SubscriptionReplacementMode.CHARGE_PRORATED_PRICE
-)`;
+)
+
+// Upgrade onto a SPECIFIC offer of the new plan. The overloads above let the
+// library resolve the offer, which may not be the one the user selected.
+val target = billing.getOfferByBasePlanId("premium_yearly", "yearly")
+val current = billing.getSubscription("premium_monthly")
+if (target != null && current != null) {
+    billing.updateSubscription(
+        activity,
+        "premium_yearly",
+        target.offerToken,
+        current.purchaseToken,
+        AppPurchase.SubscriptionReplacementMode.CHARGE_PRORATED_PRICE
+    )
+}`;
 }
 
 function generateBillingExpiryVerification(): string {
@@ -751,21 +1028,65 @@ AppPurchase.getInstance().verifySubscription("premium_monthly",
 }
 
 function generateBillingJava(o: BillingOptions): string {
-  return `// Billing setup (Java)
+  return `// ─── Setup ───────────────────────────────────────────────────
+// A library AAR is always compiled with BuildConfig.DEBUG = false, so the host
+// app must inject its own build state. Call this BEFORE initBilling().
+AppPurchase.getInstance().setDebugMode(BuildConfig.DEBUG);
+
 List<PurchaseItem> products = Arrays.asList(
-    new PurchaseItem("remove_ads", TYPE_IAP.PURCHASE, PurchaseCategory.REMOVE_ADS),
-    new PurchaseItem("premium_monthly", "free_trial", TYPE_IAP.SUBSCRIPTION)
+    new PurchaseItem("remove_ads", AppPurchase.TYPE_IAP.PURCHASE,
+            PurchaseItem.PurchaseCategory.REMOVE_ADS),
+    new PurchaseItem("premium_monthly", AppPurchase.TYPE_IAP.SUBSCRIPTION),
+    new PurchaseItem("premium_yearly", AppPurchase.TYPE_IAP.SUBSCRIPTION)
 );
 
 AppPurchase.getInstance().initBilling(getApplication(), products);
 BillingConfig.INSTANCE.setPurchaseProvider(new BillingPurchaseProvider());
 
-// Purchase
+// ─── Purchase ────────────────────────────────────────────────
 AppPurchase.getInstance().purchase(activity, "remove_ads");
 
-// Check status
 if (AppPurchase.getInstance().isPurchased()) {
     // User has premium access
+}
+
+// ─── Offers ──────────────────────────────────────────────────
+// A subscription usually has several offers. subscribe(activity, id) resolves
+// the offer itself and may not pick the one the user tapped — pass it directly.
+AppPurchase billing = AppPurchase.getInstance();
+List<OfferInfo> offers = billing.getOffers("premium_monthly");
+billing.subscribe(activity, offers.get(selectedIndex));
+
+OfferInfo base = billing.getBaseOffer("premium_yearly");
+if (base != null) {
+    priceLabel.setText(base.getBasePrice());
+    cycleLabel.setText(BillingPeriod.formatOf(base.getBillingPeriod()));
+    perMonthLabel.setText(
+            AppPurchase.formatPrice(base.getPricePerMonthMicros(), base.getCurrencyCode()));
+}
+
+int savings = billing.getSavingsPercent("premium_monthly", "premium_yearly");
+if (savings > 0) {
+    savingsBadge.setText("Save " + savings + "%");
+}
+
+// Only promise a trial this account can actually claim
+subscribeButton.setText(
+        billing.isEligibleForFreeTrial("premium_monthly") ? "Start free trial" : "Subscribe");
+
+// ─── Account hold ────────────────────────────────────────────
+// isSubscriptionActive() returns false during account hold — the user's payment
+// was declined and they must not keep premium access.
+if (billing.hasSubscriptionOnHold()) {
+    billing.showInAppMessages(activity, new InAppMessageListener() {
+        @Override
+        public void onSubscriptionRecovered(@NonNull String purchaseToken) {
+            refreshPremiumUi();
+        }
+
+        @Override
+        public void onNoActionNeeded() { }
+    });
 }`;
 }
 
