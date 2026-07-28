@@ -15,6 +15,29 @@ dependencies {
     dokka(project(":admanagekit-yandex"))
 }
 
+// On an Android module, Dokka registers a source set per variant (`debug`,
+// `release`, the test/androidTest/testFixtures variants) *plus* a generic `main`
+// — and `main`, `debug` and `release` all cover src/main. Dokka rejects that:
+//
+//   Pre-generation validity check failed: Source sets 'androidJvm' and 'release'
+//   have the common source roots: .../src/main/kotlin, .../src/main/java
+//
+// ('androidJvm' is how Dokka displays the `main` source set.) Document the
+// release variant only — it matches what each module publishes via
+// components["release"] — and suppress the rest, which also keeps test and
+// androidTest sources out of the public API docs.
+//
+// Applied here rather than in each module so a new module is covered automatically.
+subprojects {
+    plugins.withId("org.jetbrains.dokka") {
+        extensions.configure<org.jetbrains.dokka.gradle.DokkaExtension> {
+            dokkaSourceSets.configureEach {
+                suppress.set(name != "release")
+            }
+        }
+    }
+}
+
 // Generate documentation: ./gradlew dokkaGeneratePublicationHtml
 // Output: build/dokka/html
 
