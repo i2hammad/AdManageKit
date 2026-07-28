@@ -39,6 +39,7 @@ export const TOPIC_MAP: Record<string, string[]> = {
   "purchase-categories": ["wiki/Purchase-Categories.md"],
   consumables: ["wiki/Consumable-Products.md"],
   subscriptions: ["wiki/Subscriptions.md"],
+  "subscription-offers": ["wiki/Subscription-Offers.md"],
   "subscription-upgrades": ["wiki/Subscription-Upgrades.md"],
   "java-usage": ["docs/JAVA_USAGE_GUIDE.md"],
   "native-template-view": ["docs/NATIVE_TEMPLATE_VIEW.md"],
@@ -59,46 +60,15 @@ export const TOPIC_MAP: Record<string, string[]> = {
   ],
 };
 
-export const API_CLASS_NAMES = [
-  "AdManageKitConfig",
-  "BillingConfig",
-  "AdManager",
-  "AppOpenManager",
-  "BannerAdView",
-  "NativeAdViews",
-  "NativeAdManager",
-  "RewardedAdManager",
-  "AppPurchase",
-  "PurchaseItem",
-  "AdRetryManager",
-  "AdDebugUtils",
-  "AdLoadCallback",
-  "AdManagerCallback",
-  "InterstitialAdBuilder",
-  "WeakReferenceHolder",
-] as const;
-
-export const RELEASE_VERSIONS = [
-  "3.3.8",
-  "3.3.7",
-  "3.3.5",
-  "3.3.4",
-  "3.3.3",
-  "3.3.2",
-  "3.3.0",
-  "3.1.0",
-  "3.0.0",
-  "2.9.0",
-  "2.8.0",
-  "2.7.0",
-  "2.6.0",
-  "2.5.0",
-  "2.3.0",
-  "2.2.0",
-  "2.1.0",
-] as const;
-
-export const MIGRATION_VERSIONS = ["3.0.0", "2.9.0", "2.8.0", "2.7.0"] as const;
+// API class names, release versions and migration versions are deliberately NOT
+// listed here. They are derived from the bundled documentation at startup by
+// discoverApiClassNames(), discoverReleaseVersions() and
+// discoverMigrationVersions() in utils/doc-loader.ts.
+//
+// They used to be hardcoded and drifted badly: the release list stopped at 3.3.8
+// while 38 release-notes files existed, so every version from 3.4.0 onward was
+// rejected by the tool schema, and "latest" returned February 2026. Deriving them
+// means shipping a doc is sufficient to make it reachable.
 
 export const TEST_AD_UNITS: Record<string, string> = {
   banner: "ca-app-pub-3940256099942544/6300978111",

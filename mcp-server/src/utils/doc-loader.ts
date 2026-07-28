@@ -5,6 +5,8 @@ import { DocSection } from "../types.js";
 let resolvedRoot: string | null = null;
 let docSections: DocSection[] | null = null;
 let apiSections: Map<string, string> | null = null;
+let releaseVersions: string[] | null = null;
+let migrationVersions: string[] | null = null;
 
 /**
  * Resolves the root directory containing docs/, wiki/, and README.md.
@@ -205,9 +207,80 @@ export function loadTopicFiles(files: string[]): string {
   return parts.join("\n\n");
 }
 
+/**
+ * Compares two dot-separated versions numerically, newest first.
+ * Falls back to string comparison for any non-numeric component.
+ */
+function compareVersionsDesc(a: string, b: string): number {
+  const pa = a.split(".");
+  const pb = b.split(".");
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = Number(pa[i] ?? 0);
+    const nb = Number(pb[i] ?? 0);
+    if (Number.isNaN(na) || Number.isNaN(nb)) {
+      const cmp = (pb[i] ?? "").localeCompare(pa[i] ?? "");
+      if (cmp !== 0) return cmp;
+      continue;
+    }
+    if (na !== nb) return nb - na;
+  }
+  return 0;
+}
+
+/**
+ * Versions that have a release-notes file, newest first.
+ *
+ * Derived by scanning docs/release-notes/ rather than hardcoded, so a new
+ * release becomes queryable as soon as its notes are bundled. The previous
+ * hardcoded list silently stopped at 3.3.8 and made every later release
+ * unreachable through get_release_notes.
+ */
+export function discoverReleaseVersions(): string[] {
+  if (releaseVersions) return releaseVersions;
+
+  const versions: string[] = [];
+  for (const file of discoverFiles("docs/release-notes", "")) {
+    const match = path.basename(file).match(/^RELEASE_NOTES_v(.+)\.md$/);
+    if (match) versions.push(match[1]);
+  }
+  releaseVersions = versions.sort(compareVersionsDesc);
+  return releaseVersions;
+}
+
+/**
+ * Versions with a "### Migrating to X" section in the README, newest first.
+ * Derived from the README so a new migration guide needs no code change.
+ */
+export function discoverMigrationVersions(): string[] {
+  if (migrationVersions) return migrationVersions;
+
+  const readme = loadFile("README.md");
+  const found = new Set<string>();
+  for (const match of readme.matchAll(/^###\s+Migrating to\s+(\S+)\s*$/gm)) {
+    found.add(match[1]);
+  }
+  migrationVersions = Array.from(found).sort(compareVersionsDesc);
+  return migrationVersions;
+}
+
+/**
+ * Class/component names documented in docs/API_REFERENCE.md, in document order.
+ * Derived from the file's own headings, so newly documented types are
+ * immediately reachable through get_api_reference.
+ */
+export function discoverApiClassNames(): string[] {
+  return Array.from(loadApiSections().keys());
+}
+
+/**
+ * Loads release notes for a version. `"latest"` resolves to the newest version
+ * actually present, rather than a hardcoded one that goes stale every release.
+ */
 export function loadReleaseNotes(version: string): string {
   if (version === "latest") {
-    version = "3.3.8";
+    const newest = discoverReleaseVersions()[0];
+    if (!newest) return "";
+    version = newest;
   }
   return loadFile(`docs/release-notes/RELEASE_NOTES_v${version}.md`);
 }

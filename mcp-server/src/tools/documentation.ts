@@ -5,16 +5,28 @@ import {
   loadApiSections,
   loadReleaseNotes,
   loadMigrationGuide,
+  discoverApiClassNames,
+  discoverReleaseVersions,
+  discoverMigrationVersions,
 } from "../utils/doc-loader.js";
 import { searchDocs } from "../utils/search.js";
-import {
-  TOPIC_MAP,
-  API_CLASS_NAMES,
-  RELEASE_VERSIONS,
-  MIGRATION_VERSIONS,
-} from "../types.js";
+import { TOPIC_MAP } from "../types.js";
 
 const topicKeys = Object.keys(TOPIC_MAP) as [string, ...string[]];
+
+/**
+ * Builds an enum schema from values discovered in the bundled docs.
+ *
+ * z.enum() requires a non-empty tuple, so if discovery finds nothing (docs
+ * missing or unreadable) this degrades to a plain string rather than throwing
+ * at registration time and taking the whole server down. Each tool still
+ * validates the value at call time and reports what is actually available.
+ */
+function discoveredEnum(values: string[], description: string) {
+  return values.length > 0
+    ? z.enum(values as [string, ...string[]]).describe(description)
+    : z.string().describe(description);
+}
 
 export function registerDocumentationTools(server: McpServer) {
   // Tool 1: search_docs
@@ -110,9 +122,10 @@ export function registerDocumentationTools(server: McpServer) {
     "get_api_reference",
     "Get the API reference for a specific AdManageKit class or component. Returns method signatures, parameters, and usage examples.",
     {
-      class_name: z
-        .enum(API_CLASS_NAMES)
-        .describe("The class or component name to look up"),
+      class_name: discoveredEnum(
+        discoverApiClassNames(),
+        "The class or component name to look up"
+      ),
     },
     async ({ class_name }) => {
       const sections = loadApiSections();
@@ -156,11 +169,10 @@ export function registerDocumentationTools(server: McpServer) {
     "get_release_notes",
     "Get release notes for a specific AdManageKit version. Returns new features, breaking changes, migration guides, and bug fixes.",
     {
-      version: z
-        .enum(["latest", ...RELEASE_VERSIONS])
-        .describe(
-          "The version to get release notes for (e.g., '3.3.5', '3.0.0'). Use 'latest' for the most recent."
-        ),
+      version: discoveredEnum(
+        ["latest", ...discoverReleaseVersions()],
+        "The version to get release notes for (e.g., '4.4.0', '3.0.0'). Use 'latest' for the most recent."
+      ),
     },
     async ({ version }) => {
       const content = loadReleaseNotes(version);
@@ -170,7 +182,7 @@ export function registerDocumentationTools(server: McpServer) {
           content: [
             {
               type: "text" as const,
-              text: `No release notes found for version ${version}. Available versions: ${RELEASE_VERSIONS.join(", ")}`,
+              text: `No release notes found for version ${version}. Available versions: ${discoverReleaseVersions().join(", ")}`,
             },
           ],
         };
@@ -187,9 +199,10 @@ export function registerDocumentationTools(server: McpServer) {
     "get_migration_guide",
     "Get the migration guide for upgrading between AdManageKit versions. Covers breaking changes, deprecated APIs, and step-by-step migration instructions.",
     {
-      target_version: z
-        .enum(MIGRATION_VERSIONS)
-        .describe("The version you are migrating TO (e.g., '3.0.0', '2.9.0')"),
+      target_version: discoveredEnum(
+        discoverMigrationVersions(),
+        "The version you are migrating TO (e.g., '4.2.0', '3.0.0')"
+      ),
     },
     async ({ target_version }) => {
       const content = loadMigrationGuide(target_version);
@@ -199,7 +212,7 @@ export function registerDocumentationTools(server: McpServer) {
           content: [
             {
               type: "text" as const,
-              text: `No migration guide found for version ${target_version}. Migration guides are available for: ${MIGRATION_VERSIONS.join(", ")}`,
+              text: `No migration guide found for version ${target_version}. Migration guides are available for: ${discoverMigrationVersions().join(", ")}`,
             },
           ],
         };
@@ -217,6 +230,10 @@ export function registerDocumentationTools(server: McpServer) {
     "List all available AdManageKit documentation topics, API references, release notes, and wiki pages.",
     {},
     async () => {
+      const apiClassNames = discoverApiClassNames();
+      const releaseVersions = discoverReleaseVersions();
+      const migrationVersions = discoverMigrationVersions();
+
       const listing = `# AdManageKit Documentation
 
 ## Ad Types
@@ -242,7 +259,8 @@ export function registerDocumentationTools(server: McpServer) {
 - **billing-integration** - Google Play Billing setup and usage
 - **purchase-categories** - CONSUMABLE, FEATURE_UNLOCK, LIFETIME_PREMIUM, REMOVE_ADS
 - **consumables** - Consumable product handling
-- **subscriptions** - Subscription management
+- **subscriptions** - Subscription management, account hold, payment recovery
+- **subscription-offers** - Offers, trials, intro pricing, price comparison
 - **subscription-upgrades** - Upgrade/downgrade flows
 
 ## Multi-Provider
@@ -253,20 +271,36 @@ export function registerDocumentationTools(server: McpServer) {
 - **java-usage** - Java (non-Kotlin) usage guide
 
 ## API Reference Classes
-${API_CLASS_NAMES.map((c) => `- ${c}`).join("\n")}
+${apiClassNames.map((c) => `- ${c}`).join("\n")}
 
 ## Release Notes
-${RELEASE_VERSIONS.map((v) => `- v${v}`).join("\n")}
+${releaseVersions.map((v) => `- v${v}`).join("\n")}
 
 ## Migration Guides
-${MIGRATION_VERSIONS.map((v) => `- Migrating to ${v}`).join("\n")}
+${migrationVersions.map((v) => `- Migrating to ${v}`).join("\n")}
 
 ---
 Use \`get_doc_by_topic\`, \`get_api_reference\`, \`get_release_notes\`, or \`get_migration_guide\` to access specific documentation.
 Use \`search_docs\` to search across all documentation.`;
 
+      // The grouped topic listing above is hand-written, so it can fall behind
+      // TOPIC_MAP. Surface anything it missed rather than leaving a registered
+      // topic undiscoverable — the failure mode this tool previously had.
+      const undocumented = topicKeys.filter(
+        (key) => !listing.includes(`**${key}**`)
+      );
+      const complete =
+        undocumented.length > 0
+          ? listing.replace(
+              "\n---\nUse `get_doc_by_topic`",
+              `\n## Other Topics\n${undocumented
+                .map((k) => `- **${k}**`)
+                .join("\n")}\n\n---\nUse \`get_doc_by_topic\``
+            )
+          : listing;
+
       return {
-        content: [{ type: "text" as const, text: listing }],
+        content: [{ type: "text" as const, text: complete }],
       };
     }
   );
