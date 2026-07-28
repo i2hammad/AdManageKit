@@ -19,4 +19,5 @@
 - [[Purchase Categories]]
 - [[Consumable Products]]
 - [[Subscriptions]]
+- [[Subscription Offers]]
 - [[Subscription Upgrades]]

@@ -478,6 +478,57 @@ class AppPurchase {
     fun getTrialOffer(productId: String): OfferInfo?       // First offer with a free trial
     fun getBaseOffer(productId: String): OfferInfo?        // Base (non-promo) offer
 
+    // Purchase a specific offer (v4.4.0+)
+    fun subscribe(activity: Activity, offer: OfferInfo): String
+    fun subscribe(activity: Activity, subsId: String, offerToken: String?): String
+    fun purchase(activity: Activity, offer: OneTimeOfferInfo): String
+    fun purchase(activity: Activity, productId: String, offerToken: String?): String
+    fun updateSubscription(activity: Activity, newSubsId: String, offerToken: String?,
+                           oldPurchaseToken: String, mode: SubscriptionReplacementMode): String
+
+    // Offer lookup (v4.4.0+)
+    fun getIntroOffer(productId: String): OfferInfo?                    // First with intro price
+    fun getOfferById(productId: String, offerId: String): OfferInfo?
+    fun getOfferByBasePlanId(productId: String, basePlanId: String): OfferInfo?
+    fun getOfferByTag(productId: String, tag: String): OfferInfo?       // Case-insensitive
+    fun getOffersByTag(productId: String, tag: String): List<OfferInfo>
+    fun getBestValueOffer(productId: String): OfferInfo?                // Lowest per month
+    fun getCheapestFirstCycleOffer(productId: String): OfferInfo?       // Cheapest entry
+
+    // Pricing comparison (v4.4.0+)
+    fun getSavingsPercent(baseProductId: String, comparedProductId: String): Int
+    fun getPricePerMonthMicros(productId: String): Long
+    fun getFormattedPricePerMonth(productId: String): String
+    fun hasIntroductoryPrice(productId: String): Boolean
+    fun getIntroductoryPeriod(productId: String): String?
+    fun getIntroductoryCycleCount(productId: String): Int
+    companion object { fun formatPrice(priceMicros: Long, currencyCode: String): String }
+
+    // Trial eligibility (v4.4.0+) — Play filters offers per account
+    fun isEligibleForFreeTrial(productId: String): Boolean
+    fun isEligibleForIntroPrice(productId: String): Boolean
+
+    // One-time product offers (v4.4.0+, Play Billing 9)
+    fun getOneTimeOffers(productId: String): List<OneTimeOfferInfo>
+    fun getOneTimeOffer(productId: String, offerId: String): OneTimeOfferInfo?
+    fun getBestOneTimeOffer(productId: String): OneTimeOfferInfo?
+
+    // Account hold & payment recovery (v4.4.0+)
+    fun hasSubscriptionOnHold(): Boolean
+    fun hasPendingSubscriptionChange(): Boolean
+    fun showInAppMessages(activity: Activity, listener: InAppMessageListener?)
+
+    // Flow configuration (v4.4.0+)
+    fun setObfuscatedAccountId(id: String?)       // Hashed; max 64 chars
+    fun setObfuscatedProfileId(id: String?)
+    fun setOfferPersonalized(personalized: Boolean)  // EU disclosure
+
+    // Product details diagnostics (v4.4.0+)
+    fun setProductDetailsListener(listener: ProductDetailsListener?)
+    fun getUnfetchedProducts(): List<UnfetchedProduct>
+    fun isProductDetailsLoaded(productId: String): Boolean
+    fun areAllProductDetailsLoaded(): Boolean
+
     // State
     val isBillingInitialized: Boolean
     
@@ -534,7 +585,31 @@ data class OfferInfo(
     val billingPeriod: String?,       // e.g. "P1M", "P1Y"
     val currencyCode: String,
     val basePhase: ProductDetails.PricingPhase?,
-)
+
+    // Installments (v4.4.0+)
+    val installmentPlanDetails: ProductDetails.InstallmentPlanDetails? = null,
+) {
+    // Derived properties (v4.4.0+)
+    val isBaseOffer: Boolean                  // No trial, no intro
+    val hasPromotion: Boolean
+    val isInstallmentPlan: Boolean
+    val installmentCommitmentPayments: Int
+    val installmentRenewalCommitmentPayments: Int
+
+    val billingPeriodParsed: BillingPeriod?
+    val trialPeriodParsed: BillingPeriod?
+    val introPeriodParsed: BillingPeriod?
+    val trialDays: Int
+    val introTotalDays: Int                   // Cycle length × cycle count
+
+    val pricePerMonthMicros: Long             // Normalized for cross-cadence comparison
+    val pricePerWeekMicros: Long
+    val firstCyclePriceMicros: Long           // 0 on trial, else intro, else base
+    val firstCyclePrice: String
+    val introDiscountPercent: Int
+
+    fun hasTag(tag: String): Boolean          // Case-insensitive
+}
 ```
 
 Usage:
@@ -552,6 +627,94 @@ billing.getTrialOffer("premium_yearly")?.let { trial ->
 billing.getBaseOffer("premium_yearly")?.let { base ->
     priceLabel.text = base.basePrice         // "$59.99"
     cycleLabel.text = base.billingPeriod     // "P1Y"
+}
+
+// Buy exactly the offer the user tapped (v4.4.0+)
+billing.subscribe(activity, offers[selectedIndex])
+```
+
+### BillingPeriod (v4.4.0+)
+
+Parses the ISO-8601 periods Play returns and normalizes prices across cadences.
+
+```kotlin
+data class BillingPeriod(
+    val years: Int, val months: Int, val weeks: Int, val days: Int,
+    val iso: String,
+) {
+    enum class Unit { DAY, WEEK, MONTH, YEAR }
+
+    val unit: Unit          // Largest non-zero component
+    val count: Int          // Its magnitude — pair with plurals resources
+    val totalMonths: Double // "P1Y" -> 12.0
+    val totalWeeks: Double
+    val totalDays: Int      // "P1M" -> 30
+    val isZero: Boolean
+
+    fun format(abbreviated: Boolean = false): String   // "1 month" / "1mo" (English)
+
+    companion object {
+        fun parse(iso: String?): BillingPeriod?
+        fun totalMonthsOf(iso: String?): Double
+        fun totalDaysOf(iso: String?): Int
+        fun formatOf(iso: String?, abbreviated: Boolean = false): String
+        fun savingsPercent(baseMicros: Long, basePeriod: String?,
+                           comparedMicros: Long, comparedPeriod: String?): Int
+        fun pricePerMonthMicros(priceMicros: Long, period: String?): Long
+        fun pricePerWeekMicros(priceMicros: Long, period: String?): Long
+        fun isSameDuration(first: String?, second: String?): Boolean
+    }
+}
+```
+
+`format()` is an English convenience. For shipped UI, use `unit` + `count` with
+your own plurals resources — a library cannot resolve the host app's locale rules.
+
+### OneTimeOfferInfo (v4.4.0+)
+
+Typed view over a Play Billing 9 `OneTimePurchaseOfferDetails`. A one-time
+product can carry several offers; the legacy
+`getOneTimePurchaseOfferDetails()` exposes only one.
+
+```kotlin
+data class OneTimeOfferInfo(
+    val productId: String,
+    val offerId: String?,
+    val purchaseOptionId: String?,
+    val offerToken: String,
+    val offerTags: List<String>,
+
+    val formattedPrice: String,
+    val priceMicros: Long,
+    val currencyCode: String,
+    val fullPriceMicros: Long?,          // Strike-through price
+
+    val discountPercentage: Int?,
+    val discountAmountMicros: Long?,
+    val formattedDiscountAmount: String?,
+    val discountCurrencyCode: String?,
+
+    val rentalPeriod: String?,
+    val rentalExpirationPeriod: String?,
+    val preorderReleaseTimeMillis: Long,
+    val preorderPresaleEndTimeMillis: Long,
+    val maximumQuantity: Int,
+    val remainingQuantity: Int,
+    val validFromMillis: Long,
+    val validUntilMillis: Long,
+    val raw: ProductDetails.OneTimePurchaseOfferDetails,
+) {
+    val isDiscounted: Boolean
+    val effectiveDiscountPercent: Int    // From Play, or derived from fullPriceMicros
+    val isRental: Boolean
+    val isPreorder: Boolean
+    val isLimitedQuantity: Boolean
+    val isSoldOut: Boolean
+    val rentalPeriodParsed: BillingPeriod?
+    val rentalExpirationPeriodParsed: BillingPeriod?
+
+    fun hasTag(tag: String): Boolean
+    fun isValidAt(nowMillis: Long = System.currentTimeMillis()): Boolean
 }
 ```
 
@@ -832,6 +995,20 @@ enum class TYPE_IAP {
 - Use mock responses for unit testing
 
 ## Changelog
+
+### v4.4.0
+- Purchase a **specific** offer: `subscribe(activity, offer)`, `subscribe(activity, subsId, offerToken)`, `purchase(activity, offer)`, `purchase(activity, productId, offerToken)`, and a 5-argument `updateSubscription(...)`. Previously the library always resolved the token itself and could charge for whichever offer Play listed last
+- Offer lookup: `getIntroOffer`, `getOfferById`, `getOfferByBasePlanId`, `getOfferByTag` / `getOffersByTag`, `getBestValueOffer`, `getCheapestFirstCycleOffer`
+- New `BillingPeriod` type parses ISO-8601 billing periods and normalizes prices across cadences (`savingsPercent`, `pricePerMonthMicros`)
+- `OfferInfo` gained derived pricing (`pricePerMonthMicros`, `firstCyclePrice`, `introDiscountPercent`, `trialDays`, `introTotalDays`, parsed periods, `isBaseOffer`, `hasTag`) and installment-plan details
+- `getSavingsPercent(monthlyId, yearlyId)`, `getFormattedPricePerMonth(productId)`, `AppPurchase.formatPrice(micros, currency)`
+- Trial eligibility: `isEligibleForFreeTrial()`, `isEligibleForIntroPrice()`
+- New `OneTimeOfferInfo` + `getOneTimeOffers()`, `getOneTimeOffer()`, `getBestOneTimeOffer()` for Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity)
+- Account hold detected client-side: `PurchaseResult.isSuspended()`, `hasSubscriptionOnHold()`. **Behavior change** — `getSubscriptionState()` returns `ON_HOLD` and `isSubscriptionActive()` returns `false` for those purchases
+- Play payment recovery: `showInAppMessages(activity, listener)` with `InAppMessageListener`
+- Pending plan changes: `hasPendingSubscriptionChange()`, `PurchaseResult.hasPendingPurchaseUpdate()`
+- Flow configuration: `setObfuscatedAccountId()`, `setObfuscatedProfileId()`, `setOfferPersonalized()`
+- Product-details diagnostics: `setProductDetailsListener()`, `getUnfetchedProducts()`, `isProductDetailsLoaded()`, `areAllProductDetailsLoaded()`
 
 ### v3.5.7
 - Added structured offer API to `AppPurchase`: `getOffers()`, `getTrialOffer()`, `getBaseOffer()` returning typed `OfferInfo`

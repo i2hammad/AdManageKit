@@ -1,14 +1,14 @@
 # Billing Integration
 
-AdManageKit provides a comprehensive billing integration module (`admanagekit-billing`) that simplifies Google Play Billing Library v8 implementation.
+AdManageKit provides a comprehensive billing integration module (`admanagekit-billing`) that simplifies Google Play Billing Library v9 implementation.
 
 ## Quick Start
 
 ### 1. Add Dependency
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.0'
 ```
 
 ### 2. Define Products
@@ -96,9 +96,58 @@ val base = billing.getBaseOffer("premium_yearly")    // non-promo offer
 val all  = billing.getOffers("premium_yearly")       // every offer
 ```
 
+### 8. Buy a Specific Offer (v4.4.0+)
+
+`subscribe(activity, subsId)` picks the offer for you (the configured `trialId`,
+else Play's *last* offer), so on a multi-offer product it can charge for the
+wrong plan. Pass the offer the user actually tapped:
+
+```kotlin
+val offers = billing.getOffers("premium_sub")
+billing.subscribe(activity, offers[selectedIndex])   // exactly this plan
+```
+
+See [[Subscription Offers]] for offer lookup, price normalization, savings
+badges, trial eligibility, and one-time product offers.
+
+### 9. Diagnose an Empty Paywall (v4.4.0+)
+
+```kotlin
+billing.setProductDetailsListener(object : ProductDetailsListener {
+    override fun onProductDetailsLoaded(
+        productType: String,
+        loaded: List<ProductDetails>,
+        unfetched: List<UnfetchedProduct>,
+    ) {
+        unfetched.forEach { Log.e("Billing", "${it.productId}: status ${it.statusCode}") }
+    }
+    override fun onProductDetailsFailed(productType: String, responseCode: Int, debugMessage: String?) { }
+})
+```
+
+Register it **before** `initBilling`. Products land in `unfetched` when the id is
+misspelled, the product is inactive in Play Console, or the signed-in account
+cannot see the release track. `isProductDetailsLoaded(id)` and
+`areAllProductDetailsLoaded()` distinguish "missing" from "not loaded yet".
+
+### 10. Fraud Prevention & EU Disclosure (v4.4.0+)
+
+```kotlin
+// Google-recommended hashed identifiers — never raw account data. Max 64 chars.
+billing.setObfuscatedAccountId(sha256(userId))
+billing.setObfuscatedProfileId(sha256(profileId))
+
+// Required EU disclosure when prices are personalized per user.
+billing.setOfferPersonalized(true)
+```
+
+Applied to every flow the library launches (`purchase`, `subscribe`,
+`updateSubscription`). Set after sign-in; pass `null` on sign-out.
+
 ## Pages
 
 - [[Purchase Categories]] - Product classification system
+- [[Subscription Offers]] - Offers, trials, intro pricing, price comparison
 - [[Consumable Products]] - Handling consumables with manual consumption
 - [[Subscriptions]] - Subscription lifecycle management
 - [[Subscription Upgrades]] - Upgrade/downgrade handling

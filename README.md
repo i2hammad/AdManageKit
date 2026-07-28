@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.3.5`** is a patch release that makes `appOpenAdFreshnessThreshold` (default 4 hours) actually enforced on every app open show path. Previously only `ON_DEMAND` consulted it — `HYBRID`, `ONLY_CACHE`, and the multi-provider waterfall checked only whether an ad object existed and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. It also settles the `appOpenAdTimeout` default at **10 seconds** (the property said 4s while `resetToDefaults()` said 10s — 4s was too short for the fetch-with-dialog paths). No API changes. See [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md).
+**Latest Version `4.4.0`** is a minor release focused on the billing module. Subscription offers can now be **purchased individually** — `subscribe(activity, offer)` buys exactly the plan the user tapped, where previously the library always resolved the token itself and could charge for whichever offer Play listed last. It also adds offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`, `getFormattedPricePerMonth`), trial-eligibility checks, Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity), client-side **account hold** detection, Play payment-recovery messaging, and product-details diagnostics. Purely additive, with one behavior change: an on-hold subscription now reports `ON_HOLD` and is no longer `isSubscriptionActive()`. See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md).
+
+**Version `4.3.5`** is a patch release that makes `appOpenAdFreshnessThreshold` (default 4 hours) actually enforced on every app open show path. Previously only `ON_DEMAND` consulted it — `HYBRID`, `ONLY_CACHE`, and the multi-provider waterfall checked only whether an ad object existed and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. It also settles the `appOpenAdTimeout` default at **10 seconds** (the property said 4s while `resetToDefaults()` said 10s — 4s was too short for the fetch-with-dialog paths). No API changes. See [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md).
 
 **Version `4.3.4`** is a patch release that restores the pre-4.2.0 default adaptive banner height: `ADAPTIVE` again requests the standard anchored adaptive size (~50-90dp) instead of the taller *large anchored adaptive* format the Next-Gen migration had switched to. The taller format is now opt-in via `BannerAdSize.ADAPTIVE_LARGE` (`app:bannerAdSize="adaptive_large"` in XML). See [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md).
 
@@ -34,6 +36,85 @@ The legacy Google Mobile Ads SDK is in maintenance mode; new AdMob features (Ad 
 - **Threading**: Next-Gen SDK callbacks fire on a background thread (the legacy SDK guaranteed main thread). Every ad manager, provider, and view in this library already wraps its callback bodies in `Handler(Looper.getMainLooper()).post {}` — this is transparent to you as a consumer.
 - **Initialization**: `MobileAds.initialize()` must be called explicitly once, before any ad request — the legacy SDK's silent lazy-init on first use no longer exists. AdManageKit doesn't call this for you (it doesn't own your app's consent flow); see the sample app's `MyApplication.kt` for the recommended pattern.
 - **Callback types**: Where AdManageKit exposes ad-network error/value types through `AdKitError`, `AdKitLoadError`, and `AdKitValue` (used by `AdManagerCallback`, `AdLoadCallback`, `AdCallback`, and friends), those aliases now resolve to Next-Gen SDK types instead of legacy ones. Your callback *implementations* (`onFailedToLoad(error)`, `onPaidEvent(value)`, etc.) don't need to change — only code that reads legacy-only members of those objects does. See [Migrating to 4.2.0](#migrating-to-420).
+
+## What's New in 4.4.0
+
+A billing-focused minor release. Everything is additive — no existing method signature changed — with one deliberate behavior change around account hold.
+
+### Buy the Offer the User Actually Tapped
+
+`AppPurchase` could already *describe* subscription offers (`getOffers`, `getTrialOffer`, `getBaseOffer` since 3.5.7), but it could not *act* on them. `subscribe(activity, subsId)` always resolved the offer token itself — the configured `trialId`, and failing that **whichever offer Play listed last**. On a product with three plans, a user tapping "Yearly" could be charged for monthly, purely because of list order.
+
+```kotlin
+val offers = AppPurchase.getInstance().getOffers("premium_sub")
+// …render them, then buy exactly what the user chose:
+AppPurchase.getInstance().subscribe(activity, offers[selectedIndex])
+```
+
+The same applies to one-time products (`purchase(activity, offer)`) and upgrades (`updateSubscription(activity, newSubsId, offerToken, oldToken, mode)`). The original no-token overloads are unchanged.
+
+### Offer Lookup by Id, Base Plan or Tag
+
+```kotlin
+billing.getIntroOffer("premium_sub")                   // first with an intro price
+billing.getOfferByBasePlanId("premium_sub", "yearly")
+billing.getOfferByTag("premium_sub", "popular")        // Play Console offer tag
+billing.getBestValueOffer("premium_sub")               // lowest cost per month
+billing.getCheapestFirstCycleOffer("premium_sub")      // cheapest way in
+```
+
+Offer **tags** are the useful one here: tag offers in the Play Console and select them by tag, and a paywall can be re-targeted without shipping an app update.
+
+### Price Comparison Without Parsing ISO-8601
+
+Play returns billing periods as raw strings (`"P1M"`, `"P1Y"`). The new `BillingPeriod` parses them and normalizes prices so plans of different cadences compare fairly:
+
+```kotlin
+val period = BillingPeriod.parse("P1Y")!!
+period.unit          // Unit.YEAR
+period.count         // 1 → getQuantityString(R.plurals.years, count, count)
+period.totalMonths   // 12.0
+
+billing.getSavingsPercent("premium_monthly", "premium_yearly")  // 50 → "Save 50%"
+billing.getFormattedPricePerMonth("premium_yearly")             // "$5.00"
+```
+
+`OfferInfo` also gained `firstCyclePrice` (what the user pays *today* — "Free", "$1.99" or "$9.99"), `pricePerMonthMicros`, `introDiscountPercent`, `trialDays`, `introTotalDays`, `isBaseOffer` and `hasTag(...)`.
+
+### Trial Eligibility
+
+Google Play filters offers per account — a user who already used a trial simply doesn't receive that offer. So offer presence *is* the eligibility signal, now named explicitly:
+
+```kotlin
+button.text = if (billing.isEligibleForFreeTrial("premium_sub")) "Start free trial" else "Subscribe"
+```
+
+This stops a paywall promising a trial the user cannot claim and then having Play charge them immediately.
+
+### Play Billing 9 Features That Were Unused
+
+- **One-time product offers** — a single INAPP product can carry several offers (a full price plus a launch discount, a rental, a pre-order, a limited-quantity drop). New `OneTimeOfferInfo` + `getOneTimeOffers()` / `getBestOneTimeOffer()`; the legacy `getOneTimePurchaseOfferDetails()` exposes only one of them
+- **Payment recovery** — `showInAppMessages(activity, listener)` shows Play's fix-your-payment flow for declined subscriptions
+- **Product-details diagnostics** — `setProductDetailsListener(...)` and `getUnfetchedProducts()` report *which* ids Play declined and why, so an empty paywall is no longer silent
+- **Installment plans** — `OfferInfo.isInstallmentPlan` and commitment payment counts
+- **Fraud prevention & EU disclosure** — `setObfuscatedAccountId()`, `setObfuscatedProfileId()`, `setOfferPersonalized()`, applied to every flow the library launches
+
+### Account Hold Detected Client-Side (behavior change)
+
+When Play cannot charge a subscriber, the subscription enters **account hold**. This previously required server-side verification; Play Billing 9 reports it client-side, so `PurchaseResult.isSuspended()` is now populated and `getSubscriptionState()` returns `ON_HOLD`.
+
+> **`isSubscriptionActive()` therefore returns `false` during account hold.** That matches Google's requirement — the user's payment was declined and they must not keep premium access. If your app deliberately keeps serving on-hold users, check `isSuspended()` explicitly.
+
+```kotlin
+if (billing.hasSubscriptionOnHold()) {
+    billing.showInAppMessages(activity, object : InAppMessageListener {
+        override fun onSubscriptionRecovered(purchaseToken: String) { refreshPremiumUi() }
+        override fun onNoActionNeeded() { }
+    })
+}
+```
+
+See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md) and the [Subscription Offers wiki page](https://github.com/i2hammad/AdManageKit/wiki/Subscription-Offers) for full details.
 
 ## What's New in 4.3.0
 
@@ -108,15 +189,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.3.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.3.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.0'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.0'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.0'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -165,9 +246,18 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.5'
 - Circuit breaker for failing ad units
 - Memory leak prevention with WeakReference
 
+### Billing & Monetization
+- **Subscriptions & One-Time Products**: Categories (consumable, feature unlock, remove ads, lifetime premium) with automatic acknowledgment
+- **Offers**: Enumerate every trial / introductory / base offer and purchase a *specific* one (v4.4.0+)
+- **Price Comparison**: ISO-8601 period parsing, per-month normalization, "Save 40%" badges (v4.4.0+)
+- **Trial Eligibility**: Ask whether *this* account can still claim a trial before promising one (v4.4.0+)
+- **Payment Recovery**: Client-side account-hold detection plus Play's in-app recovery flow (v4.4.0+)
+- [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md)
+
 ### Privacy & Compliance
 - UMP consent management (GDPR/CCPA)
 - Automatic ad hiding for purchased users
+- Obfuscated account/profile identifiers and EU personalized-pricing disclosure (v4.4.0+)
 
 ### Multi-Provider Waterfall (New)
 - **Multiple Ad Networks**: Load ads from AdMob, Yandex, and more with automatic fallback
@@ -180,7 +270,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.3.5'
 ### Multi-Module Architecture
 - **Core Module**: Shared interfaces and configuration
 - **Compose Module**: Jetpack Compose integration
-- **Billing Module**: Google Play Billing Library v8
+- **Billing Module**: Google Play Billing Library v9
 - **Yandex Module**: Yandex Ads SDK provider
 
 ---
@@ -549,6 +639,62 @@ AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryLis
 })
 ```
 
+#### Subscription Offers & Paywalls (v4.4.0+)
+
+A single subscription product usually carries several offers — a base plan, a free trial, an introductory discount. Play returns only the ones this account is eligible for.
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+// Enumerate every offer, then buy exactly the one the user tapped.
+// (subscribe(activity, subsId) picks for you, and may not pick what they chose.)
+val offers = billing.getOffers("premium_sub")
+billing.subscribe(activity, offers[selectedIndex])
+
+// Or find a specific one
+billing.getIntroOffer("premium_sub")                   // first with an intro price
+billing.getOfferByBasePlanId("premium_sub", "yearly")
+billing.getOfferByTag("premium_sub", "popular")        // Play Console offer tag
+billing.getBestValueOffer("premium_sub")               // lowest cost per month
+```
+
+Render an offer without hand-parsing `ProductDetails` or ISO-8601 periods:
+
+```kotlin
+val offer = billing.getBaseOffer("premium_yearly") ?: return
+
+priceLabel.text    = offer.basePrice                   // "$59.99"
+cycleLabel.text    = BillingPeriod.formatOf(offer.billingPeriod)   // "1 year"
+perMonthLabel.text = AppPurchase.formatPrice(offer.pricePerMonthMicros, offer.currencyCode)
+todayLabel.text    = offer.firstCyclePrice             // "Free", "$1.99" or "$59.99"
+
+// "Save 50%" badge — compares base offers, so trials don't distort it
+val savings = billing.getSavingsPercent("premium_monthly", "premium_yearly")
+savingsBadge.isVisible = savings > 0
+savingsBadge.text = "Save $savings%"
+
+// Only promise a trial the user can actually claim
+subscribeButton.text = if (billing.isEligibleForFreeTrial("premium_sub")) {
+    "Start free trial"
+} else {
+    "Subscribe"
+}
+```
+
+> **Localization:** `BillingPeriod.formatOf()` is an English convenience. For shipped UI use `BillingPeriod.parse(iso)` and pair `unit` + `count` with your own plurals resources.
+
+One-time products can carry multiple offers too (discounts, rentals, pre-orders, limited quantity):
+
+```kotlin
+billing.getBestOneTimeOffer("remove_ads")?.let { offer ->
+    price.text = offer.formattedPrice
+    badge.isVisible = offer.isDiscounted
+    badge.text = "-${offer.effectiveDiscountPercent}%"
+    buyButton.isEnabled = !offer.isSoldOut && offer.isValidAt()
+    buyButton.setOnClickListener { billing.purchase(activity, offer) }
+}
+```
+
 #### Subscription Management (v2.9.0+)
 
 ```kotlin
@@ -556,7 +702,8 @@ AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryLis
 val state = AppPurchase.getInstance().getSubscriptionState("premium_monthly")
 when (state) {
     SubscriptionState.ACTIVE -> showPremiumUI()
-    SubscriptionState.CANCELLED -> showRenewalPrompt() // Still has access
+    SubscriptionState.CANCELLED -> showRenewalPrompt()   // Still has access
+    SubscriptionState.ON_HOLD -> showFixPaymentPrompt()  // Payment declined — no access (v4.4.0+)
     SubscriptionState.EXPIRED -> showSubscribeButton()
 }
 
@@ -575,6 +722,41 @@ AppPurchase.getInstance().changeSubscription(
 )
 ```
 
+#### Account Hold & Payment Recovery (v4.4.0+)
+
+When Play cannot charge a subscriber, the subscription enters **account hold**. As of 4.4.0 this is detected client-side — earlier versions needed a server round-trip.
+
+```kotlin
+if (billing.hasSubscriptionOnHold()) {
+    // Let Play walk the user through fixing their payment method.
+    billing.showInAppMessages(activity, object : InAppMessageListener {
+        override fun onSubscriptionRecovered(purchaseToken: String) {
+            refreshPremiumUi()   // isPurchased() is already up to date here
+        }
+        override fun onNoActionNeeded() { }
+    })
+}
+```
+
+> **Behavior change:** `isSubscriptionActive()` returns `false` during account hold, matching Google's requirement. If your app deliberately keeps serving these users, check `isSuspended()` explicitly.
+
+#### Debugging an Empty Paywall (v4.4.0+)
+
+```kotlin
+billing.setProductDetailsListener(object : ProductDetailsListener {
+    override fun onProductDetailsLoaded(
+        productType: String,
+        loaded: List<ProductDetails>,
+        unfetched: List<UnfetchedProduct>,
+    ) {
+        unfetched.forEach { Log.e("Billing", "${it.productId}: status ${it.statusCode}") }
+    }
+    override fun onProductDetailsFailed(productType: String, responseCode: Int, debugMessage: String?) { }
+})
+```
+
+Register it **before** `initBilling`. Products land in `unfetched` when the id is misspelled, the product is inactive in Play Console, or the account can't see the release track.
+
 ---
 
 ## Documentation
@@ -589,6 +771,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md)
 - [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md)
 - [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md)
 - [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md)
@@ -628,6 +811,7 @@ AppPurchase.getInstance().changeSubscription(
 - [Purchase Categories](wiki/Purchase-Categories.md)
 - [Consumable Products](wiki/Consumable-Products.md)
 - [Subscriptions](wiki/Subscriptions.md)
+- [Subscription Offers](wiki/Subscription-Offers.md)
 - [Subscription Upgrades](wiki/Subscription-Upgrades.md)
 
 ### API Documentation (Dokka)

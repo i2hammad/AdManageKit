@@ -13,6 +13,8 @@
 - [Purchase State Checking](#purchase-state-checking)
 - [Purchase History Tracking](#purchase-history-tracking)
 - [Server-Side Verification](#server-side-verification)
+- [Account Hold & Payment Recovery](#account-hold--payment-recovery)
+- [Diagnostics & Flow Configuration](#diagnostics--flow-configuration)
 - [Best Practices](#best-practices)
 
 ---
@@ -238,6 +240,117 @@ priceLabel.text = base?.basePrice.orEmpty()
 `priceAmountMicros == 0` + `FINITE_RECURRING`; intro = paid `FINITE_RECURRING`;
 base = `INFINITE_RECURRING`), so it works correctly even when an offer has all
 three phases in a non-standard order.
+
+### Buying a Specific Offer (v4.4.0+)
+
+Enumerating offers is only half the job — the paywall must then buy the one the
+user tapped. `subscribe(activity, subsId)` resolves the offer token itself (the
+configured `trialId`, else Play's *last* offer), so on a multi-offer product it
+can charge for the wrong plan. Pass the offer explicitly instead:
+
+```kotlin
+val offers = billing.getOffers("premium_sub")
+// …render offers, user picks one…
+billing.subscribe(activity, offers[selectedIndex])
+
+// Or by raw token
+billing.subscribe(activity, "premium_sub", offer.offerToken)
+
+// One-time products work the same way
+billing.purchase(activity, oneTimeOffer)
+
+// Upgrades onto a specific base plan
+billing.updateSubscription(
+    activity, "premium_yearly", offer.offerToken, oldToken,
+    AppPurchase.SubscriptionReplacementMode.CHARGE_PRORATED_PRICE
+)
+```
+
+### Finding an Offer (v4.4.0+)
+
+```kotlin
+billing.getIntroOffer("premium_sub")                   // first offer with an intro price
+billing.getOfferById("premium_sub", "winback_50")      // by Play Console offer id
+billing.getOfferByBasePlanId("premium_sub", "yearly")  // by base plan id
+billing.getOfferByTag("premium_sub", "popular")        // by Play Console offer tag
+billing.getOffersByTag("premium_sub", "seasonal")      // all offers with a tag
+billing.getBestValueOffer("premium_sub")               // lowest cost per month
+billing.getCheapestFirstCycleOffer("premium_sub")      // cheapest way in
+```
+
+Offer **tags** are the most useful of these: tag offers in the Play Console and
+select them by tag, and the paywall can be re-targeted without an app update.
+
+### Comparing Prices Across Cadences (v4.4.0+)
+
+Play returns billing periods as raw ISO-8601 (`"P1M"`, `"P1Y"`). `BillingPeriod`
+parses them and normalizes prices so plans of different cadences compare fairly:
+
+```kotlin
+val period = BillingPeriod.parse("P1Y")!!
+period.unit          // Unit.YEAR
+period.count         // 1 → resources.getQuantityString(R.plurals.years, count, count)
+period.totalMonths   // 12.0
+period.format()      // "1 year" (English convenience; localize via unit + count)
+```
+
+`OfferInfo` exposes the derived values a paywall renders directly:
+
+```kotlin
+offer.firstCyclePrice       // what the user pays today: "Free", "$1.99" or "$9.99"
+offer.pricePerMonthMicros   // yearly plan normalized for comparison
+offer.introDiscountPercent  // 80
+offer.trialDays             // 7
+offer.introTotalDays        // full promo window (cycle length × cycle count)
+offer.isBaseOffer           // no trial, no intro
+offer.hasTag("popular")
+```
+
+Plus the two strings almost every paywall needs:
+
+```kotlin
+billing.getSavingsPercent("premium_monthly", "premium_yearly")  // 50 → "Save 50%"
+billing.getFormattedPricePerMonth("premium_yearly")             // "$5.00"
+```
+
+Both compare **base** offers, so trial and intro phases don't distort the badge.
+
+### Trial Eligibility (v4.4.0+)
+
+Google Play filters offers per account — a user who already used a trial simply
+doesn't receive that offer. So the presence of a trial offer *is* the eligibility
+signal:
+
+```kotlin
+subscribeButton.text = if (billing.isEligibleForFreeTrial("premium_sub")) {
+    "Start ${billing.getFreeTrialPeriod("premium_sub")?.let { BillingPeriod.formatOf(it) }} free trial"
+} else {
+    "Subscribe"
+}
+```
+
+This stops the paywall promising a trial the user cannot claim and then having
+Play charge them immediately. `isEligibleForIntroPrice(productId)` is the
+equivalent check for introductory pricing.
+
+### One-Time Product Offers (v4.4.0+)
+
+Play Billing 9 lets a one-time product carry several offers — a full price plus a
+launch discount, a rental, a pre-order, or a limited-quantity drop. The legacy
+`getOneTimePurchaseOfferDetails()` exposes only one of them:
+
+```kotlin
+for (offer in billing.getOneTimeOffers("remove_ads")) {
+    offer.effectiveDiscountPercent  // 30
+    offer.fullPriceMicros           // strike-through price
+    offer.isRental                  // rentalPeriod / rentalExpirationPeriod
+    offer.isPreorder
+    offer.isSoldOut                 // limited-quantity drops
+    offer.isValidAt()               // validity window
+}
+
+billing.getBestOneTimeOffer("remove_ads")  // cheapest currently purchasable
+```
 
 ---
 
@@ -699,6 +812,117 @@ GET https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{pa
 
 Response includes `expiryTime`, `subscriptionState`, and more
 ```
+
+---
+
+## Account Hold & Payment Recovery
+
+### Detecting Account Hold (v4.4.0+)
+
+When Google Play cannot charge a subscriber's payment method, the subscription
+enters **account hold**. The purchase record still exists, but the user has not
+paid and must not keep premium access.
+
+From v4.4.0 this is detected client-side (Play Billing 9); earlier versions
+required a server round-trip through the Play Developer API.
+
+```kotlin
+billing.hasSubscriptionOnHold()          // any subscription on hold
+purchaseResult.isSuspended               // this specific subscription
+purchaseResult.subscriptionState         // SubscriptionState.ON_HOLD
+```
+
+> **Behavior change in 4.4.0:** `isSubscriptionActive()` returns `false` for an
+> on-hold subscription, and `getSubscriptionState()` returns `ON_HOLD` rather
+> than `ACTIVE`/`CANCELLED`. This matches Google's requirement. If your app
+> deliberately keeps serving on-hold users, check `isSuspended()` explicitly.
+
+### Recovering Declined Payments (v4.4.0+)
+
+Play can show the user an in-app flow to fix their payment method. Google
+recommends calling this on foreground entry for apps that sell subscriptions:
+
+```kotlin
+billing.showInAppMessages(activity, object : InAppMessageListener {
+    override fun onSubscriptionRecovered(purchaseToken: String) {
+        // AppPurchase has already refreshed its state — isPurchased() is correct here.
+        refreshPremiumUi()
+    }
+    override fun onNoActionNeeded() { }
+})
+```
+
+### Pending Plan Changes (v4.4.0+)
+
+A subscription upgrade or downgrade the user started but has not paid for yet:
+
+```kotlin
+billing.hasPendingSubscriptionChange()
+purchaseResult.hasPendingPurchaseUpdate()
+purchaseResult.pendingProductIds
+```
+
+The **current** plan remains the entitlement in force until the change completes,
+so show "plan change pending" rather than switching the UI to the new tier.
+
+---
+
+## Diagnostics & Flow Configuration
+
+### Why Is My Paywall Empty? (v4.4.0+)
+
+A paywall rendering blank prices used to give no signal as to why. Play Billing 9
+reports the product ids it could not resolve, and the library surfaces them:
+
+```kotlin
+billing.setProductDetailsListener(object : ProductDetailsListener {
+    override fun onProductDetailsLoaded(
+        productType: String,
+        loaded: List<ProductDetails>,
+        unfetched: List<UnfetchedProduct>,
+    ) {
+        unfetched.forEach {
+            Log.e("Billing", "${it.productId} unfetched: status ${it.statusCode}")
+        }
+    }
+
+    override fun onProductDetailsFailed(
+        productType: String,
+        responseCode: Int,
+        debugMessage: String?,
+    ) {
+        Log.e("Billing", "$productType query failed: $responseCode $debugMessage")
+    }
+})
+```
+
+Register it **before** `initBilling`. A product typically lands in `unfetched`
+when its id is misspelled, it is inactive in Play Console, or the signed-in
+account cannot see the release track.
+
+To distinguish "not loaded yet" from "genuinely missing":
+
+```kotlin
+billing.isProductDetailsLoaded("premium_sub")
+billing.areAllProductDetailsLoaded()
+billing.unfetchedProducts
+```
+
+### Fraud Prevention & EU Disclosure (v4.4.0+)
+
+```kotlin
+// Google-recommended: hashed identifiers, never raw account data. Max 64 chars.
+billing.setObfuscatedAccountId(sha256(userId))
+billing.setObfuscatedProfileId(sha256(profileId))
+
+// Required EU disclosure when prices are personalized per user.
+billing.setOfferPersonalized(true)
+```
+
+These apply to every billing flow the library launches — `purchase`, `subscribe`
+and `updateSubscription` all funnel through one internal builder, so they cannot
+be applied inconsistently. Set the account id after sign-in and clear it (pass
+`null`) on sign-out.
 
 ---
 

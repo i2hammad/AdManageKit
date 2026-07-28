@@ -20,6 +20,8 @@ import com.android.billingclient.api.BillingFlowParams;
 import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.ConsumeParams;
 import com.android.billingclient.api.ConsumeResponseListener;
+import com.android.billingclient.api.InAppMessageParams;
+import com.android.billingclient.api.InAppMessageResult;
 import com.android.billingclient.api.PendingPurchasesParams;
 import com.android.billingclient.api.ProductDetails;
 import com.android.billingclient.api.ProductDetailsResponseListener;
@@ -28,6 +30,7 @@ import com.android.billingclient.api.PurchasesUpdatedListener;
 import com.android.billingclient.api.QueryProductDetailsParams;
 import com.android.billingclient.api.QueryProductDetailsResult;
 import com.android.billingclient.api.QueryPurchasesParams;
+import com.android.billingclient.api.UnfetchedProduct;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -89,6 +92,17 @@ public class AppPurchase {
     private String idPurchased = "";
     private String currentProductId = "";
     private int currentTypeIAP = 0;
+
+    // Applied to every billing flow launched through this class. Null/false by
+    // default so existing integrations see byte-identical flow params.
+    private String obfuscatedAccountId;
+    private String obfuscatedProfileId;
+    private boolean offerPersonalized = false;
+
+    private ProductDetailsListener productDetailsListener;
+    // Products Play declined to return details for, keyed by product id, from the
+    // most recent query of each type. Cleared per product type on each query.
+    private final Map<String, UnfetchedProduct> unfetchedProducts = new ConcurrentHashMap<>();
 
     private AppPurchase() {
     }
@@ -284,6 +298,171 @@ public class AppPurchase {
         this.subscriptionVerificationCallback = callback;
     }
 
+    // ==================== Billing flow configuration ====================
+
+    /**
+     * Sets an obfuscated identifier for the user's in-app account, attached to
+     * every subsequent billing flow.
+     *
+     * <p>Google uses this to detect fraudulent transactions and to let you tie a
+     * purchase back to an account without exposing personal data. Google
+     * recommends a one-way hash of the account id — <b>never</b> the raw email,
+     * user id, or anything else that identifies the person. The value must be at
+     * most 64 characters; longer values are rejected by the billing library.
+     *
+     * <p>Set it once after sign-in and clear it (pass {@code null}) on sign-out.
+     *
+     * @param obfuscatedAccountId Hashed account identifier, or null to clear.
+     * @since 4.4.0
+     */
+    public void setObfuscatedAccountId(@Nullable String obfuscatedAccountId) {
+        this.obfuscatedAccountId = obfuscatedAccountId;
+    }
+
+    /**
+     * Sets an obfuscated identifier for the user's in-app profile, attached to
+     * every subsequent billing flow.
+     *
+     * <p>Only relevant when a single account can hold multiple profiles (e.g. a
+     * family plan with per-member entitlements). Same rules as
+     * {@link #setObfuscatedAccountId(String)}: hashed, non-identifying, max 64
+     * characters.
+     *
+     * @param obfuscatedProfileId Hashed profile identifier, or null to clear.
+     * @since 4.4.0
+     */
+    public void setObfuscatedProfileId(@Nullable String obfuscatedProfileId) {
+        this.obfuscatedProfileId = obfuscatedProfileId;
+    }
+
+    /**
+     * Declares whether the prices shown to this user were personalized using
+     * automated decision-making.
+     *
+     * <p>This is a legal disclosure requirement in the EU: if your app varies
+     * prices per user, Play must display a personalized-pricing notice in the
+     * purchase sheet. Leave this {@code false} — the default — when everyone sees
+     * the same Play Console prices, which is the normal case.
+     *
+     * @param offerPersonalized true when prices are personalized for this user.
+     * @since 4.4.0
+     */
+    public void setOfferPersonalized(boolean offerPersonalized) {
+        this.offerPersonalized = offerPersonalized;
+    }
+
+    // ==================== Product details diagnostics ====================
+
+    /**
+     * Registers a listener for product-details query results, including the
+     * products Play could not return.
+     *
+     * <p>Set this before {@link #initBilling} to diagnose an empty paywall: the
+     * listener reports each queried product type, what loaded, and what did not.
+     *
+     * @param listener The listener, or null to clear.
+     * @since 4.4.0
+     */
+    public void setProductDetailsListener(@Nullable ProductDetailsListener listener) {
+        this.productDetailsListener = listener;
+    }
+
+    /**
+     * Returns the products Play declined to return details for during the most
+     * recent query of each type.
+     *
+     * <p>A product lands here when its id does not exist, when it is inactive in
+     * Play Console, or when the signed-in account cannot see the release track.
+     * Check {@link UnfetchedProduct#getStatusCode()} for the reason.
+     *
+     * @return Unfetched products, never {@code null}.
+     * @since 4.4.0
+     */
+    @NonNull
+    public List<UnfetchedProduct> getUnfetchedProducts() {
+        return new ArrayList<>(unfetchedProducts.values());
+    }
+
+    /**
+     * Whether Play returned details for the given product id.
+     *
+     * <p>Prices and offers are only available once this is {@code true}. Use it to
+     * decide between rendering a paywall and rendering a retry state.
+     *
+     * @param productId Play product id.
+     * @return true when the product's details are loaded.
+     * @since 4.4.0
+     */
+    public boolean isProductDetailsLoaded(String productId) {
+        return productDetailsMap.containsKey(productId);
+    }
+
+    /**
+     * Whether every product passed to {@link #initBilling} has loaded details.
+     *
+     * @return true when the paywall has complete pricing data.
+     * @since 4.4.0
+     */
+    public boolean areAllProductDetailsLoaded() {
+        for (String id : inAppProductIdList) {
+            if (!productDetailsMap.containsKey(id)) return false;
+        }
+        for (String id : subProductIdList) {
+            if (!productDetailsMap.containsKey(id)) return false;
+        }
+        return true;
+    }
+
+    // ==================== Play in-app messaging ====================
+
+    /**
+     * Shows Google Play's in-app messages for the current user, if any apply.
+     *
+     * <p>The main use is recovering subscriptions whose payment was declined:
+     * rather than silently losing the subscriber, Play displays a fix-your-payment
+     * flow inside your app. Google recommends calling this on every foreground
+     * entry into the app for apps that sell subscriptions.
+     *
+     * <p>When the user recovers a purchase, this class refreshes its own state
+     * before invoking {@link InAppMessageListener#onSubscriptionRecovered(String)},
+     * so {@link #isPurchased()} is already correct by the time the callback runs.
+     *
+     * @param activity The foreground activity to host the message.
+     * @param listener Optional callback for the outcome.
+     * @since 4.4.0
+     */
+    public void showInAppMessages(Activity activity, @Nullable InAppMessageListener listener) {
+        if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
+            Log.e(Tag, "showInAppMessages: invalid activity");
+            return;
+        }
+        if (billingClient == null || !billingClient.isReady()) {
+            Log.e(Tag, "showInAppMessages: billing client not ready");
+            return;
+        }
+        InAppMessageParams params = InAppMessageParams.newBuilder()
+                .addAllInAppMessageCategoriesToShow()
+                .build();
+        billingClient.showInAppMessages(activity, params, inAppMessageResult -> {
+            int responseCode = inAppMessageResult.getResponseCode();
+            String token = inAppMessageResult.getPurchaseToken();
+            if (responseCode == InAppMessageResult.InAppMessageResponseCode.SUBSCRIPTION_STATUS_UPDATED
+                    && token != null) {
+                Log.d(Tag, "In-app message recovered a subscription");
+                // The subscription is active again; refresh before telling the app.
+                updatePurchaseStatus();
+                if (listener != null) {
+                    mainHandler.post(() -> listener.onSubscriptionRecovered(token));
+                }
+            } else {
+                Log.d(Tag, "In-app message: no action needed (code " + responseCode + ")");
+                if (listener != null) {
+                    mainHandler.post(listener::onNoActionNeeded);
+                }
+            }
+        });
+    }
+
     /**
      * Checks if a product is configured as consumable.
      *
@@ -466,17 +645,10 @@ public class AppPurchase {
     }
 
     private PurchaseResult toSubsPurchaseResult(Purchase purchase) {
-        PurchaseResult purchaseResult = new PurchaseResult(
-                purchase.getOrderId(),
-                purchase.getPackageName(),
-                purchase.getProducts(),
-                purchase.getPurchaseTime(),
-                purchase.getPurchaseState(),
-                purchase.getPurchaseToken(),
-                purchase.getQuantity(),
-                purchase.isAutoRenewing(),
-                purchase.isAcknowledged()
-        );
+        // fromPurchase() captures everything the legacy constructor did, plus the
+        // signature, account identifiers, account-hold flag and any pending plan
+        // change — all of which subscription-state reporting depends on.
+        PurchaseResult purchaseResult = PurchaseResult.fromPurchase(purchase);
         // Required for isSubscription()/getSubscriptionState() to report correctly.
         purchaseResult.setProductType(BillingClient.ProductType.SUBS);
         return purchaseResult;
@@ -580,6 +752,31 @@ public class AppPurchase {
         );
     }
 
+    private void notifyProductDetailsLoaded(String productType, List<ProductDetails> loaded,
+                                            List<UnfetchedProduct> unfetched) {
+        if (productDetailsListener == null) {
+            return;
+        }
+        List<ProductDetails> loadedCopy = new ArrayList<>(loaded);
+        List<UnfetchedProduct> unfetchedCopy = new ArrayList<>(unfetched);
+        mainHandler.post(() -> {
+            if (productDetailsListener != null) {
+                productDetailsListener.onProductDetailsLoaded(productType, loadedCopy, unfetchedCopy);
+            }
+        });
+    }
+
+    private void notifyProductDetailsFailed(String productType, int responseCode, String debugMessage) {
+        if (productDetailsListener == null) {
+            return;
+        }
+        mainHandler.post(() -> {
+            if (productDetailsListener != null) {
+                productDetailsListener.onProductDetailsFailed(productType, responseCode, debugMessage);
+            }
+        });
+    }
+
     private void notifyUpdateFinished() {
         if (updatePurchaseListener != null) {
             mainHandler.post(() -> {
@@ -600,7 +797,34 @@ public class AppPurchase {
         purchase(activity, currentProductId);
     }
 
+    /**
+     * Launches the purchase flow for a product, letting the library pick the
+     * offer (the configured trial offer if any, otherwise Play's last offer).
+     *
+     * @see #purchase(Activity, String, String) to buy one specific offer.
+     */
     public String purchase(Activity activity, String productId) {
+        return purchase(activity, productId, null);
+    }
+
+    /**
+     * Launches the purchase flow for one <b>specific</b> offer of a product.
+     *
+     * <p>Use this when the paywall shows more than one offer for the same product
+     * — a full price alongside a launch discount, or several subscription base
+     * plans — and must buy exactly the one the user tapped. Pass the token from
+     * {@link OfferInfo#getOfferToken()} or {@link OneTimeOfferInfo#getOfferToken()}.
+     *
+     * <p>When {@code offerToken} is null this behaves exactly like
+     * {@link #purchase(Activity, String)}.
+     *
+     * @param activity   the launching activity; must not be finishing.
+     * @param productId  Play product id.
+     * @param offerToken offer token to buy, or null to let the library choose.
+     * @return a human-readable result string; {@code "Billing flow started"} on success.
+     * @since 4.4.0
+     */
+    public String purchase(Activity activity, String productId, @Nullable String offerToken) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             Log.e(Tag, "Invalid activity context");
             notifyListener("Invalid activity");
@@ -637,38 +861,75 @@ public class AppPurchase {
         }
         this.currentProductId = productId;
         this.currentTypeIAP = TYPE_IAP.PURCHASE;
-        String offerToken = null;
-        if (productDetails.getProductType().equals(BillingClient.ProductType.SUBS)) {
-            List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-            if (offers != null && !offers.isEmpty()) {
-                offerToken = findBestOfferToken(productId, offers);
+        String resolvedToken = offerToken;
+        if (resolvedToken == null || resolvedToken.isEmpty()) {
+            if (productDetails.getProductType().equals(BillingClient.ProductType.SUBS)) {
+                List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
+                if (offers != null && !offers.isEmpty()) {
+                    resolvedToken = findBestOfferToken(productId, offers);
+                } else {
+                    Log.e(Tag, "No subscription offer details found for product: " + productId);
+                    notifyListener("No available offers");
+                    return "No subscription offers available";
+                }
             } else {
-                Log.e(Tag, "No subscription offer details found for product: " + productId);
-                notifyListener("No available offers");
-                return "No subscription offers available";
-            }
-        } else {
-            ProductDetails.OneTimePurchaseOfferDetails oneTimeOffer = productDetails.getOneTimePurchaseOfferDetails();
-            if (oneTimeOffer != null) {
-                offerToken = oneTimeOffer.getOfferToken();
-            } else {
-                Log.e(Tag, "No one-time purchase offer details found for product: " + productId);
-                notifyListener("No purchase offer available");
-                return "No purchase offer available";
+                ProductDetails.OneTimePurchaseOfferDetails oneTimeOffer = productDetails.getOneTimePurchaseOfferDetails();
+                if (oneTimeOffer != null) {
+                    resolvedToken = oneTimeOffer.getOfferToken();
+                } else {
+                    Log.e(Tag, "No one-time purchase offer details found for product: " + productId);
+                    notifyListener("No purchase offer available");
+                    return "No purchase offer available";
+                }
             }
         }
-        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(productDetails)
-                .setOfferToken(offerToken)
-                .build();
-        BillingFlowParams billingFlowParams = BillingFlowParams.newBuilder()
-                .setProductDetailsParamsList(Collections.singletonList(params))
-                .build();
-        BillingResult result = billingClient.launchBillingFlow(activity, billingFlowParams);
-        return handleBillingResult(result);
+        return launchFlow(activity, productDetails, resolvedToken, null);
     }
 
+    /**
+     * Launches the purchase flow for the exact one-time offer described by
+     * {@code offer}.
+     *
+     * @param activity the launching activity; must not be finishing.
+     * @param offer    an offer obtained from {@link #getOneTimeOffers(String)}.
+     * @return a human-readable result string; {@code "Billing flow started"} on success.
+     * @since 4.4.0
+     */
+    public String purchase(Activity activity, @NonNull OneTimeOfferInfo offer) {
+        return purchase(activity, offer.getProductId(), offer.getOfferToken());
+    }
+
+    /**
+     * Subscribes to a product, letting the library pick the offer (the offer
+     * whose id matches {@link PurchaseItem#trialId} if configured, otherwise
+     * Play's last offer).
+     *
+     * @see #subscribe(Activity, String, String) to subscribe to one specific offer.
+     */
     public String subscribe(Activity activity, String subsId) {
+        return subscribe(activity, subsId, (String) null);
+    }
+
+    /**
+     * Subscribes to one <b>specific</b> offer of a subscription product.
+     *
+     * <p>This is the method a multi-offer paywall needs. A single subscription
+     * product routinely carries several offers — a base plan, a 7-day free trial,
+     * a 50%-off introductory offer — and Play returns only the ones the user is
+     * actually eligible for. Enumerate them with {@link #getOffers(String)},
+     * render them, then pass the token of the one the user chose.
+     *
+     * <p>When {@code offerToken} is null this behaves exactly like
+     * {@link #subscribe(Activity, String)}.
+     *
+     * @param activity   the launching activity; must not be finishing.
+     * @param subsId     subscription product id.
+     * @param offerToken offer token from {@link OfferInfo#getOfferToken()}, or
+     *                   null to let the library choose.
+     * @return a human-readable result string; {@code "Billing flow started"} on success.
+     * @since 4.4.0
+     */
+    public String subscribe(Activity activity, String subsId, @Nullable String offerToken) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             Log.e(Tag, "Invalid activity context");
             notifyListener("Invalid activity");
@@ -703,21 +964,70 @@ public class AppPurchase {
             notifyListener("Billing service unavailable");
             return "Billing service unavailable";
         }
-        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-        if (offers == null || offers.isEmpty()) {
-            Log.e(Tag, "No subscription offers found");
-            notifyListener("No available offers");
-            return "No subscription offers available";
+        String resolvedToken = offerToken;
+        if (resolvedToken == null || resolvedToken.isEmpty()) {
+            List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
+            if (offers == null || offers.isEmpty()) {
+                Log.e(Tag, "No subscription offers found");
+                notifyListener("No available offers");
+                return "No subscription offers available";
+            }
+            resolvedToken = findBestOfferToken(subsId, offers);
         }
-        String offerToken = findBestOfferToken(subsId, offers);
-        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(productDetails)
-                .setOfferToken(offerToken)
-                .build();
-        BillingFlowParams flowParams = BillingFlowParams.newBuilder()
-                .setProductDetailsParamsList(Collections.singletonList(params))
-                .build();
-        BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
+        this.currentProductId = subsId;
+        this.currentTypeIAP = TYPE_IAP.SUBSCRIPTION;
+        return launchFlow(activity, productDetails, resolvedToken, null);
+    }
+
+    /**
+     * Subscribes to the exact offer described by {@code offer}.
+     *
+     * @param activity the launching activity; must not be finishing.
+     * @param offer    an offer obtained from {@link #getOffers(String)}.
+     * @return a human-readable result string; {@code "Billing flow started"} on success.
+     * @since 4.4.0
+     */
+    public String subscribe(Activity activity, @NonNull OfferInfo offer) {
+        return subscribe(activity, offer.getProductId(), offer.getOfferToken());
+    }
+
+    /**
+     * Builds and launches a billing flow, applying the fraud-prevention
+     * identifiers and the personalized-offer flag configured on this instance.
+     *
+     * <p>Every purchase path in this class funnels through here so those settings
+     * can never be applied inconsistently.
+     *
+     * @param updateParams subscription upgrade/downgrade params, or null for a
+     *                     plain purchase.
+     */
+    private String launchFlow(Activity activity,
+                              ProductDetails productDetails,
+                              String offerToken,
+                              @Nullable BillingFlowParams.SubscriptionUpdateParams updateParams) {
+        BillingFlowParams.ProductDetailsParams.Builder productParams =
+                BillingFlowParams.ProductDetailsParams.newBuilder()
+                        .setProductDetails(productDetails);
+        // One-time products without a configured offer have no token; setting an
+        // empty one is rejected by the billing library.
+        if (offerToken != null && !offerToken.isEmpty()) {
+            productParams.setOfferToken(offerToken);
+        }
+        BillingFlowParams.Builder flowParams = BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(Collections.singletonList(productParams.build()));
+        if (obfuscatedAccountId != null && !obfuscatedAccountId.isEmpty()) {
+            flowParams.setObfuscatedAccountId(obfuscatedAccountId);
+        }
+        if (obfuscatedProfileId != null && !obfuscatedProfileId.isEmpty()) {
+            flowParams.setObfuscatedProfileId(obfuscatedProfileId);
+        }
+        if (offerPersonalized) {
+            flowParams.setIsOfferPersonalized(true);
+        }
+        if (updateParams != null) {
+            flowParams.setSubscriptionUpdateParams(updateParams);
+        }
+        BillingResult result = billingClient.launchBillingFlow(activity, flowParams.build());
         return handleBillingResult(result);
     }
 
@@ -732,6 +1042,28 @@ public class AppPurchase {
      */
     public String updateSubscription(Activity activity, String newSubsId, String oldPurchaseToken,
                                       SubscriptionReplacementMode replacementMode) {
+        return updateSubscription(activity, newSubsId, null, oldPurchaseToken, replacementMode);
+    }
+
+    /**
+     * Upgrades or downgrades a subscription onto one <b>specific</b> offer of the
+     * new product.
+     *
+     * <p>Needed when the target subscription has several base plans or offers and
+     * the user picked one — the no-token overload would otherwise fall back to
+     * Play's last offer.
+     *
+     * @param activity         The activity context.
+     * @param newSubsId        The new subscription product ID.
+     * @param offerToken       Offer token from {@link OfferInfo#getOfferToken()},
+     *                         or null to let the library choose.
+     * @param oldPurchaseToken The purchase token of the current subscription to replace.
+     * @param replacementMode  The replacement mode (proration mode).
+     * @return Result message.
+     * @since 4.4.0
+     */
+    public String updateSubscription(Activity activity, String newSubsId, @Nullable String offerToken,
+                                      String oldPurchaseToken, SubscriptionReplacementMode replacementMode) {
         if (activity == null || activity.isFinishing() || activity.isDestroyed()) {
             Log.e(Tag, "Invalid activity context");
             notifyListener("Invalid activity");
@@ -753,13 +1085,16 @@ public class AppPurchase {
             notifyListener("Billing service unavailable");
             return "Billing service unavailable";
         }
-        List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
-        if (offers == null || offers.isEmpty()) {
-            Log.e(Tag, "No subscription offers found");
-            notifyListener("No available offers");
-            return "No subscription offers available";
+        String resolvedToken = offerToken;
+        if (resolvedToken == null || resolvedToken.isEmpty()) {
+            List<ProductDetails.SubscriptionOfferDetails> offers = productDetails.getSubscriptionOfferDetails();
+            if (offers == null || offers.isEmpty()) {
+                Log.e(Tag, "No subscription offers found");
+                notifyListener("No available offers");
+                return "No subscription offers available";
+            }
+            resolvedToken = findBestOfferToken(newSubsId, offers);
         }
-        String offerToken = findBestOfferToken(newSubsId, offers);
 
         // Build subscription update params
         BillingFlowParams.SubscriptionUpdateParams updateParams = BillingFlowParams.SubscriptionUpdateParams
@@ -768,18 +1103,8 @@ public class AppPurchase {
                 .setSubscriptionReplacementMode(replacementMode.getMode())
                 .build();
 
-        BillingFlowParams.ProductDetailsParams params = BillingFlowParams.ProductDetailsParams.newBuilder()
-                .setProductDetails(productDetails)
-                .setOfferToken(offerToken)
-                .build();
-        BillingFlowParams flowParams = BillingFlowParams.newBuilder()
-                .setProductDetailsParamsList(Collections.singletonList(params))
-                .setSubscriptionUpdateParams(updateParams)
-                .build();
-
         Log.d(Tag, "Updating subscription from token: " + oldPurchaseToken + " to: " + newSubsId);
-        BillingResult result = billingClient.launchBillingFlow(activity, flowParams);
-        return handleBillingResult(result);
+        return launchFlow(activity, productDetails, resolvedToken, updateParams);
     }
 
     /**
@@ -1675,6 +2000,78 @@ public class AppPurchase {
     }
 
     /**
+     * Whether <b>this user</b> can currently start a free trial on this product.
+     *
+     * <p>Google Play filters the offer list per account: an account that has
+     * already used the trial for a subscription simply does not receive that offer
+     * in {@link ProductDetails}. So the presence of a trial offer <i>is</i> the
+     * eligibility signal, and this method is the honestly-named way to ask.
+     *
+     * <p>Use it to choose paywall copy — "Start 7-day free trial" versus
+     * "Subscribe" — instead of showing a trial the user cannot claim and having
+     * Play charge them immediately.
+     *
+     * <p>Only meaningful once product details have loaded; see
+     * {@link #isProductDetailsLoaded(String)}.
+     *
+     * @param productId Subscription product id.
+     * @return true when a free-trial offer is available to this account.
+     * @since 4.4.0
+     */
+    public boolean isEligibleForFreeTrial(String productId) {
+        return getTrialOffer(productId) != null;
+    }
+
+    /**
+     * Whether <b>this user</b> can currently claim an introductory price on this
+     * product. Same per-account filtering as {@link #isEligibleForFreeTrial(String)}.
+     *
+     * @param productId Subscription product id.
+     * @return true when an introductory offer is available to this account.
+     * @since 4.4.0
+     */
+    public boolean isEligibleForIntroPrice(String productId) {
+        return getIntroOffer(productId) != null;
+    }
+
+    /**
+     * Whether any active subscription is in <b>account hold</b> — Play could not
+     * charge the user and has suspended the subscription.
+     *
+     * <p>These users must not receive premium access. Pair with
+     * {@link #showInAppMessages(Activity, InAppMessageListener)} to let Play walk
+     * them through fixing their payment method.
+     *
+     * @return true when at least one subscription is on hold.
+     * @since 4.4.0
+     */
+    public boolean hasSubscriptionOnHold() {
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.isSuspended()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether any subscription has a plan change the user started but has not
+     * paid for yet. The current plan remains the entitlement in force until it
+     * completes.
+     *
+     * @return true when a pending plan change exists.
+     * @since 4.4.0
+     */
+    public boolean hasPendingSubscriptionChange() {
+        for (PurchaseResult result : purchaseResultList) {
+            if (result.hasPendingPurchaseUpdate()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * ISO-8601 trial duration (e.g. {@code "P7D"}, {@code "P1W"}, {@code "P1M"}).
      *
      * @param productId Subscription product id.
@@ -1759,6 +2156,353 @@ public class AppPurchase {
             if (!info.isFreeTrial() && !info.getHasIntroPrice()) return info;
         }
         return offers.get(offers.size() - 1);
+    }
+
+    /**
+     * Returns the first offer on this subscription that has an introductory
+     * (discounted, finite-recurring) pricing phase, or {@code null} if none does.
+     *
+     * <p>An introductory offer charges a reduced price for a fixed number of
+     * cycles before reverting to the recurring price — distinct from a free
+     * trial, which charges nothing. See {@link #getTrialOffer(String)}.
+     *
+     * @param productId Subscription product id.
+     * @return Introductory offer, or {@code null}.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getIntroOffer(String productId) {
+        for (OfferInfo info : getOffers(productId)) {
+            if (info.getHasIntroPrice()) return info;
+        }
+        return null;
+    }
+
+    /**
+     * Looks up a subscription offer by its Play Console offer id.
+     *
+     * @param productId Subscription product id.
+     * @param offerId   Offer id configured in Play Console.
+     * @return The matching offer, or {@code null} when the product has no such
+     *         offer — including when the user is not eligible for it, since Play
+     *         only returns offers the current account can actually redeem.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getOfferById(String productId, String offerId) {
+        if (offerId == null) return null;
+        for (OfferInfo info : getOffers(productId)) {
+            if (offerId.equals(info.getOfferId())) return info;
+        }
+        return null;
+    }
+
+    /**
+     * Looks up a subscription offer by its Play Console base plan id.
+     *
+     * <p>Use this to pin a paywall row to a specific base plan (e.g. {@code
+     * "monthly"} vs {@code "yearly"}) rather than relying on list order. When
+     * several offers share the base plan, the first is returned — prefer the base
+     * plan's own offer by checking {@link OfferInfo#isBaseOffer()}.
+     *
+     * @param productId   Subscription product id.
+     * @param basePlanId  Base plan id configured in Play Console.
+     * @return The matching offer, or {@code null}.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getOfferByBasePlanId(String productId, String basePlanId) {
+        if (basePlanId == null) return null;
+        for (OfferInfo info : getOffers(productId)) {
+            if (basePlanId.equals(info.getBasePlanId())) return info;
+        }
+        return null;
+    }
+
+    /**
+     * Returns every offer carrying the given Play Console offer tag.
+     *
+     * <p>Tags are the supported way to drive a paywall from the Play Console
+     * without shipping an app update: tag an offer {@code "popular"} or
+     * {@code "winback"} and select it here by tag rather than by hard-coded id.
+     *
+     * @param productId Subscription product id.
+     * @param tag       Offer tag; matched case-insensitively.
+     * @return Matching offers, never {@code null}.
+     * @since 4.4.0
+     */
+    @NonNull
+    public List<OfferInfo> getOffersByTag(String productId, String tag) {
+        List<OfferInfo> matches = new ArrayList<>();
+        if (tag == null) return matches;
+        for (OfferInfo info : getOffers(productId)) {
+            if (info.hasTag(tag)) matches.add(info);
+        }
+        return matches;
+    }
+
+    /**
+     * Returns the first offer carrying the given Play Console offer tag.
+     *
+     * @param productId Subscription product id.
+     * @param tag       Offer tag; matched case-insensitively.
+     * @return The matching offer, or {@code null}.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getOfferByTag(String productId, String tag) {
+        List<OfferInfo> matches = getOffersByTag(productId, tag);
+        return matches.isEmpty() ? null : matches.get(0);
+    }
+
+    /**
+     * Returns the offer with the lowest recurring cost per month, comparing plans
+     * of different cadences on equal terms.
+     *
+     * <p>This is the "best value" badge on a paywall: a yearly plan at $59.99
+     * beats a monthly at $9.99 because it normalizes to ~$5.00/month. Offers
+     * whose period or price could not be resolved are skipped.
+     *
+     * @param productId Subscription product id.
+     * @return The cheapest-per-month offer, or {@code null} when none can be
+     *         normalized.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getBestValueOffer(String productId) {
+        OfferInfo best = null;
+        long bestPerMonth = Long.MAX_VALUE;
+        for (OfferInfo info : getOffers(productId)) {
+            long perMonth = info.getPricePerMonthMicros();
+            if (perMonth <= 0L) continue;
+            if (perMonth < bestPerMonth) {
+                bestPerMonth = perMonth;
+                best = info;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Returns the offer that costs the user least for their first billing cycle —
+     * a free trial beats an introductory price, which beats full price.
+     *
+     * <p>This is the "cheapest way in" for an acquisition-focused paywall, and is
+     * deliberately different from {@link #getBestValueOffer(String)}, which
+     * optimizes long-run cost.
+     *
+     * @param productId Subscription product id.
+     * @return The offer with the lowest first-cycle price, or {@code null} when
+     *         the product has no offers.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OfferInfo getCheapestFirstCycleOffer(String productId) {
+        OfferInfo best = null;
+        long bestPrice = Long.MAX_VALUE;
+        for (OfferInfo info : getOffers(productId)) {
+            long price = info.getFirstCyclePriceMicros();
+            if (price < bestPrice) {
+                bestPrice = price;
+                best = info;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Whether any offer on this subscription has an introductory price phase.
+     *
+     * @param productId Subscription product id.
+     * @return {@code true} when an introductory offer exists.
+     * @since 4.4.0
+     */
+    public boolean hasIntroductoryPrice(String productId) {
+        return getIntroOffer(productId) != null;
+    }
+
+    /**
+     * ISO-8601 duration of one introductory cycle (e.g. {@code "P1M"}).
+     *
+     * @param productId Subscription product id.
+     * @return Intro period string, or {@code null} when there is no intro offer.
+     * @since 4.4.0
+     */
+    @Nullable
+    public String getIntroductoryPeriod(String productId) {
+        OfferInfo intro = getIntroOffer(productId);
+        return intro != null ? intro.getIntroPeriod() : null;
+    }
+
+    /**
+     * Number of billing cycles the introductory price applies for.
+     *
+     * @param productId Subscription product id.
+     * @return Cycle count, or 0 when there is no intro offer.
+     * @since 4.4.0
+     */
+    public int getIntroductoryCycleCount(String productId) {
+        OfferInfo intro = getIntroOffer(productId);
+        return intro != null ? intro.getIntroCycleCount() : 0;
+    }
+
+    /**
+     * Recurring price of the base offer normalized to one average month, in micros.
+     *
+     * @param productId Subscription product id.
+     * @return Per-month micros, or 0 when the price or period is unavailable.
+     * @since 4.4.0
+     */
+    public long getPricePerMonthMicros(String productId) {
+        OfferInfo base = getBaseOffer(productId);
+        return base != null ? base.getPricePerMonthMicros() : 0L;
+    }
+
+    /**
+     * Recurring price of the base offer normalized to one average month, formatted
+     * in the device locale (e.g. {@code "$5.00"}).
+     *
+     * <p>Play does not provide this string, so it is composed locally from the
+     * price micros and the offer's currency. It is an approximation for display —
+     * never present it as the amount that will be charged.
+     *
+     * @param productId Subscription product id.
+     * @return Formatted per-month price, or empty string when unavailable.
+     * @since 4.4.0
+     */
+    @NonNull
+    public String getFormattedPricePerMonth(String productId) {
+        OfferInfo base = getBaseOffer(productId);
+        if (base == null) return "";
+        return formatPrice(base.getPricePerMonthMicros(), base.getCurrencyCode());
+    }
+
+    /**
+     * Whole-percent saving of {@code comparedProductId} against
+     * {@code baseProductId}, normalized to a common monthly cadence.
+     *
+     * <p>The canonical use is the "Save 40%" badge on an annual plan: pass the
+     * monthly product as the base and the yearly product as the comparison. Both
+     * products' base offers are used, so trial and introductory phases do not
+     * distort the result.
+     *
+     * @param baseProductId     The plan being compared against, usually monthly.
+     * @param comparedProductId The plan the badge is for, usually yearly.
+     * @return Whole-percent saving in {@code 0..100}; 0 when either plan is
+     *         unavailable or the compared plan is not cheaper per month.
+     * @since 4.4.0
+     */
+    public int getSavingsPercent(String baseProductId, String comparedProductId) {
+        OfferInfo base = getBaseOffer(baseProductId);
+        OfferInfo compared = getBaseOffer(comparedProductId);
+        if (base == null || compared == null) return 0;
+        return BillingPeriod.Companion.savingsPercent(
+                base.getBasePriceMicros(),
+                base.getBillingPeriod(),
+                compared.getBasePriceMicros(),
+                compared.getBillingPeriod());
+    }
+
+    /**
+     * Formats a micros price with the device's locale conventions.
+     *
+     * @param priceMicros  Price × 1,000,000.
+     * @param currencyCode ISO-4217 currency code, e.g. {@code "USD"}.
+     * @return Formatted price, or empty string when the currency is unknown or
+     *         the price is not positive.
+     * @since 4.4.0
+     */
+    @NonNull
+    public static String formatPrice(long priceMicros, String currencyCode) {
+        if (priceMicros <= 0L || currencyCode == null || currencyCode.isEmpty()) {
+            return "";
+        }
+        try {
+            NumberFormat format = NumberFormat.getCurrencyInstance();
+            format.setCurrency(Currency.getInstance(currencyCode));
+            return format.format(priceMicros / 1_000_000.0);
+        } catch (IllegalArgumentException e) {
+            // Unknown/unsupported ISO-4217 code — better an empty price than a crash.
+            Log.e(Tag, "Unknown currency code: " + currencyCode);
+            return "";
+        }
+    }
+
+    // ==================== One-time product offers (Billing 9) ====================
+
+    /**
+     * Returns every offer attached to a one-time (INAPP) product, mapped to a
+     * typed {@link OneTimeOfferInfo}.
+     *
+     * <p>Play Billing 9 lets a one-time product carry multiple offers — a full
+     * price plus, say, a 30%-off launch discount, a rental, or a pre-order. The
+     * legacy {@link ProductDetails#getOneTimePurchaseOfferDetails()} exposes only
+     * one of them; this returns the full list.
+     *
+     * @param productId One-time product id.
+     * @return Immutable {@link List} of offers (never {@code null}). Empty when
+     *         the product is a subscription or its details are not loaded.
+     * @since 4.4.0
+     */
+    @NonNull
+    public List<OneTimeOfferInfo> getOneTimeOffers(String productId) {
+        ProductDetails details = inAppProductDetailsMap.get(productId);
+        if (details == null) return Collections.emptyList();
+        List<ProductDetails.OneTimePurchaseOfferDetails> offers = details.getOneTimePurchaseOfferDetailsList();
+        if (offers == null || offers.isEmpty()) {
+            // Older products expose only the single legacy offer.
+            ProductDetails.OneTimePurchaseOfferDetails legacy = details.getOneTimePurchaseOfferDetails();
+            if (legacy == null) return Collections.emptyList();
+            return Collections.singletonList(OneTimeOfferInfo.Companion.from(productId, legacy));
+        }
+        List<OneTimeOfferInfo> result = new ArrayList<>(offers.size());
+        for (ProductDetails.OneTimePurchaseOfferDetails offer : offers) {
+            result.add(OneTimeOfferInfo.Companion.from(productId, offer));
+        }
+        return result;
+    }
+
+    /**
+     * Looks up a one-time product offer by its Play Console offer id.
+     *
+     * @param productId One-time product id.
+     * @param offerId   Offer id configured in Play Console.
+     * @return The matching offer, or {@code null}.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OneTimeOfferInfo getOneTimeOffer(String productId, String offerId) {
+        if (offerId == null) return null;
+        for (OneTimeOfferInfo info : getOneTimeOffers(productId)) {
+            if (offerId.equals(info.getOfferId())) return info;
+        }
+        return null;
+    }
+
+    /**
+     * Returns the cheapest currently-valid offer for a one-time product — the
+     * discount to show when several are live.
+     *
+     * <p>Sold-out limited-quantity offers and offers outside their validity window
+     * are skipped.
+     *
+     * @param productId One-time product id.
+     * @return The cheapest purchasable offer, or {@code null} when none is
+     *         currently purchasable.
+     * @since 4.4.0
+     */
+    @Nullable
+    public OneTimeOfferInfo getBestOneTimeOffer(String productId) {
+        OneTimeOfferInfo best = null;
+        long bestPrice = Long.MAX_VALUE;
+        for (OneTimeOfferInfo info : getOneTimeOffers(productId)) {
+            if (info.isSoldOut() || !info.isValidAt()) continue;
+            if (info.getPriceMicros() < bestPrice) {
+                bestPrice = info.getPriceMicros();
+                best = info;
+            }
+        }
+        return best;
     }
 
     public void setDiscount(double discount) {
@@ -1948,10 +2692,28 @@ public class AppPurchase {
                         }
                         Log.d(Tag, "Found Product: " + productDetails.getProductId() + " - " + productDetails.getTitle());
                     }
+                    // Play reports ids it could not resolve; keep them so an empty
+                    // paywall can be diagnosed instead of failing silently.
+                    List<UnfetchedProduct> unfetched = queryProductDetailsResult.getUnfetchedProductList();
+                    if (unfetched == null) {
+                        unfetched = Collections.emptyList();
+                    }
+                    for (Iterator<Map.Entry<String, UnfetchedProduct>> it = unfetchedProducts.entrySet().iterator(); it.hasNext(); ) {
+                        if (productType.equals(it.next().getValue().getProductType())) {
+                            it.remove();
+                        }
+                    }
+                    for (UnfetchedProduct product : unfetched) {
+                        unfetchedProducts.put(product.getProductId(), product);
+                        Log.e(Tag, "Unfetched product: " + product.getProductId()
+                                + " (status " + product.getStatusCode() + ")");
+                    }
+                    notifyProductDetailsLoaded(productType, productDetailsList, unfetched);
                     notifyUpdateFinished();
                 } else {
                     Log.e(Tag, "Error querying product details (" + productType + "): " + billingResult.getDebugMessage());
                     notifyListener("Error getting " + productType + " details: " + billingResult.getDebugMessage());
+                    notifyProductDetailsFailed(productType, billingResult.getResponseCode(), billingResult.getDebugMessage());
                 }
             }
         });

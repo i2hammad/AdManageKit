@@ -21,6 +21,7 @@ workRuntime = "2.11.2"
 composeCompiler = "1.5.8"
 yandexMobileads = "8.2.0"
 junit = "4.13.2"
+json = "20250517"
 robolectric = "4.16.1"
 mockk = "1.14.11"
 androidxTestCore = "1.7.0"
@@ -53,6 +54,7 @@ shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
 androidx-work-runtime = { module = "androidx.work:work-runtime", version.ref = "workRuntime" }
 yandex-mobileads = { module = "com.yandex.android:mobileads", version.ref = "yandexMobileads" }
 junit = { module = "junit:junit", version.ref = "junit" }
+json = { module = "org.json:json", version.ref = "json" }
 robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTestCore" }

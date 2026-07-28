@@ -5,6 +5,37 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.0] - 2026-07-28
+
+Minor release focused on the billing module: subscription offers can now be purchased individually, offer pricing can be compared and normalized without hand-parsing ISO-8601, Play Billing 9's one-time product offers (discounts, rentals, pre-orders, limited quantity) are surfaced, and account hold is detected client-side. Purely additive — no existing method signature changed.
+
+### Added
+
+- **Purchase a specific offer** — `subscribe(activity, subsId, offerToken)`, `subscribe(activity, OfferInfo)`, `purchase(activity, productId, offerToken)`, `purchase(activity, OneTimeOfferInfo)`, and `updateSubscription(activity, newSubsId, offerToken, oldPurchaseToken, mode)`. Previously a multi-offer paywall could not buy the offer the user tapped: the library always resolved the token itself (the configured `trialId`, else Play's *last* offer), so a user selecting "yearly" could be charged for whichever plan happened to be last in the list
+- **Offer lookup** — `getIntroOffer`, `getOfferById`, `getOfferByBasePlanId`, `getOffersByTag` / `getOfferByTag`, `getBestValueOffer` (lowest cost per month), `getCheapestFirstCycleOffer` (cheapest way in). Offer tags let a paywall be re-targeted from the Play Console without an app update
+- **`BillingPeriod`** — parses the ISO-8601 periods Play returns (`P7D`, `P1M`, `P1Y`) into a dominant `unit` + `count` pair for localized plurals, plus normalized `totalMonths` / `totalDays`. Includes `savingsPercent(...)` and `pricePerMonthMicros(...)` for cross-cadence comparison
+- **Normalized pricing on `OfferInfo`** — `pricePerMonthMicros`, `pricePerWeekMicros`, `firstCyclePriceMicros` / `firstCyclePrice` (what the user actually pays today), `introDiscountPercent`, `trialDays`, `introTotalDays`, parsed period accessors, `isBaseOffer` / `hasPromotion`, and `hasTag(...)`
+- **`AppPurchase.getSavingsPercent(monthlyId, yearlyId)`** and `getFormattedPricePerMonth(productId)` — the "Save 40%" and "$5.00/month, billed yearly" strings paywalls need; both compare *base* offers so trial and intro phases do not distort the result
+- **Installment plans** — `OfferInfo.isInstallmentPlan`, `installmentCommitmentPayments`, `installmentRenewalCommitmentPayments`
+- **One-time product offers (Play Billing 9)** — new `OneTimeOfferInfo` plus `getOneTimeOffers`, `getOneTimeOffer`, `getBestOneTimeOffer`. Surfaces discounts (`effectiveDiscountPercent`, `fullPriceMicros`), rentals, pre-orders, limited quantity (`isSoldOut`) and validity windows. A single one-time product can carry several offers; the legacy `getOneTimePurchaseOfferDetails()` exposes only one
+- **Trial eligibility** — `isEligibleForFreeTrial(productId)` and `isEligibleForIntroPrice(productId)`. Play filters offers per account, so the presence of a trial offer *is* the eligibility signal; these name that explicitly so paywalls stop promising trials the user cannot claim
+- **Fraud-prevention and disclosure flow params** — `setObfuscatedAccountId`, `setObfuscatedProfileId` (Google-recommended hashed identifiers, never raw account data) and `setOfferPersonalized` (required EU disclosure when prices are personalized). Applied to every billing flow the library launches
+- **Product-details diagnostics** — `setProductDetailsListener(...)` reports what loaded and what did not per product type, `getUnfetchedProducts()` returns Play's reason codes for ids it declined, and `isProductDetailsLoaded` / `areAllProductDetailsLoaded` distinguish "no products" from "not loaded yet". An empty paywall is no longer silent
+- **Play in-app messaging** — `showInAppMessages(activity, listener)` shows Play's payment-recovery flow for subscriptions whose payment was declined; the library refreshes purchase state before invoking `onSubscriptionRecovered`, so `isPurchased()` is already correct in the callback
+- **Pending plan changes** — `PurchaseResult.hasPendingPurchaseUpdate()`, `getPendingProductIds()`, `getPendingPurchaseToken()`, and `AppPurchase.hasPendingSubscriptionChange()`. The current plan stays the entitlement in force until the change is paid for
+- **`AppPurchase.formatPrice(micros, currencyCode)`** — locale-aware formatting for locally-derived prices such as per-month figures
+
+### Changed
+
+- **Account hold is detected client-side** — `PurchaseResult.isSuspended()` is populated from Play Billing 9's signal, and `getSubscriptionState()` now returns `ON_HOLD` for those purchases instead of `ACTIVE`/`CANCELLED`. **This is a behavior change:** `isSubscriptionActive()` returns `false` during account hold, which is what Google requires — an on-hold user has not paid and must not keep premium access. Detecting this previously required server-side verification. Apps that want to keep serving on-hold users must check `isSuspended()` explicitly. `AppPurchase.hasSubscriptionOnHold()` reports it globally; pair it with `showInAppMessages(...)` to let users recover
+- **Subscription `PurchaseResult`s carry full purchase data** — `toSubsPurchaseResult` now builds via `PurchaseResult.fromPurchase(...)` instead of the legacy 9-argument constructor, so signature, account identifiers, account-hold state and pending plan changes are populated on subscription results
+- All purchase paths funnel through one internal `launchFlow(...)`, so obfuscated identifiers and the personalized-offer flag can never be applied inconsistently across `purchase` / `subscribe` / `updateSubscription`
+
+### Notes
+
+- `OfferInfo` gained a trailing `installmentPlanDetails` constructor parameter (defaulted to `null`). Source-compatible; obtain instances from `AppPurchase` rather than constructing them
+- The billing module's unit tests now build real `ProductDetails` fixtures from Play-shaped JSON (`org.json` added as a test-only dependency), so offer classification is verified against the billing library's own parser rather than a stand-in
+
 ## [4.3.5] - 2026-07-27
 
 Patch release: `appOpenAdFreshnessThreshold` (default 4 hours) is now enforced on every app open show path. Only `ON_DEMAND` consulted it before — `HYBRID`, `FRESH_WITH_CACHE_FALLBACK`, `ONLY_CACHE`, and the multi-provider waterfall gated on "an ad object exists" and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. No API changes.

@@ -48,9 +48,14 @@ dependencies {
     implementation(libs.androidx.constraintlayout) // Use 'api' instead of 'implementation' to expose it
     api(libs.material)
 
-    // PurchaseResultTest is a pure JVM test (the tested PurchaseResult paths
-    // never touch android.* APIs), so JUnit is the only test dependency needed.
+    // These are pure JVM tests — the tested PurchaseResult / OfferInfo /
+    // BillingPeriod paths never touch android.* APIs.
     testImplementation(libs.junit)
+    // The billing library parses ProductDetails from JSON. The android.jar stub
+    // used by unit tests returns null from every org.json method, so tests that
+    // build real ProductDetails fixtures need a working implementation ahead of
+    // the stub on the classpath.
+    testImplementation(libs.json)
 }
 
 afterEvaluate {
@@ -60,7 +65,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-billing"
-                version = "4.3.5"
+                version = "4.4.0"
             }
         }
     }

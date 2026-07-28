@@ -46,6 +46,13 @@ public class PurchaseResult {
     private long expiryTime;
     private boolean expiryVerified;
 
+    // Account hold, reported client-side by Play Billing 9
+    private boolean suspended;
+
+    // Pending subscription change awaiting payment (Play Billing 9)
+    private List<String> pendingProductIds;
+    private String pendingPurchaseToken;
+
     /**
      * Purchase states from Google Play Billing.
      */
@@ -78,6 +85,14 @@ public class PurchaseResult {
         result.acknowledged = purchase.isAcknowledged();
         result.originalJson = purchase.getOriginalJson();
         result.signature = purchase.getSignature();
+        result.suspended = purchase.isSuspended();
+
+        // A pending upgrade/downgrade the user started but has not paid for yet.
+        Purchase.PendingPurchaseUpdate pendingUpdate = purchase.getPendingPurchaseUpdate();
+        if (pendingUpdate != null) {
+            result.pendingProductIds = pendingUpdate.getProducts();
+            result.pendingPurchaseToken = pendingUpdate.getPurchaseToken();
+        }
 
         // Get account identifiers if available
         AccountIdentifiers accountIdentifiers = purchase.getAccountIdentifiers();
@@ -488,6 +503,13 @@ public class PurchaseResult {
             return SubscriptionState.NOT_SUBSCRIPTION;
         }
 
+        // Account hold: Play reports this client-side from Billing 9 onward, so it
+        // no longer needs a server round-trip. The user has no access until they
+        // fix their payment method.
+        if (suspended) {
+            return SubscriptionState.ON_HOLD;
+        }
+
         // If we have a valid purchase in the list, it's either active or cancelled
         if (isPurchased() && acknowledged) {
             if (autoRenewing) {
@@ -529,6 +551,71 @@ public class PurchaseResult {
      */
     public boolean isSubscriptionCancelled() {
         return getSubscriptionState() == SubscriptionState.CANCELLED;
+    }
+
+    /**
+     * Whether this subscription is in <b>account hold</b> — Google Play could not
+     * charge the user's payment method and has suspended the subscription.
+     *
+     * <p>The user keeps the subscription record but must not receive premium
+     * access until they fix payment. Call
+     * {@link AppPurchase#showInAppMessages(android.app.Activity, InAppMessageListener)}
+     * to let Play walk them through recovery.
+     *
+     * <p>Populated from Play Billing 9's client-side signal; earlier versions of
+     * this library required server-side verification to detect it.
+     *
+     * @return true when the subscription is on hold.
+     * @since 4.4.0
+     */
+    public boolean isSuspended() {
+        return suspended;
+    }
+
+    /**
+     * Sets the account-hold flag. Populated automatically from the Play purchase.
+     *
+     * @since 4.4.0
+     */
+    public void setSuspended(boolean suspended) {
+        this.suspended = suspended;
+    }
+
+    /**
+     * Whether the user has started a subscription change (upgrade or downgrade)
+     * that has not been paid for yet.
+     *
+     * <p>Until it completes, the <i>current</i> plan remains the entitlement in
+     * force. Use this to show "plan change pending" rather than switching the UI
+     * to the new tier prematurely.
+     *
+     * @return true when a pending change exists.
+     * @since 4.4.0
+     */
+    public boolean hasPendingPurchaseUpdate() {
+        return pendingPurchaseToken != null && !pendingPurchaseToken.isEmpty();
+    }
+
+    /**
+     * Product ids of the pending subscription change, or {@code null} when there
+     * is none. See {@link #hasPendingPurchaseUpdate()}.
+     *
+     * @since 4.4.0
+     */
+    @Nullable
+    public List<String> getPendingProductIds() {
+        return pendingProductIds;
+    }
+
+    /**
+     * Purchase token of the pending subscription change, or {@code null} when
+     * there is none. See {@link #hasPendingPurchaseUpdate()}.
+     *
+     * @since 4.4.0
+     */
+    @Nullable
+    public String getPendingPurchaseToken() {
+        return pendingPurchaseToken;
     }
 
     // ==================== Expiry Time Methods ====================

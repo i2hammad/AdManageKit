@@ -3,6 +3,7 @@ package com.i2hammad.admanagekit.billing
 import com.android.billingclient.api.BillingClient
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -171,5 +172,49 @@ class PurchaseResultTest {
         val pending = PurchaseResult().apply { setPurchaseState(PurchaseResult.State.PENDING) }
         assertFalse(pending.isPurchased)
         assertTrue(pending.isPending)
+    }
+
+    // ==================== account hold ====================
+
+    @Test
+    fun `a subscription defaults to not suspended`() {
+        assertFalse(subscriptionResult().isSuspended)
+        assertEquals(PurchaseResult.SubscriptionState.ACTIVE, subscriptionResult().subscriptionState)
+    }
+
+    @Test
+    fun `a suspended subscription reports ON_HOLD and loses access`() {
+        val onHold = subscriptionResult().apply { setSuspended(true) }
+        assertTrue(onHold.isSuspended)
+        assertEquals(PurchaseResult.SubscriptionState.ON_HOLD, onHold.subscriptionState)
+        // Account hold means the user must not receive premium access.
+        assertFalse(onHold.isSubscriptionActive)
+        assertFalse(onHold.isSubscriptionCancelled)
+    }
+
+    @Test
+    fun `account hold outranks cancellation`() {
+        val onHold = subscriptionResult(autoRenewing = false).apply { setSuspended(true) }
+        assertEquals(PurchaseResult.SubscriptionState.ON_HOLD, onHold.subscriptionState)
+    }
+
+    @Test
+    fun `suspension does not apply to one-time purchases`() {
+        val inApp = PurchaseResult().apply {
+            setProductType(BillingClient.ProductType.INAPP)
+            setPurchaseState(PurchaseResult.State.PURCHASED)
+            setSuspended(true)
+        }
+        assertEquals(PurchaseResult.SubscriptionState.NOT_SUBSCRIPTION, inApp.subscriptionState)
+    }
+
+    // ==================== pending plan change ====================
+
+    @Test
+    fun `no pending plan change by default`() {
+        val result = subscriptionResult()
+        assertFalse(result.hasPendingPurchaseUpdate())
+        assertNull(result.pendingProductIds)
+        assertNull(result.pendingPurchaseToken)
     }
 }

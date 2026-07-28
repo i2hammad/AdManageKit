@@ -8,7 +8,7 @@ AdManageKit is an Android library for simplifying Google AdMob ads, Google Play 
 
 - **AdManageKit** (main module): Ad managers, native ad views, waterfall orchestrators, AdMob providers, UMP consent
 - **admanagekit-core**: Zero-dependency core — purchase provider interfaces, multi-provider ad interfaces (`com.i2hammad.admanagekit.core.ad`), provider registry
-- **admanagekit-billing**: Google Play Billing Library v8 integration (`AppPurchase`)
+- **admanagekit-billing**: Google Play Billing Library v9 integration (`AppPurchase`)
 - **admanagekit-compose**: Jetpack Compose wrappers for all ad formats
 - **admanagekit-yandex**: Yandex Mobile Ads SDK 8 providers for the waterfall
 - **app**: Sample application demonstrating library usage; also hosts integration-style unit tests
@@ -50,7 +50,10 @@ CI (`.github/workflows/ci.yml`) runs `assembleDebug` + `testDebugUnitTest` on JD
 - `AdManageKitConfig`: global mutable config object; `resetToDefaults()` must cover every field (tested)
 
 ### Billing Module (admanagekit-billing)
-- `AppPurchase`: Billing client wrapper (v8). Entitlement requires `PurchaseState.PURCHASED`; restore paths acknowledge unacknowledged purchases; listener callbacks are main-thread and fire once per init
+- `AppPurchase`: Billing client wrapper (v9). Entitlement requires `PurchaseState.PURCHASED`; restore paths acknowledge unacknowledged purchases; listener callbacks are main-thread and fire once per init
+- Offers: `OfferInfo` (subscriptions) and `OneTimeOfferInfo` (one-time products) classify pricing phases by recurrence/price, never list position. `BillingPeriod` parses ISO-8601 periods and normalizes prices across cadences. Every purchase path funnels through the private `launchFlow(...)` so obfuscated ids / personalized-offer flags stay consistent
+- Account hold (`PurchaseResult.isSuspended`) maps to `SubscriptionState.ON_HOLD` and revokes `isSubscriptionActive()` — deliberate, matches Google's requirement
+- Billing tests build real `ProductDetails` from Play-shaped JSON via `src/test/java/com/android/billingclient/api/ProductDetailsFactory.kt` (same-package access to the package-private constructor; needs the `org.json` test dependency)
 - Debug behavior is injected via `AppPurchase.setDebugMode(boolean)` (a library cannot read the host app's `BuildConfig.DEBUG`)
 
 ### Callback Contracts (load-bearing — preserve when editing)

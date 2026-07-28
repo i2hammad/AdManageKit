@@ -42,7 +42,7 @@ enum class SubscriptionState {
     ACTIVE,          // Subscribed and will renew
     CANCELLED,       // Cancelled but still has access
     GRACE_PERIOD,    // Payment issue, still has access (server-side only)
-    ON_HOLD,         // Payment issue, no access (server-side only)
+    ON_HOLD,         // Payment declined, no access (client-side since v4.4.0)
     PAUSED,          // User paused (server-side only)
     EXPIRED,         // Subscription ended
     NOT_SUBSCRIPTION // Product is not a subscription
@@ -56,9 +56,61 @@ enum class SubscriptionState {
 | ACTIVE | Yes | `isAutoRenewing = true` |
 | CANCELLED | Yes | `isAutoRenewing = false`, still in purchase list |
 | GRACE_PERIOD | No | Requires server API |
-| ON_HOLD | No | Requires server API |
+| ON_HOLD | **Yes (v4.4.0+)** | `isSuspended = true` (Play Billing 9) |
 | PAUSED | No | Requires server API |
 | EXPIRED | Yes | Not returned by `queryPurchasesAsync` |
+
+## Account Hold (v4.4.0+)
+
+When Google Play cannot charge a subscriber's payment method, the subscription
+enters **account hold**. The purchase record still exists, but the user has not
+paid and must not keep premium access.
+
+Since v4.4.0 this is detected client-side; earlier versions needed a server
+round-trip through the Play Developer API.
+
+```kotlin
+val billing = AppPurchase.getInstance()
+
+billing.hasSubscriptionOnHold()      // any subscription on hold
+purchaseResult.isSuspended           // this specific subscription
+purchaseResult.subscriptionState     // SubscriptionState.ON_HOLD
+```
+
+> **Behavior change in 4.4.0.** `isSubscriptionActive()` now returns `false` for
+> an on-hold subscription, and `getSubscriptionState()` returns `ON_HOLD` rather
+> than `ACTIVE`/`CANCELLED`. This matches Google's requirement — an on-hold user's
+> payment was declined. If your app deliberately keeps serving these users, check
+> `isSuspended()` explicitly rather than relying on the old behavior.
+
+### Recovering declined payments
+
+Play can show the user an in-app flow to fix their payment method. Google
+recommends calling this on foreground entry for apps that sell subscriptions:
+
+```kotlin
+billing.showInAppMessages(activity, object : InAppMessageListener {
+    override fun onSubscriptionRecovered(purchaseToken: String) {
+        // AppPurchase has already refreshed — isPurchased() is correct here.
+        refreshPremiumUi()
+    }
+    override fun onNoActionNeeded() { }
+})
+```
+
+### Pending plan changes
+
+A subscription upgrade or downgrade the user started but has not paid for yet:
+
+```kotlin
+billing.hasPendingSubscriptionChange()
+purchaseResult.hasPendingPurchaseUpdate()
+purchaseResult.pendingProductIds
+purchaseResult.pendingPurchaseToken
+```
+
+The **current** plan remains the entitlement in force until the change completes,
+so show "plan change pending" rather than switching the UI to the new tier.
 
 ## Checking Subscription Status
 
@@ -190,7 +242,18 @@ for (offer in billing.getOffers("premium_monthly")) {
 }
 ```
 
-See [API Reference](../docs/API_REFERENCE.md#offerinfo-v347) for the full `OfferInfo` schema.
+Since v4.4.0 you can also **buy** a specific offer rather than letting the
+library pick one, and compare plans across billing cadences:
+
+```kotlin
+billing.subscribe(activity, offer)                              // buy exactly this offer
+billing.isEligibleForFreeTrial("premium_monthly")               // Play filters per account
+billing.getSavingsPercent("premium_monthly", "premium_yearly")  // 50 → "Save 50%"
+billing.getFormattedPricePerMonth("premium_yearly")             // "$5.00"
+```
+
+See [[Subscription Offers]] for the full offer API, and
+[API Reference](../docs/API_REFERENCE.md#offerinfo-v347) for the `OfferInfo` schema.
 
 ## Handling Subscription Changes
 
