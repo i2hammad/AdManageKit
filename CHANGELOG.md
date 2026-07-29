@@ -5,15 +5,39 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.4.2] - 2026-07-29
 
-Documentation and CI only — no library code changed, so this affects no published artifact.
+Bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could crash the app, a completed purchase could fail to disable ads, blank gaps were left where banner/native slots should have collapsed, and app open ads could appear over excluded screens.
 
-### Added
+### Fixed
+
+- **Rewarded ad callbacks were delivered on a background thread.** `RewardedAdManager`'s direct show path attached the Next-Gen SDK's callbacks with no marshalling — including the abstract `onRewardEarned` and `onAdDismissed`, which is exactly where apps grant the reward and update the UI. Produced a `CalledFromWrongThreadException` or a corrupted UI update on any rewarded flow touching a view. All load, show and reward callbacks now post to main; the waterfall path is marshalled explicitly too, so the guarantee no longer depends on provider behavior. The v4.3.1 threading fix covered interstitial and banner/native but missed rewarded
+- **A completed purchase could fail to disable ads.** `handlePurchase(Purchase)` gated every entitlement mutation on `productDetailsMap`, populated only by a successful `queryProductDetailsAsync` — and Play declines ids routinely (hence `getUnfetchedProducts()`). The purchase was acknowledged and `onProductPurchased` fired, but `isPurchased()` stayed `false` and ads kept serving until the next launch, since `verifyPurchased()` only runs on billing-service connect. Product type now resolves from the configured id lists first (as `verifyPurchased` already did), then product details, then the purchase's own `isAutoRenewing()`
+- **Blank gaps where an ad should have collapsed.** In XML, `NativeBannerSmall`/`Medium`/`Large` hid only the shimmer for premium users and left the root visible; `NativeBannerMedium` never collapsed on load failure at all and `NativeBannerSmall` only did so on the strategy path. In Compose, every wrapper claimed its height with a Compose modifier while the hide logic lived in the View's `visibility` — so the ad vanished and the gap stayed — and each `update` block then forced the view back to `VISIBLE`, which for banners ran through `showAd()` and **restarted the shimmer** on an empty slot. Height is now driven by slot state, and all five Compose ad composables gate on `rememberPurchaseStatus()`
+- **Compose silently loaded nothing on a wrapped context.** 12 sites gated on `context is ComponentActivity` with no `ContextWrapper` unwrapping and, at ten of them, no `else` branch. `LocalContext.current` is a `ContextThemeWrapper` inside `Dialog`/`ModalBottomSheet` composables and under theme wrappers, where the ad never loaded and no failure callback fired. New `Context.findComponentActivity()` unwraps the chain, mirroring `NativeBannerSmall.findHostActivity()`
+- **App open ads could appear over excluded screens.** The pending-ad path taken when an ad loads while backgrounded bypassed both `isActivityExcluded(...)` and `skipNextAd`, so an ad could show over a splash/PIN screen or during a flow protected by `disableAppOpenAdsTemporarily()`
+- **A replaced or cancelled retry stranded its owner.** `AdRetryManager` keys retries by ad unit id, and `NativeAdIntegrationManager` withholds the failure when it schedules one — so two native views sharing an ad unit (the screen key resolves to the base id) collided and the evicted view shimmered forever. `scheduleRetry` now takes an `onDropped` callback, delivered via `Handler.post` so a handler that reschedules cannot re-enter `scheduleRetry` mid-mutation. A non-atomic get-then-remove in `cancelRetry` was fixed alongside
+- **Duplicate `onNextAction()` and duplicate shows.** `AdManager`'s force-show and splash flows guarded their outcomes with plain `var`s written from both the SDK thread and the main-thread timeout; a race could deliver the terminal callback twice or attempt two shows. Each flow now uses one `AtomicBoolean` latch across load-success / load-failure / timeout. `onAdShowedFullScreenContent` also invoked `callback.onAdShowed()` on the SDK thread while the dismiss/fail paths beside it marshalled correctly
+- **`BannerAdView` leaked its Activity and kept loading ads after detach.** Auto-refresh was never stopped on detach, so a banner in a `RecyclerView`/`ViewPager`/fragment kept requesting ads indefinitely (each refresh schedules the next) with the pending `Runnable` retaining the Activity. Host `ON_DESTROY` only covers whole-Activity teardown. Refresh now stops on detach and resumes on re-attach, and the lifecycle observer is unregistered on cleanup
+- **`RewardedAdManager` retry closures retained the Activity** passed to `showAd()`, parked on the main `Handler` off a process-lifetime singleton. Now use the application context, as `AdManager` already did at three sites
+- `AdManager` no longer opens its loading dialog over a finishing/destroyed activity — a `BadTokenException` there left `isFetchingWithDialog` stuck `true`, permanently short-circuiting every later force-show
+- `showWaterfallWithWelcomeDialog` attaches to an in-flight load instead of starting a duplicate, matching its non-waterfall twin
+- Restored / already-acknowledged purchases now reach the purchase history listener
+
+### Changed
+
+- **An account-hold subscription no longer disables ads.** `getSubscriptionState()` already reported `ON_HOLD` and `isSubscriptionActive()` already returned `false`, but `isPurchased()` still counted them — leaving those users with no premium features *and* no ads. Apps that deliberately keep serving on-hold users ad-free must check `isSuspended()` explicitly; pair `hasSubscriptionOnHold()` with `showInAppMessages(...)` to prompt a payment fix
+- **Premium users no longer reserve ad space in Compose** — composables return before creating the view, so the slot occupies zero height instead of an empty block
+
+### Documentation
+
+Also shipped in this release (documentation and CI only — no effect on the artifacts):
+
+**Added**
 
 - **`.github/workflows/sync-wiki.yml`** — mirrors `wiki/` into the GitHub wiki repository on every push to `main` that touches it. The wiki is a separate git repo (`<repo>.wiki.git`), so the `wiki/` directory here was only ever a source copy; editing it published nothing. That gap is why the live wiki had drifted to 2.8.0. Removals propagate, and the job is a no-op when the two already match
 
-### Fixed
+**Fixed**
 
 - **The entire wiki was refreshed against source.** Install snippets across all pages moved to `v4.4.1` (they ranged from `v2.8.0` to a literal `VERSION` placeholder), as did version-stamped page titles and `**Library Version**` lines
 - **`FRESH_WITH_CACHE_FALLBACK` was missing from every strategy list in the wiki**, including the dedicated Ad Loading Strategies page, which described "three loading strategies" and documented only three. That page's availability matrix also marked Native/`ONLY_CACHE` as unsupported while its own footnote described the combination working — `NativeAdIntegrationManager` handles all four strategies, so the matrix is now all-supported
@@ -26,6 +50,11 @@ Documentation and CI only — no library code changed, so this affects no publis
 - **The wiki Quick Configuration snippet produced an app that never loads ads.** It constructed `AppOpenManager` with no `MobileAds.initialize()` call — a legacy-SDK pattern that has been broken since 4.2.0 removed the SDK's silent lazy-init, and which also races the `ProcessLifecycleOwner` observer ahead of initialization. Replaced with the sample app's pattern: initialize off the main thread, construct `AppOpenManager` only after it returns
 - **`wiki/Home.md` factual drift** — API badge said 21+ (minSdk is 24); the loading-strategy list showed 3 of 4, omitting `FRESH_WITH_CACHE_FALLBACK`; the page index omitted all six billing pages, including the 4.4.0 Subscription Offers page
 - **`wiki/NativeAdManager.md` template table read as exhaustive** but listed roughly 15 of 38, contradicting its own stated total. Now labelled a selection, with rows for the themed and `flat_*` families and a link to `attrs.xml` as the authoritative list
+
+### Notes
+
+- 5 new `AdRetryManager` tests cover the `onDropped` contract; 173 tests pass
+- The layout fixes are not test-covered (the Compose module has no test source set); on-device verification is recommended
 
 ## [4.4.1] - 2026-07-29
 

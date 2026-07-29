@@ -1,10 +1,10 @@
-# App Open Ads - AdManageKit v4.4.1
+# App Open Ads - AdManageKit v4.4.2
 
 ## Overview
 
 AdManageKit provides lifecycle-aware app open ad management through `AppOpenManager`. App open ads display when users launch or return to your app, with support for loading strategies, ad freshness enforcement, welcome dialogs, activity/screen exclusion, and the multi-provider waterfall.
 
-**Library Version**: v4.4.1
+**Library Version**: v4.4.2
 
 ## Features
 
@@ -23,9 +23,9 @@ AdManageKit provides lifecycle-aware app open ad management through `AppOpenMana
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.1'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
 }
 ```
 

@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.4.1`** is a patch release that updates the Google Mobile Ads Next-Gen SDK to **1.3.0** (from 1.2.1) and repairs three documentation-delivery channels that had silently gone stale: the API docs build had failed on every release since the Dokka 2.x upgrade, leaving [the published KDoc](https://i2hammad.github.io/AdManageKit/) without any 4.x types; MCP server npm publishing had been broken since January 2026; and the MCP tool schemas hardcoded which versions and classes existed, so they rejected `4.4.0` as an unknown version. No AdManageKit API changed. See [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md).
+**Latest Version `4.4.2`** is a bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could **crash the app** (every show-path callback, including `onRewardEarned`, was delivered on a background thread), a **completed purchase could fail to disable ads** until the next launch, **blank gaps** were left where banner/native slots should have collapsed for premium users and after failed loads (in both XML and Compose), and app open ads could appear over screens excluded via `disableAppOpenAdsTemporarily()`. Also fixes a `BannerAdView` leak that kept requesting ads after detach. Two deliberate behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose. See [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md).
+
+**Version `4.4.1`** is a patch release that updates the Google Mobile Ads Next-Gen SDK to **1.3.0** (from 1.2.1) and repairs three documentation-delivery channels that had silently gone stale: the API docs build had failed on every release since the Dokka 2.x upgrade, leaving [the published KDoc](https://i2hammad.github.io/AdManageKit/) without any 4.x types; MCP server npm publishing had been broken since January 2026; and the MCP tool schemas hardcoded which versions and classes existed, so they rejected `4.4.0` as an unknown version. No AdManageKit API changed. See [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md).
 
 **Version `4.4.0`** is a minor release focused on the billing module. Subscription offers can now be **purchased individually** — `subscribe(activity, offer)` buys exactly the plan the user tapped, where previously the library always resolved the token itself and could charge for whichever offer Play listed last. It also adds offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`, `getFormattedPricePerMonth`), trial-eligibility checks, Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity), client-side **account hold** detection, Play payment-recovery messaging, and product-details diagnostics. Purely additive, with one behavior change: an on-hold subscription now reports `ON_HOLD` and is no longer `isSubscriptionActive()`. See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md).
 
@@ -191,15 +193,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.1'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.2'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -773,6 +775,7 @@ Register it **before** `initBilling`. Products land in `unfetched` when the id i
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md)
 - [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md)
 - [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md)
 - [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md)

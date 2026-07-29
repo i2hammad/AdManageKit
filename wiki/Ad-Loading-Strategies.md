@@ -1,4 +1,4 @@
-# Ad Loading Strategies - AdManageKit v4.4.1
+# Ad Loading Strategies - AdManageKit v4.4.2
 
 ## Overview
 

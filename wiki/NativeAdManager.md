@@ -1,10 +1,10 @@
-# Native Ads - AdManageKit v4.4.1
+# Native Ads - AdManageKit v4.4.2
 
 ## Overview
 
 AdManageKit provides comprehensive native ad support with caching, multiple formats, and the new `NativeTemplateView` (v2.6.0+). Native ads blend seamlessly with your app's content while maximizing engagement.
 
-**Library Version**: v4.4.1
+**Library Version**: v4.4.2
 
 ## Features
 
@@ -19,8 +19,8 @@ AdManageKit provides comprehensive native ad support with caching, multiple form
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
 }
 ```
 
