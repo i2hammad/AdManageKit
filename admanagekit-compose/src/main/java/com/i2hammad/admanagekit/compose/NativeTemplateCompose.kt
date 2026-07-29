@@ -74,14 +74,23 @@ fun NativeTemplateCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
+    // Premium users get no ad and no reserved space.
+    if (rememberPurchaseStatus()) return
+
+    // Drives this slot's visibility: the view hiding its own root cannot shrink the
+    // Compose node, and the update block below used to force it back to VISIBLE.
+    val slotState = rememberAdSlotState(adUnitId, template, customLayoutResId)
+
     // Create callback
     val callback = remember(adUnitId, template, customLayoutResId) {
         object : AdLoadCallback() {
             override fun onAdLoaded() {
+                slotState.value = AdSlotState.SHOWN
                 currentOnAdLoaded?.invoke()
             }
 
             override fun onFailedToLoad(error: LoadAdError?) {
+                slotState.value = AdSlotState.HIDDEN
                 currentOnAdFailedToLoad?.invoke(error)
             }
 
@@ -119,12 +128,22 @@ fun NativeTemplateCompose(
 
     // Load the ad
     DisposableEffect(adUnitId, template, loadingStrategy, customLayoutResId) {
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             if (loadingStrategy != null) {
-                nativeTemplateView.loadNativeAd(context, adUnitId, callback, loadingStrategy)
+                nativeTemplateView.loadNativeAd(activity, adUnitId, callback, loadingStrategy)
             } else {
-                nativeTemplateView.loadNativeAd(context, adUnitId, callback)
+                nativeTemplateView.loadNativeAd(activity, adUnitId, callback)
             }
+        } else {
+            // No hosting Activity (e.g. an application context). Report it instead of
+            // rendering an empty slot forever with no signal to the caller.
+            android.util.Log.w(
+                "NativeTemplateCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            slotState.value = AdSlotState.HIDDEN
+            callback.onFailedToLoad(null)
         }
 
         onDispose {
@@ -142,7 +161,11 @@ fun NativeTemplateCompose(
                 .fillMaxWidth()
                 .wrapContentHeight(),
             update = { view ->
-                view.visibility = android.view.View.VISIBLE
+                // Do not force VISIBLE unconditionally - NativeTemplateView hides its
+                // own root on failure/premium and this overrode it.
+                view.visibility =
+                    if (slotState.value.occupiesSpace) android.view.View.VISIBLE
+                    else android.view.View.GONE
             }
         )
     }

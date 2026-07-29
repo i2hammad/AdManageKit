@@ -40,6 +40,7 @@ import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
 import com.i2hammad.admanagekit.waterfall.InterstitialWaterfall
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import androidx.core.graphics.drawable.toDrawable
 
 /**
@@ -199,8 +200,14 @@ class AdManager() {
             dialogView.findViewById<android.widget.TextView>(R.id.loadingMessage)?.text = subtitle
         }
 
-        // Show dialog
-        dialog.show()
+        // Show dialog. Callers guard isFinishing/isDestroyed, but the activity can
+        // still die between that check and here - a thrown BadTokenException would
+        // otherwise crash the app and strand isFetchingWithDialog at true.
+        try {
+            dialog.show()
+        } catch (e: Exception) {
+            Log.w("AdManager", "Loading dialog show failed (activity window gone): ${e.message}")
+        }
 
         // Animate overlay fade in
         overlay.animate()
@@ -324,7 +331,10 @@ class AdManager() {
         // Mark this unit as loading
         loadingAdUnits.add(adUnitId)
         isAdLoading = true
-        var callbackCalled = false  // Prevent double callbacks
+        // Once-only guard shared between the GMA load callbacks (background thread)
+        // and the timeout below (main thread). Must be atomic: with a plain var both
+        // sides can pass their check in a race and onNextAction() fires twice.
+        val callbackCalled = AtomicBoolean(false)
 
         // Load the interstitial ad
         InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
@@ -337,8 +347,7 @@ class AdManager() {
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Interstitial ad loaded for splash", true)
 
                 // Only call callback if not already called by timeout
-                if (!callbackCalled) {
-                    callbackCalled = true
+                if (callbackCalled.compareAndSet(false, true)) {
                     callback.onNextAction()
                     callback.onAdLoaded()
                 } else {
@@ -387,8 +396,7 @@ class AdManager() {
                 firebaseAnalytics.logEvent("ad_failed_to_load", params)
 
                 // Only call callback if not already called by timeout
-                if (!callbackCalled) {
-                    callbackCalled = true
+                if (callbackCalled.compareAndSet(false, true)) {
                     callback.onNextAction()
                     callback.onFailedToLoad(loadAdError)
                 }
@@ -396,10 +404,9 @@ class AdManager() {
         })
 
         Handler(Looper.getMainLooper()).postDelayed({
-            if (loadingAdUnits.contains(adUnitId) && !callbackCalled) {
+            if (loadingAdUnits.contains(adUnitId) && callbackCalled.compareAndSet(false, true)) {
                 Log.d("AdManager", "Ad loading timed out for splash")
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Interstitial ad loading timed out for splash", false)
-                callbackCalled = true
 
                 // Note: Don't remove from loadingAdUnits here - the ad callback will still fire
                 // and save the ad if it arrives later. Just allow new UI flows to proceed.
@@ -846,6 +853,16 @@ class AdManager() {
             AdDebugUtils.logEvent(currentAdUnitId, "cachedFallbackAvailable", "Cached ad saved as fallback", true)
         }
 
+        // Never open the loading dialog over a finishing/destroyed activity:
+        // Dialog.show() would throw BadTokenException, and isFetchingWithDialog
+        // (set just below) would be left stuck true, short-circuiting every
+        // future force-show to onNextAction()
+        if (activity.isFinishing || activity.isDestroyed) {
+            Log.d("AdManager", "Skipping forceShowInterstitialInternal: activity is finishing/destroyed")
+            callback.onNextAction()
+            return
+        }
+
         isFetchingWithDialog = true
 
         // Show beautiful loading dialog
@@ -854,9 +871,13 @@ class AdManager() {
         // Load fresh ad with timeout
         val adRequest = AdRequest.Builder(currentAdUnitId).build()
         val timeoutMillis = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
-        var adLoaded = false
-        var timeoutTriggered = false
-        var dialogDismissed = false
+        // Once-only outcome guard shared between the GMA load callbacks (background
+        // thread) and the timeout handler (main thread). Atomic because with plain
+        // vars both sides can pass their checks in a race, showing two ads and/or
+        // delivering onNextAction() twice. Exactly one of load-success / load-failure /
+        // timeout wins this flag and drives the flow to its single terminal outcome.
+        val resolved = AtomicBoolean(false)
+        var dialogDismissed = false  // Main-thread-confined (only touched inside posted blocks)
 
         // Helper to safely dismiss dialog only once (ensures main thread execution)
         fun dismissDialogOnce(onDismissed: () -> Unit) {
@@ -893,11 +914,10 @@ class AdManager() {
 
         InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
-                // Always save the ad
+                // Always save the ad (even when the timeout already won the race)
                 mInterstitialAd = interstitialAd
-                adLoaded = true
 
-                if (timeoutTriggered) {
+                if (!resolved.compareAndSet(false, true)) {
                     // Timeout already triggered, but ad loaded - it's saved for next time
                     Log.d("AdManager", "Ad loaded after timeout - saved for next show")
                     AdDebugUtils.logEvent(currentAdUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
@@ -916,8 +936,7 @@ class AdManager() {
             }
 
             override fun onAdFailedToLoad(loadAdError: LoadAdError) {
-                if (timeoutTriggered) return
-                adLoaded = true
+                if (!resolved.compareAndSet(false, true)) return
                 Log.e("AdManager", "Failed to load fresh interstitial ad: ${loadAdError.message}")
                 AdDebugUtils.logEvent(currentAdUnitId, "onFailedToLoad", "Fresh interstitial failed: ${loadAdError.message}", false)
 
@@ -942,8 +961,7 @@ class AdManager() {
 
         // Timeout handler
         Handler(Looper.getMainLooper()).postDelayed({
-            if (!adLoaded) {
-                timeoutTriggered = true
+            if (resolved.compareAndSet(false, true)) {
                 Log.d("AdManager", "Force show interstitial timed out")
                 AdDebugUtils.logEvent(currentAdUnitId, "onTimeout", "Force show interstitial timed out", false)
 
@@ -1349,8 +1367,11 @@ class AdManager() {
                 adDisplayCount++
                 AdDebugUtils.logEvent(shownAdUnitId, "onAdImpression", "Interstitial ad shown", true)
 
-                // Notify callback that ad is now showing
-                callback.onAdShowed()
+                // Notify callback that ad is now showing. GMA fires this on a background
+                // thread and onAdShowed is documented for UI work ("pause app content,
+                // mute audio") - deliver on main like the dismiss/fail paths below.
+                if (Looper.myLooper() == Looper.getMainLooper()) callback.onAdShowed()
+                else Handler(Looper.getMainLooper()).post { callback.onAdShowed() }
 
                 // Log Firebase event for ad impression (standard event)
                 val params = Bundle().apply {
@@ -1524,9 +1545,9 @@ class AdManager() {
         var elapsedMs = 0L
         val handler = Handler(Looper.getMainLooper())
 
-        // Show dialog if requested
+        // Show dialog if requested (never over a finishing/destroyed activity)
         var dialogViews: LoadingDialogViews? = null
-        if (showDialog) {
+        if (showDialog && !activity.isFinishing && !activity.isDestroyed) {
             dialogViews = showBeautifulLoadingDialog(activity)
         }
 
@@ -1718,7 +1739,10 @@ class AdManager() {
                 isDisplayingAd = true
                 lastAdShowTime = System.currentTimeMillis()
                 adDisplayCount++
-                callback.onAdShowed()
+                // Providers marshal to main today; keep the same defensive delivery as the
+                // direct path in case a future provider does not.
+                if (Looper.myLooper() == Looper.getMainLooper()) callback.onAdShowed()
+                else Handler(Looper.getMainLooper()).post { callback.onAdShowed() }
                 logAdImpression(adUnitId ?: "", "interstitial")
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId ?: "")
@@ -1771,6 +1795,9 @@ class AdManager() {
     private fun forceShowWaterfallInternal(activity: Activity, callback: AdManagerCallback) {
         if (isFetchingWithDialog || isDisplayingAd) { callback.onNextAction(); return }
         if (currentLoadingDialog?.dialog?.isShowing == true) { callback.onNextAction(); return }
+        // Never open the loading dialog over a finishing/destroyed activity (see
+        // forceShowInterstitialInternal for the failure mode)
+        if (activity.isFinishing || activity.isDestroyed) { callback.onNextAction(); return }
 
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) { callback.onNextAction(); return }

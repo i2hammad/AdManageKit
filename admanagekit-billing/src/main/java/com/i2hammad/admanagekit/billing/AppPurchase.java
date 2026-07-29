@@ -507,9 +507,15 @@ public class AppPurchase {
      * @return true if user has an ad-disabling purchase, false otherwise.
      */
     public boolean isPurchased() {
-        // Check subscriptions
-        if (!purchaseResultList.isEmpty()) {
-            return true;
+        // Check subscriptions. An account-hold subscription is deliberately NOT
+        // counted: getSubscriptionState() reports ON_HOLD and isSubscriptionActive()
+        // returns false for it, so counting it here would leave the user with no
+        // premium features AND no ads - monetized by neither path. Use
+        // hasSubscriptionOnHold() + showInAppMessages() to prompt a payment fix.
+        for (PurchaseResult result : purchaseResultList) {
+            if (!result.isSuspended()) {
+                return true;
+            }
         }
         // Check for ad-disabling INAPP purchases only
         for (String productId : stringList) {
@@ -678,7 +684,14 @@ public class AppPurchase {
     }
 
     private void recomputePurchasedState() {
-        boolean owned = !purchaseResultList.isEmpty();
+        // Mirror isPurchased(): an account-hold subscription does not grant entitlement.
+        boolean owned = false;
+        for (PurchaseResult result : purchaseResultList) {
+            if (!result.isSuspended()) {
+                owned = true;
+                break;
+            }
+        }
         if (!owned) {
             for (String productId : stringList) {
                 // Consumables do not disable ads / grant premium.
@@ -2513,6 +2526,61 @@ public class AppPurchase {
         return discount;
     }
 
+    /**
+     * Records a PURCHASED purchase in this instance's owned-product state so
+     * {@link #isPurchased()} and {@link #getOwnerIdSubs()} reflect it immediately.
+     *
+     * <p>Product type is resolved from the configured {@code subProductIdList} /
+     * {@code inAppProductIdList} first, and only then from {@code productDetailsMap}.
+     * This ordering matters: {@code productDetailsMap} is populated solely by a
+     * successful {@code queryProductDetailsAsync}, and Play declines ids routinely
+     * (see {@link #getUnfetchedProducts()}). Keying entitlement off it meant a
+     * completed, acknowledged purchase could be dropped on the floor - the buyer kept
+     * seeing ads until the next app launch, because {@link #verifyPurchased(boolean)}
+     * only runs on billing-service connect. {@code verifyPurchased} already matched
+     * against the configured lists; this brings the purchase path in line.</p>
+     *
+     * @param purchase  the PURCHASED purchase.
+     * @param productId the product id the purchase was attributed to.
+     */
+    private void applyPurchasedEntitlement(Purchase purchase, String productId) {
+        boolean isSubs = subProductIdList.contains(productId);
+        boolean isInApp = inAppProductIdList.contains(productId);
+
+        if (!isSubs && !isInApp) {
+            // Not a configured id (e.g. promo code for a product this build doesn't
+            // list). Fall back to Play's own classification when we have it.
+            ProductDetails details = productDetailsMap.get(productId);
+            if (details != null) {
+                isSubs = BillingClient.ProductType.SUBS.equals(details.getProductType());
+                isInApp = BillingClient.ProductType.INAPP.equals(details.getProductType());
+            }
+        }
+
+        if (!isSubs && !isInApp) {
+            // Last resort: the Purchase itself tells us whether it auto-renews.
+            // Better to grant entitlement on a best guess than to silently keep
+            // showing ads to someone who just paid.
+            isSubs = purchase.isAutoRenewing();
+            isInApp = !isSubs;
+            Log.w(Tag, "Unrecognized product id '" + productId
+                    + "'; inferred type " + (isSubs ? "SUBS" : "INAPP") + " from the purchase");
+        }
+
+        if (isSubs) {
+            isPurchased = true;
+            handlePurchase(toSubsPurchaseResult(purchase), productId);
+        } else {
+            if (!stringList.contains(productId)) {
+                stringList.add(productId);
+            }
+            // Consumables do not disable ads / grant premium.
+            if (!isProductConsumable(productId)) {
+                isPurchased = true;
+            }
+        }
+    }
+
     public void handlePurchase(Purchase purchase) {
         String productId = purchase.getProducts() != null && !purchase.getProducts().isEmpty() ? purchase.getProducts().get(0) : "Unknown Product";
         if (purchase.getPurchaseState() == Purchase.PurchaseState.PURCHASED) {
@@ -2537,24 +2605,7 @@ public class AppPurchase {
                             // Notify history listener about new purchase
                             notifyPurchaseHistoryEvent(purchase, productId, false);
 
-                            ProductDetails details = productDetailsMap.get(productId);
-                            if (details != null) {
-                                if (details.getProductType().equals(BillingClient.ProductType.SUBS)) {
-                                    // Subscription - add to subscription list, mark as purchased
-                                    isPurchased = true;
-                                    handlePurchase(toSubsPurchaseResult(purchase), productId);
-                                } else if (details.getProductType().equals(BillingClient.ProductType.INAPP)) {
-                                    // INAPP purchase - check if consumable or lifetime
-                                    if (!stringList.contains(productId)) {
-                                        stringList.add(productId);
-                                    }
-                                    // Only set isPurchased for non-consumable (lifetime) purchases
-                                    // Consumables don't disable ads
-                                    if (!isProductConsumable(productId)) {
-                                        isPurchased = true;
-                                    }
-                                }
-                            }
+                            applyPurchasedEntitlement(purchase, productId);
                         } else {
                             Log.e(Tag, "Failed to acknowledge purchase: " + billingResult.getDebugMessage());
                             notifyListener("Failed to acknowledge purchase: " + billingResult.getDebugMessage());
@@ -2572,23 +2623,12 @@ public class AppPurchase {
                 }
                 idPurchased = productId;
 
-                ProductDetails details = productDetailsMap.get(productId);
-                if (details != null) {
-                    if (details.getProductType().equals(BillingClient.ProductType.SUBS)) {
-                        // Subscription - add to subscription list, mark as purchased
-                        isPurchased = true;
-                        handlePurchase(toSubsPurchaseResult(purchase), productId);
-                    } else if (details.getProductType().equals(BillingClient.ProductType.INAPP)) {
-                        // INAPP purchase - check if consumable or lifetime
-                        if (!stringList.contains(productId)) {
-                            stringList.add(productId);
-                        }
-                        // Only set isPurchased for non-consumable (lifetime) purchases
-                        if (!isProductConsumable(productId)) {
-                            isPurchased = true;
-                        }
-                    }
-                }
+                // Restored/already-acknowledged purchases are history events too - this
+                // branch previously skipped reporting them, so a reinstall or a purchase
+                // acknowledged elsewhere never reached the history listener.
+                notifyPurchaseHistoryEvent(purchase, productId, false);
+
+                applyPurchasedEntitlement(purchase, productId);
             }
         } else if (purchase.getPurchaseState() == Purchase.PurchaseState.PENDING) {
             Log.d(Tag, "Purchase is pending for product: " + productId);

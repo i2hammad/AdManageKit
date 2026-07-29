@@ -133,6 +133,9 @@ class NativeBannerMedium @JvmOverloads constructor(
 
         // Reset container visibility in case a previous load failed and hid it
         binding.adContainer.visibility = View.VISIBLE
+        // Reset root visibility in case a previous load failed (or was premium-blocked)
+        // and collapsed it - otherwise a later successful load stays invisible.
+        binding.root.visibility = View.VISIBLE
 
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
@@ -141,6 +144,8 @@ class NativeBannerMedium @JvmOverloads constructor(
 
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,
@@ -321,6 +326,9 @@ class NativeBannerMedium @JvmOverloads constructor(
                     AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeBannerMedium failed: ${adError.message}", false)
                     adPlaceholder.visibility = View.GONE
                     shimmerFrameLayout.visibility = View.GONE
+                    // Collapse the whole view, not just its children: the root keeps its
+                    // padding/background otherwise and leaves a blank gap in the layout.
+                    binding.root.visibility = View.GONE
 
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
@@ -348,6 +356,8 @@ class NativeBannerMedium @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
@@ -489,6 +499,8 @@ class NativeBannerMedium @JvmOverloads constructor(
         if (purchaseProvider.isPurchased()) {
             AdDebugUtils.logEvent(adUnitId, "adBlocked", "User has purchased - hiding ad", true)
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,

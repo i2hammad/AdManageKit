@@ -254,4 +254,111 @@ class AdRetryManagerTest {
         assertEquals(1, executions.get())
         assertFalse(retryManager.hasActiveRetry("unit-throw"))
     }
+
+    // =================== onDropped: replaced/cancelled retries must notify ===================
+
+    @Test
+    fun `replaced retry notifies onDropped so its owner is not stranded`() {
+        AdManageKitConfig.autoRetryFailedAds = true
+        val firstDropped = AtomicInteger(0)
+        val firstRan = AtomicInteger(0)
+        val secondRan = AtomicInteger(0)
+
+        // Two consumers of the SAME ad unit - the second schedule evicts the first
+        retryManager.scheduleRetry(
+            "unit-shared",
+            attempt = 0,
+            onDropped = { firstDropped.incrementAndGet() }
+        ) { firstRan.incrementAndGet() }
+
+        retryManager.scheduleRetry("unit-shared", attempt = 0) { secondRan.incrementAndGet() }
+
+        idleMs(60_000)
+
+        // The evicted retry never runs...
+        assertEquals(0, firstRan.get())
+        // ...so its owner must be told exactly once, or it waits forever
+        assertEquals(1, firstDropped.get())
+        // The replacement still runs normally
+        assertEquals(1, secondRan.get())
+    }
+
+    @Test
+    fun `cancelRetry notifies onDropped`() {
+        AdManageKitConfig.autoRetryFailedAds = true
+        val dropped = AtomicInteger(0)
+        val ran = AtomicInteger(0)
+
+        retryManager.scheduleRetry(
+            "unit-cancel",
+            attempt = 0,
+            onDropped = { dropped.incrementAndGet() }
+        ) { ran.incrementAndGet() }
+
+        retryManager.cancelRetry("unit-cancel")
+        idleMs(60_000)
+
+        assertEquals(0, ran.get())
+        assertEquals(1, dropped.get())
+        assertFalse(retryManager.hasActiveRetry("unit-cancel"))
+    }
+
+    @Test
+    fun `cancelAllRetries notifies every onDropped`() {
+        AdManageKitConfig.autoRetryFailedAds = true
+        val dropped = AtomicInteger(0)
+
+        retryManager.scheduleRetry("unit-a", attempt = 0, onDropped = { dropped.incrementAndGet() }) { }
+        retryManager.scheduleRetry("unit-b", attempt = 0, onDropped = { dropped.incrementAndGet() }) { }
+
+        retryManager.cancelAllRetries()
+        idleMs(60_000)
+
+        assertEquals(2, dropped.get())
+        assertEquals(0, retryManager.getActiveRetryCount())
+    }
+
+    @Test
+    fun `onDropped fires when retries are disabled or attempts exhausted`() {
+        val disabledDropped = AtomicInteger(0)
+        AdManageKitConfig.autoRetryFailedAds = false
+        retryManager.scheduleRetry(
+            "unit-disabled",
+            attempt = 0,
+            onDropped = { disabledDropped.incrementAndGet() }
+        ) { }
+
+        val exhaustedDropped = AtomicInteger(0)
+        AdManageKitConfig.autoRetryFailedAds = true
+        retryManager.scheduleRetry(
+            "unit-exhausted",
+            attempt = 3,
+            maxAttempts = 3,
+            onDropped = { exhaustedDropped.incrementAndGet() }
+        ) { }
+
+        idleMs(60_000)
+
+        // A refused retry never runs either, so the caller still needs a terminal signal
+        assertEquals(1, disabledDropped.get())
+        assertEquals(1, exhaustedDropped.get())
+    }
+
+    @Test
+    fun `retry that actually runs does not notify onDropped`() {
+        AdManageKitConfig.autoRetryFailedAds = true
+        val dropped = AtomicInteger(0)
+        val ran = AtomicInteger(0)
+
+        retryManager.scheduleRetry(
+            "unit-runs",
+            attempt = 0,
+            onDropped = { dropped.incrementAndGet() }
+        ) { ran.incrementAndGet() }
+
+        idleMs(60_000)
+
+        assertEquals(1, ran.get())
+        assertEquals(0, dropped.get())
+    }
 }

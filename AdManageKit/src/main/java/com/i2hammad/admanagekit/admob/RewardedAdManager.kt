@@ -83,6 +83,17 @@ object RewardedAdManager {
     private var sessionAdImpressions = 0
 
     /**
+     * Next-Gen SDK callbacks fire on background threads. Every consumer-facing
+     * callback and every mutation of this manager's state runs through here so
+     * state stays main-thread-confined and app code can safely touch views in
+     * onRewardEarned / onAdDismissed / onAdLoaded etc. (mirrors AppOpenManager).
+     */
+    private fun runOnMain(action: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) action()
+        else Handler(Looper.getMainLooper()).post(action)
+    }
+
+    /**
      * Callback interface for rewarded ad events.
      * Provides granular control over ad lifecycle.
      */
@@ -212,7 +223,7 @@ object RewardedAdManager {
         AdDebugUtils.logEvent(adUnitId, "loadStarted", "Starting rewarded ad load", true)
 
         RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
-            override fun onAdFailedToLoad(adError: LoadAdError) {
+            override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
                 isLoading = false
                 rewardedAd = null
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
@@ -234,17 +245,22 @@ object RewardedAdManager {
                 // Attempt automatic retry if enabled
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
                     retryAttempts++
+                    // Use the application context: the retry closure is parked on the main
+                    // Handler for up to maxRetryDelay and re-arms across attempts, so
+                    // capturing the Activity passed to showAd()/loadRewardedAd() would keep
+                    // it alive off this process-lifetime singleton.
+                    val appContext = context.applicationContext
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = retryAttempts - 1,
                         maxAttempts = AdManageKitConfig.maxRetryAttempts
                     ) {
-                        loadRewardedAd(context)
+                        loadRewardedAd(appContext)
                     }
                 }
             }
 
-            override fun onAdLoaded(ad: RewardedAd) {
+            override fun onAdLoaded(ad: RewardedAd) = runOnMain {
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0 // Reset retry count on success
@@ -307,7 +323,7 @@ object RewardedAdManager {
         val adRequest = AdRequest.Builder(adUnitId).build()
 
         RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
-            override fun onAdFailedToLoad(adError: LoadAdError) {
+            override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
                 isLoading = false
                 rewardedAd = null
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
@@ -323,7 +339,7 @@ object RewardedAdManager {
                 notifyPendingLoadFailure(adError)
             }
 
-            override fun onAdLoaded(ad: RewardedAd) {
+            override fun onAdLoaded(ad: RewardedAd) = runOnMain {
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0
@@ -418,7 +434,9 @@ object RewardedAdManager {
         val adRequest = AdRequest.Builder(adUnitId).build()
 
         RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
-            override fun onAdFailedToLoad(adError: LoadAdError) {
+            // Both callbacks post to main BEFORE touching callbackCalled/isLoading, so those
+            // flags are main-thread-confined and cannot race the (main-thread) timeout below.
+            override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
                 isLoading = false
                 rewardedAd = null
 
@@ -440,7 +458,7 @@ object RewardedAdManager {
                 }
             }
 
-            override fun onAdLoaded(ad: RewardedAd) {
+            override fun onAdLoaded(ad: RewardedAd) = runOnMain {
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0
@@ -520,14 +538,17 @@ object RewardedAdManager {
             return
         }
 
+        // Next-Gen SDK event callbacks fire on background threads. Each body posts to
+        // main before touching manager state or invoking consumer callbacks - apps
+        // grant rewards and navigate/update views in onRewardEarned/onAdDismissed.
         ad.adEventCallback = object : RewardedAdEventCallback {
-            override fun onAdClicked() {
+            override fun onAdClicked() = runOnMain {
                 Log.d(TAG, "Ad was clicked.")
                 AdDebugUtils.logEvent(adUnitId, "onAdClicked", "Rewarded ad clicked", true)
                 callback.onAdClicked()
             }
 
-            override fun onAdDismissedFullScreenContent() {
+            override fun onAdDismissedFullScreenContent() = runOnMain {
                 Log.d(TAG, "Ad dismissed fullscreen content.")
                 AdDebugUtils.logEvent(adUnitId, "onAdDismissed", "Rewarded ad dismissed", true)
                 isShowingAd = false
@@ -545,7 +566,7 @@ object RewardedAdManager {
                 callback.onAdDismissed()
             }
 
-            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) {
+            override fun onAdFailedToShowFullScreenContent(adError: FullScreenContentError) = runOnMain {
                 Log.e(TAG, "Ad failed to show fullscreen content: ${adError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToShow", "Rewarded ad failed to show: ${adError.message}", false)
                 // Only reset state owned by this ad - don't clobber a different ad that is showing
@@ -570,7 +591,7 @@ object RewardedAdManager {
                 callback.onAdDismissed()
             }
 
-            override fun onAdImpression() {
+            override fun onAdImpression() = runOnMain {
                 Log.d(TAG, "Ad recorded an impression.")
                 AdDebugUtils.logEvent(adUnitId, "onAdImpression", "Rewarded ad impression", true)
 
@@ -582,7 +603,7 @@ object RewardedAdManager {
                 logAdImpression()
             }
 
-            override fun onAdShowedFullScreenContent() {
+            override fun onAdShowedFullScreenContent() = runOnMain {
                 Log.d(TAG, "Ad showed fullscreen content.")
                 AdDebugUtils.logEvent(adUnitId, "onAdShowed", "Rewarded ad showing", true)
                 isShowingAd = true
@@ -604,18 +625,22 @@ object RewardedAdManager {
         // Claim the showing slot before show() so a concurrent showAd call is rejected
         isShowingAd = true
         ad.show(activity) { rewardItem ->
-            Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
-            AdDebugUtils.logEvent(adUnitId, "onRewardEarned", "Reward: ${rewardItem.amount} ${rewardItem.type}", true)
+            // The reward listener also fires on a background thread - marshal before the
+            // app grants the reward (typically a UI/state update)
+            runOnMain {
+                Log.d(TAG, "User earned reward: ${rewardItem.amount} ${rewardItem.type}")
+                AdDebugUtils.logEvent(adUnitId, "onRewardEarned", "Reward: ${rewardItem.amount} ${rewardItem.type}", true)
 
-            // Log reward event to Firebase
-            val params = Bundle().apply {
-                putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
-                putString("reward_type", rewardItem.type)
-                putInt("reward_amount", rewardItem.amount)
+                // Log reward event to Firebase
+                val params = Bundle().apply {
+                    putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
+                    putString("reward_type", rewardItem.type)
+                    putInt("reward_amount", rewardItem.amount)
+                }
+                firebaseAnalytics?.logEvent("rewarded_ad_reward", params)
+
+                callback.onRewardEarned(rewardItem.type, rewardItem.amount)
             }
-            firebaseAnalytics?.logEvent("rewarded_ad_reward", params)
-
-            callback.onRewardEarned(rewardItem.type, rewardItem.amount)
         }
     }
 
@@ -761,12 +786,14 @@ object RewardedAdManager {
 
                 if (AdManageKitConfig.autoRetryFailedAds && shouldAttemptRetry()) {
                     retryAttempts++
+                    // Application context - see the AdMob load path for why
+                    val appContext = context.applicationContext
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = adUnitId,
                         attempt = retryAttempts - 1,
                         maxAttempts = AdManageKitConfig.maxRetryAttempts
                     ) {
-                        loadViaWaterfall(context)
+                        loadViaWaterfall(appContext)
                     }
                 }
             }
@@ -900,15 +927,18 @@ object RewardedAdManager {
             return
         }
 
+        // Bundled providers already marshal to main, but third-party/custom providers
+        // registered through AdProviderConfig need not - marshal here so the
+        // main-thread guarantee holds for every provider, not just the shipped ones.
         waterfall.show(activity, object : RewardedAdProvider.RewardedShowCallback {
-            override fun onAdShowed() {
+            override fun onAdShowed() = runOnMain {
                 isShowingAd = true
                 AdDebugUtils.logEvent(adUnitId, "onAdShowed", "Rewarded waterfall ad showing", true)
                 logAdImpression()
                 callback.onAdShowed()
             }
 
-            override fun onAdDismissed() {
+            override fun onAdDismissed() = runOnMain {
                 isShowingAd = false
                 rewardedWaterfall = null
                 val params = Bundle().apply {
@@ -921,7 +951,7 @@ object RewardedAdManager {
                 callback.onAdDismissed()
             }
 
-            override fun onAdFailedToShow(error: AdKitAdError) {
+            override fun onAdFailedToShow(error: AdKitAdError) = runOnMain {
                 isShowingAd = false
                 rewardedWaterfall = null
                 val params = Bundle().apply {
@@ -936,18 +966,18 @@ object RewardedAdManager {
                 callback.onAdDismissed()
             }
 
-            override fun onAdClicked() {
+            override fun onAdClicked() = runOnMain {
                 callback.onAdClicked()
             }
 
-            override fun onAdImpression() {
+            override fun onAdImpression() = runOnMain {
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
                 }
                 firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.AD_IMPRESSION, params)
             }
 
-            override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
+            override fun onRewardEarned(rewardType: String, rewardAmount: Int) = runOnMain {
                 AdDebugUtils.logEvent(adUnitId, "onRewardEarned", "Waterfall reward: $rewardAmount $rewardType", true)
                 val params = Bundle().apply {
                     putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)

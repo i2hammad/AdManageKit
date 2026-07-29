@@ -2,6 +2,7 @@ package com.i2hammad.admanagekit.compose
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
@@ -78,14 +79,23 @@ fun NativeAdCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
-    // Create callback once
-    val callback = remember(adUnitId) {
+    // Premium users get no ad and no reserved space.
+    if (rememberPurchaseStatus()) return
+
+    // Drives this slot's height: the view hiding itself cannot shrink the Compose node.
+    val slotState = rememberAdSlotState(adUnitId, size)
+
+    // Create callback once. Keyed on size as well as adUnitId so it always writes to
+    // the slot state belonging to the ad currently being requested.
+    val callback = remember(adUnitId, size) {
         object : AdLoadCallback() {
             override fun onAdLoaded() {
+                slotState.value = AdSlotState.SHOWN
                 currentOnAdLoaded?.invoke()
             }
 
             override fun onFailedToLoad(error: LoadAdError?) {
+                slotState.value = AdSlotState.HIDDEN
                 currentOnAdFailedToLoad?.invoke(error)
             }
 
@@ -122,11 +132,21 @@ fun NativeAdCompose(
 
     // Load the ad when the composable is first composed
     DisposableEffect(adUnitId, size, useCachedAd, loadingStrategy) {
+        // SMALL/MEDIUM require a real Activity; LARGE accepts any Context.
+        val activity = context.findComponentActivity()
+        if (activity == null && size != NativeAdSize.LARGE) {
+            android.util.Log.w(
+                "NativeAdCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            slotState.value = AdSlotState.HIDDEN
+            currentOnAdFailedToLoad?.invoke(null)
+        }
         when (size) {
             NativeAdSize.SMALL -> {
-                if (context is androidx.activity.ComponentActivity) {
+                if (activity != null) {
                     (nativeAdView as NativeBannerSmall).loadNativeBannerAd(
-                        activity = context,
+                        activity = activity,
                         adNativeBanner = adUnitId,
                         adCallBack = callback,
                         loadingStrategy = loadingStrategy
@@ -134,9 +154,9 @@ fun NativeAdCompose(
                 }
             }
             NativeAdSize.MEDIUM -> {
-                if (context is androidx.activity.ComponentActivity) {
+                if (activity != null) {
                     (nativeAdView as NativeBannerMedium).loadNativeBannerAd(
-                        activity = context,
+                        activity = activity,
                         adNativeBanner = adUnitId,
                         adCallBack = callback,
                         loadingStrategy = loadingStrategy
@@ -182,10 +202,19 @@ fun NativeAdCompose(
             factory = { nativeAdView },
             modifier = modifier
                 .fillMaxWidth()
-                .heightIn(min = adHeight),
+                // heightIn(min=) is a floor that never collapses, so a failed or
+                // premium-blocked slot kept an 80-300dp blank block on screen. Drop
+                // the floor entirely once the slot is hidden.
+                .then(
+                    if (slotState.value.occupiesSpace) Modifier.heightIn(min = adHeight)
+                    else Modifier.height(0.dp)
+                ),
             update = { view ->
-                // Update view if needed when recomposed
-                view.visibility = android.view.View.VISIBLE
+                // Do not force VISIBLE unconditionally - that overrode the view's own
+                // hide on failure/premium, which is what left the gap on screen.
+                view.visibility =
+                    if (slotState.value.occupiesSpace) android.view.View.VISIBLE
+                    else android.view.View.GONE
             }
         )
     }

@@ -142,6 +142,8 @@ class NativeBannerSmall @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,
@@ -305,6 +307,9 @@ class NativeBannerSmall @JvmOverloads constructor(
                     AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "NativeBannerSmall failed: ${adError.message}", false)
                     adPlaceholder.visibility = GONE
                     shimmerFrameLayout.visibility = GONE
+                    // Collapse the whole view, not just its children: the root keeps its
+                    // padding/background otherwise and leaves a blank gap in the layout.
+                    binding.root.visibility = GONE
 
                     val params = Bundle().apply {
                         putString(FirebaseAnalytics.Param.AD_UNIT_NAME, adUnitId)
@@ -366,6 +371,8 @@ class NativeBannerSmall @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = GONE
             callback?.onFailedToLoad(
                 LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )
@@ -443,6 +450,8 @@ class NativeBannerSmall @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,

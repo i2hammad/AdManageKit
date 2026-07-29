@@ -34,6 +34,16 @@ class AdRetryManager private constructor() {
     
     private val handler = Handler(Looper.getMainLooper())
     private val activeRetries = ConcurrentHashMap<String, RetryInfo>()
+
+    /**
+     * Delivers a dropped-retry notification on the main thread, on a later loop turn.
+     * Posting rather than invoking inline keeps a handler that reacts by scheduling
+     * another retry from re-entering [scheduleRetry] mid-mutation.
+     */
+    private fun notifyDropped(retryInfo: RetryInfo) {
+        val onDropped = retryInfo.onDropped ?: return
+        handler.post { onDropped() }
+    }
     
     companion object {
         @Volatile
@@ -54,30 +64,44 @@ class AdRetryManager private constructor() {
         val attempt: Int,
         val maxAttempts: Int,
         val runnable: Runnable,
-        val retryAction: () -> Unit
+        val retryAction: () -> Unit,
+        /** Invoked if this retry is dropped before it runs, so its owner isn't stranded. */
+        val onDropped: (() -> Unit)? = null
     )
     
     /**
      * Schedule a retry with exponential backoff delay
      * 
+     * Retries are keyed by ad unit id, so scheduling for an id that already has a
+     * pending retry replaces it. When a caller depends on its retry to deliver a
+     * terminal result (rather than merely warming a cache), it must pass [onDropped]
+     * so it is still notified if its retry is replaced or cancelled — otherwise the
+     * eviction silently strands that caller's callback.
+     *
      * @param adUnitId The ad unit ID to retry
      * @param attempt Current attempt number (0-based)
      * @param maxAttempts Maximum number of retry attempts
+     * @param onDropped Invoked (main thread) if this retry is replaced or cancelled
+     *        before running, or if it is refused because retries are disabled/exhausted
      * @param retryAction The action to execute when retrying
      */
+    @JvmOverloads
     fun scheduleRetry(
         adUnitId: String,
         attempt: Int,
         maxAttempts: Int = AdManageKitConfig.maxRetryAttempts,
+        onDropped: (() -> Unit)? = null,
         retryAction: () -> Unit
     ) {
         if (!AdManageKitConfig.autoRetryFailedAds) {
             AdDebugUtils.logEvent(adUnitId, "retryDisabled", "Automatic retry is disabled in config", false)
+            onDropped?.let { handler.post(it) }
             return
         }
-        
+
         if (attempt >= maxAttempts) {
             AdDebugUtils.logEvent(adUnitId, "retryLimitReached", "Maximum retry attempts ($maxAttempts) reached", false)
+            onDropped?.let { handler.post(it) }
             return
         }
         
@@ -120,7 +144,7 @@ class AdRetryManager private constructor() {
 
         // Store retry info for tracking, cancelling any previously scheduled retry
         // for the same ad unit so it doesn't execute as a duplicate
-        val newRetryInfo = RetryInfo(adUnitId, attempt, maxAttempts, runnable, retryAction)
+        val newRetryInfo = RetryInfo(adUnitId, attempt, maxAttempts, runnable, retryAction, onDropped)
         retryInfo = newRetryInfo
         activeRetries.put(adUnitId, newRetryInfo)?.let { previous ->
             handler.removeCallbacks(previous.runnable)
@@ -130,6 +154,9 @@ class AdRetryManager private constructor() {
                 "Cancelled previously scheduled retry before scheduling a new one",
                 true
             )
+            // The replaced retry will never run. Tell its owner, or a caller waiting on
+            // it (e.g. a native ad view holding its shimmer) waits forever.
+            notifyDropped(previous)
         }
 
         // Schedule the retry
@@ -161,29 +188,31 @@ class AdRetryManager private constructor() {
      * @param adUnitId The ad unit ID to cancel retry for
      */
     fun cancelRetry(adUnitId: String) {
-        activeRetries[adUnitId]?.let { retryInfo ->
+        activeRetries.remove(adUnitId)?.let { retryInfo ->
             handler.removeCallbacks(retryInfo.runnable)
-            activeRetries.remove(adUnitId)
-            
+
             AdDebugUtils.logEvent(
-                adUnitId, 
-                "retryCancelled", 
-                "Retry cancelled for ad unit", 
+                adUnitId,
+                "retryCancelled",
+                "Retry cancelled for ad unit",
                 true
             )
+            // Cancelled retries never run either - notify the owner so it can settle
+            notifyDropped(retryInfo)
         }
     }
-    
+
     /**
      * Cancel all pending retries
      */
     fun cancelAllRetries() {
-        activeRetries.values.forEach { retryInfo ->
-            handler.removeCallbacks(retryInfo.runnable)
-        }
-        
         val cancelledCount = activeRetries.size
+        val dropped = activeRetries.values.toList()
         activeRetries.clear()
+        dropped.forEach { retryInfo ->
+            handler.removeCallbacks(retryInfo.runnable)
+            notifyDropped(retryInfo)
+        }
         
         if (cancelledCount > 0) {
             AdDebugUtils.logEvent(

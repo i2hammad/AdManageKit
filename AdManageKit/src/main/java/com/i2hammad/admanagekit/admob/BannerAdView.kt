@@ -89,6 +89,11 @@ class BannerAdView @JvmOverloads constructor(
     private val useWaterfall: Boolean
         get() = AdProviderConfig.getBannerChain().isNotEmpty()
 
+    // Lifecycle we registered this view on, kept so cleanup() can unregister.
+    // A Lifecycle holds a strong reference to its observers, so a view removed from
+    // a still-living activity would otherwise be retained by it.
+    private var registeredLifecycle: Lifecycle? = null
+
     // Performance tracking
     private var loadStartTime: Long = 0
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
@@ -112,6 +117,35 @@ class BannerAdView @JvmOverloads constructor(
             shimmerFrameLayout.startShimmer()
             firebaseAnalytics = FirebaseAnalytics.getInstance(context)
             refreshHandler = Handler(Looper.getMainLooper())
+        }
+    }
+
+    /**
+     * Stop the auto-refresh loop as soon as this view leaves the window.
+     *
+     * Without this, a pending refresh Runnable keeps the view (and therefore its
+     * Activity context) reachable from the main-thread Handler, and each refresh
+     * schedules the next one - so a detached banner would keep requesting ads
+     * forever. That is both a leak and an invalid-traffic risk. The host's
+     * ON_DESTROY only covers the case where the whole Activity goes away; views
+     * inside a RecyclerView/ViewPager/fragment are detached long before that,
+     * and a non-LifecycleOwner context gets no lifecycle callbacks at all.
+     */
+    override fun onDetachedFromWindow() {
+        stopAutoRefresh()
+        super.onDetachedFromWindow()
+    }
+
+    /**
+     * Resume the refresh loop when the view comes back on screen (e.g. a recycled
+     * RecyclerView row or a returning ViewPager page). [autoRefreshEnabled] is the
+     * user's intent and survives detach, so honoring it here restores the previous
+     * behavior for views that are merely detached rather than destroyed.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (autoRefreshEnabled && currentAdUnitId != null) {
+            scheduleNextRefresh()
         }
     }
 
@@ -246,8 +280,12 @@ class BannerAdView @JvmOverloads constructor(
             )
         }
 
-        // Register lifecycle observer if possible
+        // Register lifecycle observer if possible. Note this is best-effort: the context
+        // may not be a LifecycleOwner, and a view can be detached long before its host is
+        // destroyed (RecyclerView / ViewPager / fragment view recreation), so
+        // onDetachedFromWindow below is what actually bounds the refresh loop.
         if (context is LifecycleOwner) {
+            registeredLifecycle = context.lifecycle
             context.lifecycle.addObserver(this)
         }
 
@@ -842,7 +880,12 @@ class BannerAdView @JvmOverloads constructor(
         try {
             stopAutoRefresh()
             adView?.destroy()
-            
+
+            // Unregister from the host lifecycle - it holds a strong reference to this
+            // view, which would otherwise outlive the view itself on a long-lived host
+            registeredLifecycle?.removeObserver(this)
+            registeredLifecycle = null
+
             AdDebugUtils.logDebug("BannerAdView", "Cleanup completed for ad: $currentAdUnitId")
         } catch (e: Exception) {
             AdDebugUtils.logError("BannerAdView", "Error during cleanup: ${e.message}", e)

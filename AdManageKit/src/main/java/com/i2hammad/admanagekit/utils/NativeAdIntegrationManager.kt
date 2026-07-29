@@ -444,9 +444,16 @@ object NativeAdIntegrationManager {
                         retryAttempt < AdManageKitConfig.maxRetryAttempts
 
                 if (shouldRetry) {
+                    // Retries are keyed by ad unit id globally, and enhancedAdUnitId is just
+                    // the base id - so two views sharing one ad unit (e.g. a SMALL and a
+                    // MEDIUM native on the same screen) collide, and the second schedule
+                    // evicts the first. onDropped propagates the original failure in that
+                    // case; without it the evicted view never hears back and holds its
+                    // shimmer forever.
                     AdRetryManager.getInstance().scheduleRetry(
                         adUnitId = enhancedAdUnitId,
-                        attempt = retryAttempt
+                        attempt = retryAttempt,
+                        onDropped = { originalCallback?.onFailedToLoad(error) }
                     ) {
                         loadNativeAdWithCaching(
                             activity = activity,

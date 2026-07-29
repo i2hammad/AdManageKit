@@ -72,6 +72,9 @@ fun ProgrammaticNativeAdCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
+    // Premium users get no ad and no reserved space, and no load is issued.
+    if (rememberPurchaseStatus()) return
+
     // Load the ad when the composable is first composed
     LaunchedEffect(adUnitId, size, useCachedAd) {
         isLoading = true
@@ -79,9 +82,10 @@ fun ProgrammaticNativeAdCompose(
         // Cancel any prior in-flight load before starting a new one.
         loadHandle?.cancel()
 
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             loadHandle = ProgrammaticNativeAdLoader.loadNativeAd(
-                activity = context,
+                activity = activity,
                 adUnitId = adUnitId,
                 size = size,
                 useCachedAd = useCachedAd,
@@ -135,6 +139,20 @@ fun ProgrammaticNativeAdCompose(
                     }
                 }
             )
+        } else {
+            android.util.Log.w(
+                "ProgrammaticNativeAdCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            isLoading = false
+            hasError = true
+            currentOnAdFailedToLoad?.invoke(
+                LoadAdError(
+                    LoadAdError.ErrorCode.INTERNAL_ERROR,
+                    "No hosting ComponentActivity for this composable",
+                    null
+                )
+            )
         }
     }
 
@@ -145,20 +163,23 @@ fun ProgrammaticNativeAdCompose(
         ProgrammaticNativeAdLoader.NativeAdSize.LARGE -> 300.dp
     }
 
+    // Once the load has failed there is nothing to show, so the slot must occupy no
+    // space at all. Previously the Box kept its fixed 80-300dp height and simply
+    // rendered empty content inside it, leaving a blank block on screen.
+    // Collapsing the height (rather than returning early) keeps the cleanup
+    // DisposableEffect below composed, so a held ad is still released on dispose.
+    val hasAd = nativeAdView != null || providerAdView != null
+    val slotHeight = if (hasError && !hasAd) 0.dp else adHeight
+
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(adHeight),
+            .height(slotHeight),
         contentAlignment = Alignment.Center
     ) {
         when {
             isLoading && showLoadingIndicator -> {
                 CircularProgressIndicator()
-            }
-
-            hasError -> {
-                // Don't show anything if ad failed to load
-                // This maintains the same behavior as the original ad views
             }
 
             nativeAdView != null || providerAdView != null -> {

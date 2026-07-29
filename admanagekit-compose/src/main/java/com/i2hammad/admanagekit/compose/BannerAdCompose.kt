@@ -9,6 +9,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -113,6 +114,14 @@ fun BannerAdCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
+    // Premium users get no ad and no reserved space. Returning before the view is
+    // created also means no load is issued at all.
+    if (rememberPurchaseStatus()) return
+
+    // Drives this slot's height. The view hiding itself on failure cannot shrink the
+    // Compose node, so the height must come from state instead.
+    var slotState by rememberAdSlotState(adUnitId, adSize)
+
     // Remember the BannerAdView to prevent recreation on recomposition
     val bannerAdView = remember(adUnitId, adSize) {
         BannerAdView(context)
@@ -122,13 +131,16 @@ fun BannerAdCompose(
     // actual slot width (parent padding included), not the full window
     DisposableEffect(adUnitId, adSize) {
         var pendingLoad: View.OnLayoutChangeListener? = null
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
+                    slotState = AdSlotState.SHOWN
                     currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: LoadAdError?) {
+                    slotState = AdSlotState.HIDDEN
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 
@@ -153,8 +165,15 @@ fun BannerAdCompose(
                 }
             }
             pendingLoad = loadWhenMeasured(bannerAdView) {
-                bannerAdView.loadBanner(context, adUnitId, adSize, callback)
+                bannerAdView.loadBanner(activity, adUnitId, adSize, callback)
             }
+        } else {
+            android.util.Log.w(
+                "BannerAdCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            slotState = AdSlotState.HIDDEN
+            currentOnAdFailedToLoad?.invoke(null)
         }
         onDispose {
             pendingLoad?.let { bannerAdView.removeOnLayoutChangeListener(it) }
@@ -185,11 +204,17 @@ fun BannerAdCompose(
                 factory = { bannerAdView },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(adHeight),
+                    // Collapse to nothing once the load has failed; reserve the real
+                    // height while loading so a successful fill doesn't shift the layout.
+                    .height(if (slotState.occupiesSpace) adHeight else 0.dp),
                 update = { view ->
-                    // Update the view if needed when recomposed
-                    if (view.visibility != android.view.View.VISIBLE) {
-                        view.showAd()
+                    // Never force the view visible unconditionally - that overrode the
+                    // hide the library performs on failure and on premium, and
+                    // showAd() also restarts the shimmer on an empty banner.
+                    if (slotState.occupiesSpace) {
+                        if (view.visibility != android.view.View.VISIBLE) view.showAd()
+                    } else {
+                        view.visibility = android.view.View.GONE
                     }
                 }
             )
@@ -237,18 +262,26 @@ fun BannerAdCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
+    // Premium users get no ad and no reserved space.
+    if (rememberPurchaseStatus()) return
+
+    var slotState by rememberAdSlotState(adUnitId)
+
     val bannerAdView = remember(adUnitId) {
         BannerAdView(context)
     }
 
     DisposableEffect(adUnitId) {
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
+                    slotState = AdSlotState.SHOWN
                     currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: LoadAdError?) {
+                    slotState = AdSlotState.HIDDEN
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 
@@ -272,7 +305,14 @@ fun BannerAdCompose(
                     currentOnPaidEvent?.invoke(adValue)
                 }
             }
-            bannerAdView.loadBanner(context, adUnitId, callback)
+            bannerAdView.loadBanner(activity, adUnitId, callback)
+        } else {
+            android.util.Log.w(
+                "BannerAdCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            slotState = AdSlotState.HIDDEN
+            currentOnAdFailedToLoad?.invoke(null)
         }
         onDispose {
             // Destroy the underlying AdView and stop auto-refresh when removed
@@ -286,10 +326,13 @@ fun BannerAdCompose(
             factory = { bannerAdView },
             modifier = modifier
                 .fillMaxWidth()
-                .height(height),
+                // Collapse once the load has failed rather than leaving a blank block
+                .height(if (slotState.occupiesSpace) height else 0.dp),
             update = { view ->
-                if (view.visibility != android.view.View.VISIBLE) {
-                    view.showAd()
+                if (slotState.occupiesSpace) {
+                    if (view.visibility != android.view.View.VISIBLE) view.showAd()
+                } else {
+                    view.visibility = android.view.View.GONE
                 }
             }
         )
@@ -356,19 +399,27 @@ fun CollapsibleBannerAdCompose(
     val currentOnAdClosed by rememberUpdatedState(onAdClosed)
     val currentOnPaidEvent by rememberUpdatedState(onPaidEvent)
 
+    // Premium users get no ad and no reserved space.
+    if (rememberPurchaseStatus()) return
+
+    var slotState by rememberAdSlotState(adUnitId, placement)
+
     val bannerAdView = remember(adUnitId, placement) {
         BannerAdView(context)
     }
 
     DisposableEffect(adUnitId, placement) {
         var pendingLoad: View.OnLayoutChangeListener? = null
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             val callback = object : AdLoadCallback() {
                 override fun onAdLoaded() {
+                    slotState = AdSlotState.SHOWN
                     currentOnAdLoaded?.invoke()
                 }
 
                 override fun onFailedToLoad(error: LoadAdError?) {
+                    slotState = AdSlotState.HIDDEN
                     currentOnAdFailedToLoad?.invoke(error)
                 }
 
@@ -394,13 +445,21 @@ fun CollapsibleBannerAdCompose(
             }
             pendingLoad = loadWhenMeasured(bannerAdView) {
                 bannerAdView.loadCollapsibleBanner(
-                    context = context,
+                    context = activity,
                     adUnitId = adUnitId,
                     collapsible = true,
                     placement = placement,
                     callback = callback
                 )
             }
+        } else {
+            android.util.Log.w(
+                "BannerAdCompose",
+                "No hosting ComponentActivity for ad unit $adUnitId; skipping load"
+            )
+            slotState = AdSlotState.HIDDEN
+            slotState = AdSlotState.HIDDEN
+            currentOnAdFailedToLoad?.invoke(null)
         }
         onDispose {
             pendingLoad?.let { bannerAdView.removeOnLayoutChangeListener(it) }
@@ -427,10 +486,12 @@ fun CollapsibleBannerAdCompose(
                 factory = { bannerAdView },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(adHeight),
+                    .height(if (slotState.occupiesSpace) adHeight else 0.dp),
                 update = { view ->
-                    if (view.visibility != android.view.View.VISIBLE) {
-                        view.showAd()
+                    if (slotState.occupiesSpace) {
+                        if (view.visibility != android.view.View.VISIBLE) view.showAd()
+                    } else {
+                        view.visibility = android.view.View.GONE
                     }
                 }
             )

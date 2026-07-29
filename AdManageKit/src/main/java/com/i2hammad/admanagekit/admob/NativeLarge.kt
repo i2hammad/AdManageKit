@@ -137,6 +137,10 @@ class NativeLarge @JvmOverloads constructor(
         // Reset container visibility in case a previous load failed and hid it
         binding.adUnit.visibility = View.VISIBLE
 
+        // Reset root visibility in case a previous load failed (or was premium-blocked)
+        // and collapsed it - otherwise a later successful load stays invisible.
+        binding.root.visibility = View.VISIBLE
+
         if (useWaterfall) { loadViaWaterfall(context, adUnitId, callback); return }
 
         val nativeAdView: NativeAdView = binding.nativeAdView
@@ -145,6 +149,8 @@ class NativeLarge @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,
@@ -339,6 +345,8 @@ class NativeLarge @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(
                     LoadAdError.ErrorCode.INTERNAL_ERROR,
@@ -444,6 +452,8 @@ class NativeLarge @JvmOverloads constructor(
         val purchaseProvider = BillingConfig.getPurchaseProvider()
         if (purchaseProvider.isPurchased()) {
             shimmerFrameLayout.visibility = View.GONE
+            // Premium user: collapse the slot entirely so no blank gap is left behind.
+            binding.root.visibility = View.GONE
             callback?.onFailedToLoad(
                 LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, AdManager.PURCHASED_APP_ERROR_MESSAGE, null)
             )

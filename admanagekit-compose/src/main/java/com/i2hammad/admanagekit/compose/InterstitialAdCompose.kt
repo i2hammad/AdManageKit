@@ -47,11 +47,16 @@ fun rememberInterstitialAd(
 
     // Preload the ad when the composable is first created
     LaunchedEffect(adUnitId, preloadAd) {
-        if (preloadAd && context is androidx.activity.ComponentActivity) {
-            try {
-                AdManager.getInstance().loadInterstitialAd(context, adUnitId)
-            } catch (e: Exception) {
-                currentOnAdFailedToLoad?.invoke("Failed to load ad: ${e.message}")
+        val activity = context.findComponentActivity()
+        if (preloadAd) {
+            if (activity != null) {
+                try {
+                    AdManager.getInstance().loadInterstitialAd(activity, adUnitId)
+                } catch (e: Exception) {
+                    currentOnAdFailedToLoad?.invoke("Failed to load ad: ${e.message}")
+                }
+            } else {
+                currentOnAdFailedToLoad?.invoke("No hosting ComponentActivity; cannot preload ad")
             }
         }
     }
@@ -60,11 +65,12 @@ fun rememberInterstitialAd(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && currentPreloadAd) {
-                if (context is androidx.activity.ComponentActivity) {
+                val activity = context.findComponentActivity()
+                if (activity != null) {
                     // Reload ad if it's not ready when resuming
                     if (!AdManager.getInstance().isReady()) {
                         try {
-                            AdManager.getInstance().loadInterstitialAd(context, currentAdUnitId)
+                            AdManager.getInstance().loadInterstitialAd(activity, currentAdUnitId)
                         } catch (e: Exception) {
                             currentOnAdFailedToLoad?.invoke("Failed to reload ad: ${e.message}")
                         }
@@ -81,7 +87,8 @@ fun rememberInterstitialAd(
     // Return function to show the ad
     return remember(adUnitId) {
         {
-            if (context is androidx.activity.ComponentActivity) {
+            val activity = context.findComponentActivity()
+            if (activity != null) {
                 val callback = object : AdManagerCallback() {
                     override fun onAdShowed() {
                         currentOnAdShown?.invoke()
@@ -96,7 +103,7 @@ fun rememberInterstitialAd(
                     // Show ad based on time interval (respects AdManager's built-in logic).
                     // AdManager invokes onNextAction when no ad is ready or the time gate skips,
                     // and onAdShowed only when the ad is actually displayed.
-                    AdManager.getInstance().showInterstitialAdByTime(context, callback)
+                    AdManager.getInstance().showInterstitialAdByTime(activity, callback)
                 } catch (e: Exception) {
                     currentOnAdFailedToLoad?.invoke("Failed to show ad: ${e.message}")
                     currentOnAdDismissed?.invoke()
@@ -138,7 +145,8 @@ fun InterstitialAdEffect(
     val currentOnAdFailedToLoad by rememberUpdatedState(onAdFailedToLoad)
 
     LaunchedEffect(adUnitId, showMode, maxDisplayCount) {
-        if (context is androidx.activity.ComponentActivity) {
+        val activity = context.findComponentActivity()
+        if (activity != null) {
             val callback = object : AdManagerCallback() {
                 override fun onAdShowed() {
                     currentOnAdShown?.invoke()
@@ -154,13 +162,13 @@ fun InterstitialAdEffect(
             fun showAd() {
                 when (showMode) {
                     InterstitialShowMode.TIME ->
-                        AdManager.getInstance().showInterstitialAdByTime(context, callback)
+                        AdManager.getInstance().showInterstitialAdByTime(activity, callback)
                     InterstitialShowMode.COUNT ->
-                        AdManager.getInstance().showInterstitialAdByCount(context, callback, maxDisplayCount)
+                        AdManager.getInstance().showInterstitialAdByCount(activity, callback, maxDisplayCount)
                     InterstitialShowMode.FORCE ->
-                        AdManager.getInstance().forceShowInterstitial(context, callback)
+                        AdManager.getInstance().forceShowInterstitial(activity, callback)
                     InterstitialShowMode.FORCE_WITH_DIALOG ->
-                        AdManager.getInstance().forceShowInterstitialWithDialog(context, callback)
+                        AdManager.getInstance().forceShowInterstitialWithDialog(activity, callback)
                 }
             }
 
@@ -172,7 +180,7 @@ fun InterstitialAdEffect(
                     // Load first, then drive the show from the load result
                     var completed = false
                     AdManager.getInstance().loadInterstitialAd(
-                        context,
+                        activity,
                         adUnitId,
                         object : AdLoadCallback<InterstitialAd> {
                             override fun onAdLoaded(interstitialAd: InterstitialAd) {
@@ -194,6 +202,10 @@ fun InterstitialAdEffect(
                 currentOnAdFailedToLoad?.invoke("Ad operation failed: ${e.message}")
                 currentOnAdDismissed?.invoke()
             }
+        } else {
+            // No hosting Activity: settle the flow instead of hanging the caller
+            currentOnAdFailedToLoad?.invoke("No hosting ComponentActivity; cannot show ad")
+            currentOnAdDismissed?.invoke()
         }
     }
 }
@@ -372,11 +384,11 @@ fun rememberInterstitialAdState(
     val context = LocalContext.current
 
     val state = remember(adUnitId) {
-        if (context is androidx.activity.ComponentActivity) {
-            InterstitialAdState(adUnitId, context)
-        } else {
-            throw IllegalStateException("InterstitialAdState requires ComponentActivity context")
-        }
+        val activity = context.findComponentActivity()
+            ?: throw IllegalStateException(
+                "rememberInterstitialAdState requires a ComponentActivity-backed context"
+            )
+        InterstitialAdState(adUnitId, activity)
     }
 
     LaunchedEffect(autoLoad) {

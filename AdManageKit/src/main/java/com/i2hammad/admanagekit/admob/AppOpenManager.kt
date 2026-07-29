@@ -1400,16 +1400,31 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         if (currentWelcomeDialog?.dialog?.isShowing == true) { callback?.onNextAction(); return }
         if (activity.isFinishing) { callback?.onNextAction(); return }
 
-        isLoading.set(true)
         isFetchingWithDialog = true
         dialogFetchCallback = callback
         val dialogViews = showWelcomeBackDialog(activity)
         val timeoutMillis = AdManageKitConfig.appOpenAdTimeout.inWholeMilliseconds
 
+        // Only start a new load if none is in flight; otherwise attach to the in-flight
+        // one (mirrors showAdWithWelcomeDialog). Previously this method unconditionally
+        // set isLoading and replaced appOpenWaterfall, so a background prefetch already
+        // running (fetchViaWaterfall) was orphaned and two loads ran concurrently.
+        val ownsLoad = isLoading.compareAndSet(false, true)
+
+        // If attaching to an in-flight load, absorb any previously parked waiter so it
+        // still gets notified alongside the dialog flow
+        val previousPendingCallback = if (!ownsLoad) pendingFetchCallback else null
+
         var hasTimedOut = false
         val timeoutRunnable = scheduleTimeout(timeoutMillis) {
             hasTimedOut = true
-            isLoading.set(false)
+            if (ownsLoad) {
+                isLoading.set(false)
+            } else {
+                // Detach from the in-flight load we were waiting on, restoring any
+                // previously parked waiter we absorbed
+                pendingFetchCallback = previousPendingCallback
+            }
             isFetchingWithDialog = false
             val timedOutCallback = dialogFetchCallback
             dialogFetchCallback = null
@@ -1417,6 +1432,71 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
                 timedOutCallback?.onAdTimedOut()
                 timedOutCallback?.onNextAction()
             }
+        }
+
+        if (!ownsLoad) {
+            Log.d(LOG_TAG, "showWaterfallWithWelcomeDialog: load already in flight, attaching to it")
+            // Only cancel the previous waiter's timeout if we absorbed it
+            if (previousPendingCallback != null) {
+                pendingFetchTimeoutRunnable?.let { cancelTimeout(it) }
+                pendingFetchTimeoutRunnable = null
+            }
+            val dialogPendingCallback = object : AdLoadCallback() {
+                override fun onAdLoaded() {
+                    if (hasTimedOut) return
+                    cancelTimeout(timeoutRunnable)
+                    isFetchingWithDialog = false
+                    val loadedCallback = dialogFetchCallback
+                    dialogFetchCallback = null
+                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "App open waterfall ad loaded by in-flight fetch (dialog)", true)
+
+                    if (!isAppInForeground.get()) {
+                        Log.d(LOG_TAG, "App in background, saving waterfall ad for when user returns")
+                        pendingAdToShow.set(true)
+                        pendingAdCallback = loadedCallback
+                        animateDialogDismissal(dialogViews) { currentWelcomeDialog = null }
+                        return
+                    }
+
+                    currentWelcomeDialog = dialogViews
+                    if (!activity.isFinishing && !activity.isDestroyed) {
+                        showWaterfallLoadedAd(activity, loadedCallback)
+                    } else {
+                        dismissWelcomeDialogWithDelay(dialogViews)
+                        currentWelcomeDialog = null
+                        loadedCallback?.onNextAction()
+                    }
+                }
+
+                override fun onFailedToLoad(error: AdKitError?) {
+                    if (hasTimedOut) return
+                    cancelTimeout(timeoutRunnable)
+                    isFetchingWithDialog = false
+                    val failedCallback = dialogFetchCallback
+                    dialogFetchCallback = null
+                    AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "In-flight app open waterfall fetch failed (dialog): ${error?.message}", false)
+                    animateDialogDismissal(dialogViews) {
+                        failedCallback?.onFailedToLoad(error)
+                        failedCallback?.onNextAction()
+                    }
+                }
+            }
+            pendingFetchCallback = if (previousPendingCallback != null) {
+                object : AdLoadCallback() {
+                    override fun onAdLoaded() {
+                        previousPendingCallback.onAdLoaded()
+                        dialogPendingCallback.onAdLoaded()
+                    }
+
+                    override fun onFailedToLoad(error: AdKitError?) {
+                        previousPendingCallback.onFailedToLoad(error)
+                        dialogPendingCallback.onFailedToLoad(error)
+                    }
+                }
+            } else {
+                dialogPendingCallback
+            }
+            return
         }
 
         val waterfall = createAppOpenWaterfall()
@@ -2178,6 +2258,21 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         // Double-check interstitial isn't showing (could have started between onStart check and now)
         if (AdManager.getInstance().isAdOrDialogShowing()) {
             Log.d(LOG_TAG, "Skipping pending ad dialog - interstitial is showing")
+            callback?.onNextAction()
+            return
+        }
+
+        // Honor the same gates as showAdIfAvailable - this path previously bypassed
+        // both, so a pending ad could appear over an excluded activity (splash, PIN)
+        // or during a flow protected by disableAppOpenAdsTemporarily() (e.g. payment).
+        // The loaded ad stays cached for the next legitimate show opportunity.
+        if (isActivityExcluded(activity::class.java)) {
+            Log.d(LOG_TAG, "Skipping pending ad - activity is excluded from app open ads")
+            callback?.onNextAction()
+            return
+        }
+        if (skipNextAd.getAndSet(false)) {
+            Log.d(LOG_TAG, "Skipping pending ad - skipNextAd was set")
             callback?.onNextAction()
             return
         }
