@@ -5,6 +5,27 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.1] - 2026-07-29
+
+Patch release: updates the Google Mobile Ads Next-Gen SDK to 1.3.0 and repairs three documentation-delivery channels that had silently gone stale — the API docs site had not regenerated since the Dokka 2.x upgrade, the MCP documentation server was stuck on npm at 1.0.0 (January 2026), and that server's tool schemas hardcoded which versions and classes existed, so they rejected 4.4.0 as unknown. **No AdManageKit API changed.**
+
+### Changed
+
+- **Google Mobile Ads Next-Gen SDK 1.2.1 → 1.3.0** (`adsMobileSdk` in `gradle/libs.versions.toml`). The SDK is an `api` dependency, so apps on 4.4.1 resolve 1.3.0 transitively unless they pin it themselves. No AdManageKit code needed to change — the library was already on Next-Gen patterns throughout. `assembleDebug` and the full unit test suite (168 tests) pass against 1.3.0
+
+### Fixed
+
+- **API documentation generation (Dokka)** — the Deploy API Documentation workflow failed on every release since the Dokka 2.x upgrade, so the published KDoc never gained any 4.x types. On an Android module Dokka registers a source set per variant plus a generic `main`, and `main`/`debug`/`release` all cover `src/main`, tripping the duplicate-source-root check. Dokka now documents the **release variant only** — matching what each module publishes via `components["release"]` — and suppresses the rest, which also keeps test and androidTest sources out of the public API docs. Configured once in the root build, so new modules are covered automatically. Now emits 1244 pages across all five modules, including the 4.4.0 billing types
+- **MCP server npm publishing** — the `publish-npm` job never installed dependencies, so `prepublishOnly`'s `npm run build` re-ran `tsc` with no `node_modules` and died with `TS2307` on every import; the build job's artifact could not help, since `prepublishOnly` rebuilds from source regardless. Adds `npm ci` and drops the redundant `download-artifact` step. Also declares **`zod` as a direct dependency** — it is imported by two tool modules but appeared in neither `dependencies` nor `devDependencies`, resolving only via npm hoisting it out of `@modelcontextprotocol/sdk`
+- **MCP tool schemas drifting from bundled docs** — `get_release_notes` accepted 17 versions against 38 bundled release-notes files (rejecting everything from 3.4.0 onward, with `"latest"` hardcoded to 3.3.8), `get_migration_guide` omitted the 4.2.0 Next-Gen SDK migration, `get_api_reference` listed 16 classes against 34 documented sections, and `TOPIC_MAP` had no `Subscription-Offers` entry. These lists are now derived at startup from the bundled content — scanning `docs/release-notes/`, the README's `### Migrating to X` headings, and the `API_REFERENCE.md` section parser — so shipping a doc is sufficient to make it reachable. The hardcoded `RELEASE_VERSIONS` / `MIGRATION_VERSIONS` / `API_CLASS_NAMES` constants are removed
+- **MCP code-generation templates emitting obsolete APIs** — `generate_config` emitted no `MobileAds.initialize()` call, so since v4.2.0 (Next-Gen SDK, no silent lazy-init) the generated `Application` class produced an app that never loads ads. Both languages now initialize explicitly off the main thread, read the application id from the manifest, and construct `AppOpenManager` only after initialization returns. Billing `setup` gained `setDebugMode(BuildConfig.DEBUG)`, obfuscated account ids and `ProductDetailsListener`; `subscribe` now shows the offer-explicit form instead of the overload that can charge for a plan the user did not pick; new `offers` and `account_hold` scenarios were added; `SubscriptionState.ON_HOLD` is handled; and the Java template — previously a stub covering only `setup` and `purchase` — now mirrors the Kotlin coverage
+- **`FRESH_WITH_CACHE_FALLBACK` missing from MCP loading-strategy enums** — it was absent from every strategy field, and native ads were restricted to two of the four values. All four fields now share an `AD_LOADING_STRATEGIES` constant mirroring `AdLoadingStrategy.kt`
+
+### Notes
+
+- The MCP server is versioned separately and published as **1.2.0**
+- The MCP server bundles docs from the repository at publish time, so release notes and wiki pages ship automatically once committed
+
 ## [4.4.0] - 2026-07-28
 
 Minor release focused on the billing module: subscription offers can now be purchased individually, offer pricing can be compared and normalized without hand-parsing ISO-8601, Play Billing 9's one-time product offers (discounts, rentals, pre-orders, limited quantity) are surfaced, and account hold is detected client-side. Purely additive — no existing method signature changed.

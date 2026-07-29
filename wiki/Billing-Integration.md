@@ -7,8 +7,8 @@ AdManageKit provides a comprehensive billing integration module (`admanagekit-bi
 ### 1. Add Dependency
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
 ```
 
 ### 2. Define Products

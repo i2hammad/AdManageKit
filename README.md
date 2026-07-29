@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.4.0`** is a minor release focused on the billing module. Subscription offers can now be **purchased individually** — `subscribe(activity, offer)` buys exactly the plan the user tapped, where previously the library always resolved the token itself and could charge for whichever offer Play listed last. It also adds offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`, `getFormattedPricePerMonth`), trial-eligibility checks, Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity), client-side **account hold** detection, Play payment-recovery messaging, and product-details diagnostics. Purely additive, with one behavior change: an on-hold subscription now reports `ON_HOLD` and is no longer `isSubscriptionActive()`. See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md).
+**Latest Version `4.4.1`** is a patch release that updates the Google Mobile Ads Next-Gen SDK to **1.3.0** (from 1.2.1) and repairs three documentation-delivery channels that had silently gone stale: the API docs build had failed on every release since the Dokka 2.x upgrade, leaving [the published KDoc](https://i2hammad.github.io/AdManageKit/) without any 4.x types; MCP server npm publishing had been broken since January 2026; and the MCP tool schemas hardcoded which versions and classes existed, so they rejected `4.4.0` as an unknown version. No AdManageKit API changed. See [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md).
+
+**Version `4.4.0`** is a minor release focused on the billing module. Subscription offers can now be **purchased individually** — `subscribe(activity, offer)` buys exactly the plan the user tapped, where previously the library always resolved the token itself and could charge for whichever offer Play listed last. It also adds offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`, `getFormattedPricePerMonth`), trial-eligibility checks, Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity), client-side **account hold** detection, Play payment-recovery messaging, and product-details diagnostics. Purely additive, with one behavior change: an on-hold subscription now reports `ON_HOLD` and is no longer `isSubscriptionActive()`. See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md).
 
 **Version `4.3.5`** is a patch release that makes `appOpenAdFreshnessThreshold` (default 4 hours) actually enforced on every app open show path. Previously only `ON_DEMAND` consulted it — `HYBRID`, `ONLY_CACHE`, and the multi-provider waterfall checked only whether an ad object existed and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. It also settles the `appOpenAdTimeout` default at **10 seconds** (the property said 4s while `resetToDefaults()` said 10s — 4s was too short for the fetch-with-dialog paths). No API changes. See [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md).
 
@@ -25,7 +27,7 @@ Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads
 
 ## Next-Gen GMA SDK
 
-As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.2.1`) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
+As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.3.0` as of 4.4.1) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
 
 ### Why the move
 
@@ -189,15 +191,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.0'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.1'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.1'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.1'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -771,6 +773,7 @@ Register it **before** `initBilling`. Products land in `unfetched` when the id i
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md)
 - [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md)
 - [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md)
 - [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md)
