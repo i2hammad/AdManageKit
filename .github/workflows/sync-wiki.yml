@@ -1,0 +1,55 @@
+name: Sync Wiki
+
+# The GitHub wiki lives in a separate repository (<repo>.wiki.git), so the
+# wiki/ directory in this repo is only a source copy — editing it does not
+# publish anything. This mirrors wiki/ into the wiki repo so the two cannot
+# drift apart again.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'wiki/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-wiki
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Clone wiki repository
+        run: |
+          git clone \
+            "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" \
+            wiki-repo
+
+      - name: Mirror wiki/ into the wiki repo
+        run: |
+          # Delete top-level markdown first so removals in wiki/ propagate,
+          # then copy the current source of truth over the top.
+          find wiki-repo -maxdepth 1 -name '*.md' -delete
+          cp wiki/*.md wiki-repo/
+
+      - name: Commit and push
+        working-directory: wiki-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Wiki already matches wiki/ — nothing to push."
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "Sync wiki from ${GITHUB_SHA:0:7}"
+          git push

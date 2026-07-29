@@ -1,4 +1,4 @@
-# Configuration - AdManageKit v2.8.0
+# Configuration - AdManageKit v4.4.1
 
 ## Overview
 
@@ -31,6 +31,8 @@ class MyApp : Application() {
     }
 }
 ```
+
+> **Since 4.2.0 you must also call `MobileAds.initialize()` yourself**, before any ad request — the Next-Gen SDK removed the legacy SDK's silent lazy-init. `AdManageKitConfig` only configures this library's behavior; it does not initialize the ads SDK. See [[Home]] for the initialization pattern.
 
 ## All Configuration Options
 
@@ -135,6 +137,28 @@ AdManageKitConfig.apply {
     defaultBannerRefreshInterval = 60.seconds
     enableCollapsibleBannersByDefault = false
     defaultCollapsiblePlacement = CollapsibleBannerPlacement.BOTTOM
+}
+```
+
+### Native Ad Settings
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `nativeLoadingStrategy` | Loading strategy | HYBRID |
+| `nativeCacheExpiry` | Cache expiry for native ads | 1 hour |
+| `defaultNativeMediaAspect` | Media aspect-ratio hint sent with every native request (v4.3.3+) | ANY |
+| `nativeVideoStartMuted` | Start video creatives muted (v4.3.3+) | true |
+| `nativeVideoClickToExpand` | Allow click-to-expand on video creatives (v4.3.3+) | false |
+| `nativeVideoCustomControls` | Request custom video controls (v4.3.3+) | false |
+
+`NativeMediaAspect` values: `UNSPECIFIED`, `ANY`, `LANDSCAPE`, `PORTRAIT`, `SQUARE`. `NativeTemplateView.setMediaAspect(...)` overrides the global default per view.
+
+```kotlin
+AdManageKitConfig.apply {
+    nativeLoadingStrategy = AdLoadingStrategy.HYBRID
+    nativeCacheExpiry = 1.hours
+    defaultNativeMediaAspect = NativeMediaAspect.ANY
+    nativeVideoStartMuted = true
 }
 ```
 

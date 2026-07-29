@@ -1,16 +1,16 @@
-# Native Ads - AdManageKit v2.8.0
+# Native Ads - AdManageKit v4.4.1
 
 ## Overview
 
 AdManageKit provides comprehensive native ad support with caching, multiple formats, and the new `NativeTemplateView` (v2.6.0+). Native ads blend seamlessly with your app's content while maximizing engagement.
 
-**Library Version**: v2.8.0
+**Library Version**: v4.4.1
 
 ## Features
 
 - **Multiple Formats**: Small, Medium, Large, and 38 template styles
 - **Smart Caching**: Per-unit caching with 1-hour expiration
-- **Loading Strategies**: ON_DEMAND, ONLY_CACHE, HYBRID
+- **Loading Strategies**: ON_DEMAND, ONLY_CACHE, HYBRID, FRESH_WITH_CACHE_FALLBACK
 - **Shimmer Loading**: Beautiful loading placeholders
 - **NativeTemplateView**: Unified component with 38 templates (v2.6.0+)
 - **Video Support**: All templates support video ads
@@ -19,8 +19,8 @@ AdManageKit provides comprehensive native ad support with caching, multiple form
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
 }
 ```
 
@@ -53,6 +53,30 @@ dependencies {
 | `flat_*` family (10 styles) | Flat/minimal design systems |
 
 See [`attrs.xml`](https://github.com/i2hammad/AdManageKit/blob/main/AdManageKit/src/main/res/values/attrs.xml) for the full `adTemplate` enum.
+
+### Custom Templates (v4.3.0+)
+
+If none of the 38 presets fit, supply your own layout. The root must be a Next-Gen SDK `NativeAdView` reusing the standard asset ids (`ad_headline`, `ad_body`, `ad_call_to_action`, `ad_app_icon`, `ad_advertiser`, `ad_media`).
+
+```kotlin
+nativeTemplateView.setCustomTemplate(
+    layoutResId = R.layout.my_native_ad,
+    shimmerResId = R.layout.my_shimmer,   // optional
+    sizeHint = NativeAdSize.MEDIUM        // optional, default MEDIUM
+)
+```
+
+Or in XML via `app:customAdLayout` / `app:customAdShimmerLayout`, or `customLayoutResId` on `NativeTemplateCompose`.
+
+### Media Aspect Ratio (v4.3.3+)
+
+Every native request carries a media aspect-ratio hint matched to the template's `MediaView` slot. Override it globally with `AdManageKitConfig.defaultNativeMediaAspect`, or per view:
+
+```kotlin
+nativeTemplateView.setMediaAspect(NativeMediaAspect.LANDSCAPE)
+```
+
+Values: `UNSPECIFIED`, `ANY` (default), `LANDSCAPE`, `PORTRAIT`, `SQUARE`.
 
 ## Usage
 
@@ -146,6 +170,7 @@ val cachedAd = NativeAdManager.getCachedNativeAd("ad-unit-id")
 | ON_DEMAND | Show shimmer, fetch fresh ad |
 | ONLY_CACHE | Show cached or hide container |
 | HYBRID | Show cached if ready, fetch with shimmer otherwise |
+| FRESH_WITH_CACHE_FALLBACK | Fetch fresh, fall back to cache if the load fails |
 
 ```kotlin
 // Global strategy

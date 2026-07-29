@@ -5,6 +5,28 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Documentation and CI only — no library code changed, so this affects no published artifact.
+
+### Added
+
+- **`.github/workflows/sync-wiki.yml`** — mirrors `wiki/` into the GitHub wiki repository on every push to `main` that touches it. The wiki is a separate git repo (`<repo>.wiki.git`), so the `wiki/` directory here was only ever a source copy; editing it published nothing. That gap is why the live wiki had drifted to 2.8.0. Removals propagate, and the job is a no-op when the two already match
+
+### Fixed
+
+- **The entire wiki was refreshed against source.** Install snippets across all pages moved to `v4.4.1` (they ranged from `v2.8.0` to a literal `VERSION` placeholder), as did version-stamped page titles and `**Library Version**` lines
+- **`FRESH_WITH_CACHE_FALLBACK` was missing from every strategy list in the wiki**, including the dedicated Ad Loading Strategies page, which described "three loading strategies" and documented only three. That page's availability matrix also marked Native/`ONLY_CACHE` as unsupported while its own footnote described the combination working — `NativeAdIntegrationManager` handles all four strategies, so the matrix is now all-supported
+- **Native ad configuration added to the wiki Configuration page.** The v4.3.3 settings (`defaultNativeMediaAspect`, `nativeVideoStartMuted`, `nativeVideoClickToExpand`, `nativeVideoCustomControls`) had never been documented there, and there was no native section at all
+- **Custom templates (v4.3.0) and media aspect (v4.3.3) added to the Native Ads page** — `setCustomTemplate(...)` and `setMediaAspect(...)` appeared nowhere in the native documentation
+- **Setup snippets that omit `MobileAds.initialize()`** on the Interstitial Ads and Configuration pages now carry a note that the call is mandatory as of 4.2.0. Both show configuration only, and configuration alone yields an app that never loads ads
+
+- **Native ad template count was wrong everywhere it appeared.** The figure was stated as 17, 27, 28 or 37 depending on the file; the actual number is **38**, one per entry in the `adTemplate` enum in `attrs.xml`, each with a backing `layout_native_*.xml`. The most common wrong value has a specific cause: the enum's values run `0`–`37`, so 37 is the highest *index*, not the count. The `[3.6.0]` entry below shows the same off-by-one — it reads "total templates: 27 → 37" while listing the new `flat_*` values as 28–37, which only reconciles at 38. Corrected in `README.md`, `CLAUDE.md`, `wiki/NativeAdManager.md`, `docs/NATIVE_TEMPLATE_VIEW.md` and `docs/COMPOSE_INTEGRATION.md`. Historical entries in this file are deliberately left as written
+- **`wiki/Home.md` described 2.8.0** — five majors behind. It stated the version three times (header, "What's New", install snippets), all now 4.4.1, with the yandex module and the compileSdk 37 step added to the snippet, and a Recent Highlights block for 4.4.0 / 4.3.x / 4.2.0 so the Next-Gen SDK migration is reachable from the wiki landing page
+- **The wiki Quick Configuration snippet produced an app that never loads ads.** It constructed `AppOpenManager` with no `MobileAds.initialize()` call — a legacy-SDK pattern that has been broken since 4.2.0 removed the SDK's silent lazy-init, and which also races the `ProcessLifecycleOwner` observer ahead of initialization. Replaced with the sample app's pattern: initialize off the main thread, construct `AppOpenManager` only after it returns
+- **`wiki/Home.md` factual drift** — API badge said 21+ (minSdk is 24); the loading-strategy list showed 3 of 4, omitting `FRESH_WITH_CACHE_FALLBACK`; the page index omitted all six billing pages, including the 4.4.0 Subscription Offers page
+- **`wiki/NativeAdManager.md` template table read as exhaustive** but listed roughly 15 of 38, contradicting its own stated total. Now labelled a selection, with rows for the themed and `flat_*` families and a link to `attrs.xml` as the authoritative list
+
 ## [4.4.1] - 2026-07-29
 
 Patch release: updates the Google Mobile Ads Next-Gen SDK to 1.3.0 and repairs three documentation-delivery channels that had silently gone stale — the API docs site had not regenerated since the Dokka 2.x upgrade, the MCP documentation server was stuck on npm at 1.0.0 (January 2026), and that server's tool schemas hardcoded which versions and classes existed, so they rejected 4.4.0 as unknown. **No AdManageKit API changed.**

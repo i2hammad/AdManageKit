@@ -1,8 +1,8 @@
-# Ad Loading Strategies - AdManageKit v2.8.0
+# Ad Loading Strategies - AdManageKit v4.4.1
 
 ## Overview
 
-AdManageKit v2.6.0+ introduces three loading strategies that control how ads are fetched and displayed. Choose the right strategy based on your app's needs for user experience vs. ad coverage.
+AdManageKit v2.6.0+ introduces four loading strategies that control how ads are fetched and displayed. Choose the right strategy based on your app's needs for user experience vs. ad coverage.
 
 ## Strategy Types
 
@@ -63,15 +63,33 @@ AdManageKitConfig.interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
 - Default recommendation
 - Balanced UX and coverage
 
+### 4. FRESH_WITH_CACHE_FALLBACK
+
+**Fetch fresh first, fall back to cache on failure**
+
+```kotlin
+AdManageKitConfig.nativeLoadingStrategy = AdLoadingStrategy.FRESH_WITH_CACHE_FALLBACK
+```
+
+| Pros | Cons |
+|------|------|
+| Freshest creative when the network cooperates | Slower than cache-first when the fetch is slow |
+| Cache covers the failure case | Requires a warm cache to help |
+| Successful loads are cached for later | - |
+
+**Best for:**
+- RecyclerView / feed scenarios where each item should try for a fresh ad
+- Placements where creative freshness matters more than instant fill
+
 ## Strategy Availability
 
-| Ad Type | ON_DEMAND | ONLY_CACHE | HYBRID |
-|---------|-----------|------------|--------|
-| Interstitial | ✅ | ✅ | ✅ |
-| App Open | ✅ | ✅ | ✅ |
-| Native | ✅ | ❌ | ✅ |
+| Ad Type | ON_DEMAND | ONLY_CACHE | HYBRID | FRESH_WITH_CACHE_FALLBACK |
+|---------|-----------|------------|--------|---------------------------|
+| Interstitial | ✅ | ✅ | ✅ | ✅ |
+| App Open | ✅ | ✅ | ✅ | ✅ |
+| Native | ✅ | ✅ | ✅ | ✅ |
 
-> **Note:** Native ads use shimmer instead of dialog, so ONLY_CACHE hides container if not cached.
+> **Note:** Native ads use shimmer instead of a dialog, so `ONLY_CACHE` hides the container when nothing is cached rather than blocking the UI.
 
 ## Configuration
 

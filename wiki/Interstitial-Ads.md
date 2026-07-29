@@ -1,10 +1,10 @@
-# Interstitial Ads - AdManageKit v2.8.0
+# Interstitial Ads - AdManageKit v4.4.1
 
 ## Overview
 
 AdManageKit provides a complete interstitial ad stack with `AdManager` and the fluent `InterstitialAdBuilder`. Features include loading strategies, automatic retry, frequency controls, splash screen support, and Jetpack Compose utilities.
 
-**Library Version**: v2.8.0
+**Library Version**: v4.4.1
 
 ## What's New
 
@@ -23,11 +23,11 @@ AdManageKit provides a complete interstitial ad stack with `AdManager` and the f
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.8.0'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.1'
     // Optional - Jetpack Compose
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.1'
 }
 ```
 
@@ -57,6 +57,8 @@ class MyApp : Application() {
     }
 }
 ```
+
+> **Since 4.2.0 you must also call `MobileAds.initialize()` yourself**, before any ad request — the Next-Gen SDK removed the legacy SDK's silent lazy-init. This snippet covers configuration only. See [[Home]] or the sample app's [`MyApplication.kt`](https://github.com/i2hammad/AdManageKit/blob/main/app/src/main/java/com/i2hammad/admanagekit/sample/MyApplication.kt) for the initialization pattern.
 
 ## Option 1: Direct AdManager
 
@@ -104,6 +106,7 @@ fun showInterstitial(activity: Activity) {
 | ON_DEMAND | Always fetch fresh ad with dialog |
 | ONLY_CACHE | Show cached if ready, skip otherwise |
 | HYBRID | Show cached if ready, fetch fresh otherwise |
+| FRESH_WITH_CACHE_FALLBACK | Fetch fresh, fall back to cache if the load fails |
 
 ```kotlin
 // Set strategy

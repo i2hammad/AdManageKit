@@ -38,11 +38,11 @@ This is fully backward compatible -- if no provider chains are configured, all e
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:VERSION"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:VERSION"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.1"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.1"
 
     // Add Yandex provider
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:VERSION"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.1"
 }
 ```
 
@@ -161,7 +161,7 @@ if (isRussia) {
 All existing features continue to work when the waterfall is active:
 
 - Time-based and count-based interstitial display
-- Loading strategies (ON_DEMAND, ONLY_CACHE, HYBRID)
+- Loading strategies (ON_DEMAND, ONLY_CACHE, HYBRID, FRESH_WITH_CACHE_FALLBACK)
 - Shimmer loading placeholders
 - Loading dialogs for interstitials
 - Welcome back dialog for app open ads
