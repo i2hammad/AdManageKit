@@ -1,14 +1,14 @@
 # NativeTemplateView Guide
 
-**New in v2.6.0** - A unified native ad component supporting 28 different template styles with Material 3 theming and video support.
+**New in v2.6.0** - A unified native ad component supporting 38 different template styles with Material 3 theming and video support.
 
 ## Overview
 
-`NativeTemplateView` is a single, flexible component that replaces the need for multiple native ad views. It supports 28 different visual templates that can be set via XML attributes or programmatically.
+`NativeTemplateView` is a single, flexible component that replaces the need for multiple native ad views. It supports 38 different visual templates that can be set via XML attributes or programmatically.
 
 ## Features
 
-- **28 Template Styles**: From minimal to icon-left, compact to fullscreen video
+- **38 Template Styles**: From minimal to icon-left, compact to fullscreen video
 - **Material 3 Theming**: Automatic dark/light mode support
 - **Video Support**: All templates support video ads (120dp+ MediaView)
 - **Shimmer Loading**: Beautiful loading animation

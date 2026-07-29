@@ -8,11 +8,11 @@ AdManageKit provides comprehensive native ad support with caching, multiple form
 
 ## Features
 
-- **Multiple Formats**: Small, Medium, Large, and 17+ template styles
+- **Multiple Formats**: Small, Medium, Large, and 38 template styles
 - **Smart Caching**: Per-unit caching with 1-hour expiration
 - **Loading Strategies**: ON_DEMAND, ONLY_CACHE, HYBRID
 - **Shimmer Loading**: Beautiful loading placeholders
-- **NativeTemplateView**: Unified component with 17 templates (v2.6.0+)
+- **NativeTemplateView**: Unified component with 38 templates (v2.6.0+)
 - **Video Support**: All templates support video ads
 
 ## Installation
@@ -36,7 +36,7 @@ dependencies {
 
 ### NativeTemplateView (v2.6.0+)
 
-17 template styles in one unified component:
+38 template styles in one unified component. A selection:
 
 | Template | Best For |
 |----------|----------|
@@ -49,6 +49,10 @@ dependencies {
 | `video_small/medium/large` | Video content |
 | `video_square/vertical/fullscreen` | Social feeds |
 | `featured`, `grid_card`, `overlay_dark`, `story_style` | Various layouts |
+| `app_store`, `social_feed`, `gradient_card`, `spotlight` | Themed placements |
+| `flat_*` family (10 styles) | Flat/minimal design systems |
+
+See [`attrs.xml`](https://github.com/i2hammad/AdManageKit/blob/main/AdManageKit/src/main/res/values/attrs.xml) for the full `adTemplate` enum.
 
 ## Usage
 
@@ -201,7 +205,7 @@ Load → Check cache →
 
 ## Best Practices
 
-1. **Use NativeTemplateView** - Unified API with 17 templates
+1. **Use NativeTemplateView** - Unified API with 38 templates
 2. **Enable Caching** - Improves load times and reduces requests
 3. **Use HYBRID Strategy** - Best balance for most cases
 4. **Clear on Destroy** - Call `clearAllCachedAds()` in `onDestroy()`

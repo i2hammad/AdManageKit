@@ -45,7 +45,7 @@ CI (`.github/workflows/ci.yml`) runs `assembleDebug` + `testDebugUnitTest` on JD
 - `AppOpenManager`: Lifecycle-aware app open ads (welcome-back dialog flow included)
 - `NativeAdManager`: Native ad cache (per-unit lists, LRU, expiry; destructive reads)
 - `NativeAdIntegrationManager`: Screen-aware caching strategies (HYBRID / ONLY_CACHE / ...)
-- Views: `BannerAdView`, `NativeBannerSmall/Medium`, `NativeLarge`, `NativeTemplateView` (37 templates); all native views expose `destroy()`
+- Views: `BannerAdView`, `NativeBannerSmall/Medium`, `NativeLarge`, `NativeTemplateView` (38 templates); all native views expose `destroy()`
 - `waterfall` package: `InterstitialWaterfall` etc. — try providers in order; generation tokens + per-attempt timeout guarantee exactly one terminal callback per load/show
 - `AdManageKitConfig`: global mutable config object; `resetToDefaults()` must cover every field (tested)
 

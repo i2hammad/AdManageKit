@@ -14,7 +14,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
 
 | Component | Description |
 |-----------|-------------|
-| `NativeTemplateCompose` | Unified native ad with 28 templates (NEW in 2.6.0) |
+| `NativeTemplateCompose` | Unified native ad with 38 templates (NEW in 2.6.0) |
 | `BannerAdCompose` | Banner ad with lifecycle management |
 | `NativeBannerSmallCompose` | Small native banner (80dp) |
 | `NativeBannerMediumCompose` | Medium native banner (120dp) |
@@ -29,7 +29,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
 
 ## NativeTemplateCompose (NEW in 2.6.0)
 
-A Compose wrapper for `NativeTemplateView` supporting all 28 template styles.
+A Compose wrapper for `NativeTemplateView` supporting all 38 template styles.
 
 ### Basic Usage
 
