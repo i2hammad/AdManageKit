@@ -209,7 +209,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.1'
 ## Features
 
 ### NativeTemplateView (v2.6.0+)
-- **27 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, flexible, icon_left, top_icon_media, spotlight, and more
+- **38 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, flexible, icon_left, top_icon_media, spotlight, plus the video_* and flat_* families
 - **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
 - **Material 3 Theming**: Automatic dark/light mode support
 - **AdChoices Control**: Configure placement position (v2.9.0+)
