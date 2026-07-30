@@ -1,10 +1,38 @@
 name: Publish MCP Server
 
+# The MCP server bundles docs/, wiki/ and README.md into its npm tarball at publish
+# time (scripts/bundle-docs.js), so a documentation change only reaches consumers
+# once the package is republished. Publishing therefore runs automatically whenever
+# bundled content changes on main - not just on an explicit mcp-v* tag.
+#
+# npm refuses to overwrite an existing version, so the version is resolved at
+# publish time (see "Resolve publish version"): an explicit bump in package.json
+# wins, otherwise the patch is incremented from whatever is currently on npm. The
+# resolved version is applied in the runner only and never committed back, so this
+# workflow cannot trigger itself.
+
+# Note: GitHub ANDs `paths` with the ref filters, so it applies to the mcp-v* tag
+# trigger too. In practice that is fine - an mcp-v* tag is cut on a commit that
+# bumps mcp-server/package.json, which matches mcp-server/** - and
+# workflow_dispatch ignores path filters entirely if a forced publish is ever needed.
 on:
   push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "wiki/**"
+      - "README.md"
+      - "mcp-server/**"
     tags:
       - "mcp-v*"
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-mcp
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -56,6 +84,48 @@ jobs:
       # fails with TS2307 "Cannot find module" for every import.
       - run: npm ci
 
+      # Pick the version to publish. An explicit bump in package.json always wins,
+      # so a deliberate minor/major release works as before. Otherwise the patch is
+      # incremented from the newest version on npm, which is what makes unattended
+      # docs-triggered publishes possible: republishing an unchanged version is a
+      # hard 403 from the registry ("You cannot publish over the previously
+      # published versions").
+      - name: Resolve publish version
+        id: version
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          PKG=$(node -p "require('./package.json').name")
+          REPO=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm view "$PKG" version 2>/dev/null || echo "0.0.0")
+          echo "package=$PKG repo=$REPO published=$PUBLISHED"
+
+          TARGET=$(REPO="$REPO" PUBLISHED="$PUBLISHED" node -e '
+            const parse = v => v.split("-")[0].split(".").map(Number);
+            const [aM,am,ap] = parse(process.env.REPO);
+            const [bM,bm,bp] = parse(process.env.PUBLISHED);
+            const repoIsNewer =
+              aM > bM || (aM === bM && (am > bm || (am === bm && ap > bp)));
+            console.log(repoIsNewer
+              ? process.env.REPO
+              : [bM, bm, bp + 1].join("."));
+          ')
+
+          echo "Publishing $PKG@$TARGET"
+          echo "target=$TARGET" >> "$GITHUB_OUTPUT"
+
+          # Applied in the runner only. Not committed back to main, so this
+          # workflow can never re-trigger itself.
+          npm version "$TARGET" --no-git-tag-version --allow-same-version
+
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "Published ${{ steps.version.outputs.target }} to npm" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Repository package.json still reads $(node -p "require('./package.json').version" || true) in git;" >> "$GITHUB_STEP_SUMMARY"
+          echo "the published version is resolved at publish time and not committed back." >> "$GITHUB_STEP_SUMMARY"

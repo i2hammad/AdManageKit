@@ -107,4 +107,4 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.1'
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.1'
 ```
 
-For the MCP server, `npx @i2hammad/admanagekit-mcp@latest` now resolves to 1.2.0.
+For the MCP server, `npx -y admanagekit-mcp-server` now resolves to 1.2.0 or newer.
