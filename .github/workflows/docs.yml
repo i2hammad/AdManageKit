@@ -1,14 +1,28 @@
 name: Deploy API Documentation
 
+# The published KDoc is generated from source, so anything that changes a doc
+# comment changes the site. Deploying only on release meant a KDoc correction sat
+# unpublished until the next version shipped - and the live site kept serving text
+# the source no longer said. Pushes to main that touch documented source (or the
+# Dokka configuration) now deploy as well.
+#
+# `paths` applies only to the push trigger; release and workflow_dispatch are
+# unaffected by it and continue to deploy unconditionally.
 on:
+  # Deploy on push to main when documented source or Dokka config changes
+  push:
+    branches: [main]
+    paths:
+      - "**/src/main/**"
+      - "build.gradle.kts"
+      - "*/build.gradle.kts"
+      - "gradle/libs.versions.toml"
+      - ".github/workflows/docs.yml"
   # Deploy on release
   release:
     types: [published]
   # Also allow manual trigger
   workflow_dispatch:
-  # Deploy on push to main (optional - uncomment if wanted)
-  # push:
-  #   branches: [main]
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
