@@ -273,6 +273,10 @@ NativeTemplateCompose(
 )
 ```
 
+`customLayoutResId` takes precedence over `template`, mirroring `app:customAdLayout` in XML.
+
+`customShimmerResId` is optional, but if omitted the shimmer falls back to the one belonging to `template` (default `CARD_MODERN`) — so a custom layout shows a placeholder shaped like a different ad. Either supply a matching shimmer or set `template` to the closest built-in. See [Custom Templates & Shimmer](COMPOSE_INTEGRATION.md#custom-templates--shimmer-v430) in the Compose guide for the full explanation.
+
 ## Jetpack Compose Usage
 
 NativeTemplateView is also available as a Compose component via the `ad-manage-kit-compose` module.

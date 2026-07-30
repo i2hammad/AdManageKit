@@ -60,6 +60,27 @@ fun MyScreen() {
 }
 ```
 
+### Custom Templates & Shimmer (v4.3.0+)
+
+If none of the 38 built-in templates fit, pass your own layout instead of a `template`:
+
+```kotlin
+NativeTemplateCompose(
+    adUnitId = "ca-app-pub-xxx/yyy",
+    customLayoutResId = R.layout.my_native_ad,
+    customShimmerResId = R.layout.my_native_ad_shimmer,  // recommended, see below
+    customSizeHint = NativeAdSize.MEDIUM
+)
+```
+
+`customLayoutResId` takes precedence over `template`. The layout's root must be (or inflate as) a Next-Gen SDK `NativeAdView`, reusing the standard asset ids so the library can bind them: `ad_headline`, `ad_body`, `ad_call_to_action`, `ad_app_icon`, `ad_advertiser`, `ad_media`, `ad_stars`, `ad_choices_view`. Omitted ids are simply not populated, but keep the call-to-action fully visible and tappable — the native ad validator flags clipping as a policy violation.
+
+> **`customShimmerResId` is optional, but omitting it is rarely what you want.** The shimmer then falls back to the one belonging to `template` (default `CARD_MODERN`), so a custom layout still shows a placeholder — just one shaped like a different ad, which visibly jumps when the real ad arrives. Either supply a matching shimmer, or set `template` to whichever built-in most resembles your layout so the fallback is the right shape. Passing `0` is the same as omitting it.
+
+`customSizeHint` classifies the ad for the cache and gives the Yandex waterfall a fallback size, since a custom layout has no built-in size bucket — `SMALL` (icon + title + CTA), `MEDIUM` (adds body), `LARGE` (adds media). It does not affect how your layout is measured.
+
+The XML and programmatic equivalents are covered in [[Native Ads|NativeAdManager]].
+
 ### Traditional Native Composables
 
 ```kotlin

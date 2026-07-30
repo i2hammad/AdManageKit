@@ -99,7 +99,9 @@ class NativeBannerSmall @JvmOverloads constructor(
     /**
      * Load native banner ad with custom loading strategy override
      *
-     * @param loadingStrategy Strategy to use (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
+     * @param loadingStrategy Strategy to use. All four strategies are supported for native ads;
+     *        ONLY_CACHE serves a cached ad if one is ready and otherwise hides the container
+     *        without issuing a network request.
      */
     fun loadNativeBannerAd(
         activity: Activity,
@@ -112,7 +114,9 @@ class NativeBannerSmall @JvmOverloads constructor(
     /**
      * Load native banner ad with custom loading strategy and callback
      *
-     * @param loadingStrategy Strategy to use (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
+     * @param loadingStrategy Strategy to use. All four strategies are supported for native ads;
+     *        ONLY_CACHE serves a cached ad if one is ready and otherwise hides the container
+     *        without issuing a network request.
      */
     fun loadNativeBannerAd(
         activity: Activity,

@@ -27,7 +27,9 @@ import com.i2hammad.admanagekit.core.ad.NativeAdSize
  * @param adUnitId The AdMob ad unit ID
  * @param template The template style to use (default: CARD_MODERN)
  * @param modifier Modifier for styling the ad container
- * @param loadingStrategy Loading strategy (ON_DEMAND or HYBRID). Note: ONLY_CACHE is not supported for native ads.
+ * @param loadingStrategy Loading strategy. All four strategies are supported for native ads;
+ *        ONLY_CACHE serves a cached ad if one is ready and otherwise hides the container
+ *        without issuing a network request.
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked

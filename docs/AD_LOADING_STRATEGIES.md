@@ -1,16 +1,19 @@
 # Ad Loading Strategies Guide
 
-**New in v2.6.0** - AdManageKit supports three different ad loading strategies to fit different use cases in your app.
+**New in v2.6.0** - AdManageKit supports four different ad loading strategies to fit different use cases in your app.
 
 ## Strategy Availability
 
 | Strategy | Interstitial | App Open | Native |
 |----------|-------------|----------|--------|
 | ON_DEMAND | ✅ | ✅ | ✅ |
-| ONLY_CACHE | ✅ | ✅ | ❌ |
+| ONLY_CACHE | ✅ | ✅ | ✅ |
 | HYBRID | ✅ | ✅ | ✅ |
+| FRESH_WITH_CACHE_FALLBACK | ✅ | ✅ | ✅ |
 
-> **Note:** `ONLY_CACHE` is only available for **Interstitial** and **App Open** ads. Native ads display inline with shimmer loading, so they always need to load content.
+> **Note:** all four strategies work for every ad type. `ONLY_CACHE` behaves differently
+> on native ads: instead of blocking with a dialog, it shows a cached ad if one is ready
+> and otherwise hides the container (see [Native Ads Behavior](#native-ads-behavior)).
 
 ## Strategy Types
 
@@ -82,6 +85,26 @@ User triggers ad → Check cache →
         If timeout: Skip ad → Continue
 ```
 
+### 4. FRESH_WITH_CACHE_FALLBACK
+**Fetch fresh first, fall back to cache if the load fails**
+
+- ✅ Freshest creative whenever the network cooperates
+- ✅ A warm cache covers the failure case
+- ✅ Successful loads are cached for later requests
+- ⚠️ Slower than cache-first when the fetch is slow
+
+**Best for:**
+- RecyclerView / feed placements where each item should try for a fresh ad
+- Placements where creative freshness matters more than instant fill
+
+**How it works:**
+```
+Load ad → Fetch fresh →
+    If loaded: Show ad (and cache it for next time)
+    If failed: Fall back to cached ad if one exists
+        If no cache: Skip / hide container
+```
+
 ---
 
 ## Native Ads Behavior
@@ -116,6 +139,14 @@ Load native ad → Check cache →
     → Show shimmer → Fetch fresh ad →
         ✅ Show ad when loaded → Hide shimmer
         ❌ On failure → Hide container
+```
+
+**FRESH_WITH_CACHE_FALLBACK:**
+```
+Load native ad → Show shimmer → Fetch fresh ad →
+    ✅ Show ad when loaded → Hide shimmer (ad is cached for next time)
+    ❌ On failure → Show cached ad if one exists
+        ❌ No cache → Hide container
 ```
 
 ### Usage Example

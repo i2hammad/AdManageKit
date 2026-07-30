@@ -202,7 +202,10 @@ class MainActivity : AppCompatActivity() {
         // Configure ONLY_CACHE strategy
         AdManageKitConfig.apply {
             interstitialLoadingStrategy = AdLoadingStrategy.ONLY_CACHE
-            nativeLoadingStrategy = AdLoadingStrategy.HYBRID // Auto-converted from ONLY_CACHE
+            // Native ads support ONLY_CACHE too - there is no auto-conversion. Set it
+            // explicitly if you want cache-or-nothing; HYBRID here is a deliberate choice
+            // to still fetch when the cache misses.
+            nativeLoadingStrategy = AdLoadingStrategy.HYBRID
             enableSmartPreloading = true
         }
 
@@ -387,7 +390,7 @@ AdManageKitConfig.apply {
 ## Testing
 
 See `LoadingStrategyTestActivity.kt` for comprehensive testing of:
-- All three loading strategies
+- All four loading strategies
 - Preload functionality
 - Cache management
 - Real-time cache status monitoring

@@ -7,14 +7,14 @@ AdManageKit provides native Jetpack Compose components for all ad types with ful
 ## Installation
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.6.0'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
 ```
 
 ## Available Components
 
 | Component | Description |
 |-----------|-------------|
-| `NativeTemplateCompose` | Unified native ad with 38 templates (NEW in 2.6.0) |
+| `NativeTemplateCompose` | Unified native ad with 38 templates, or a fully custom layout (NEW in 2.6.0) |
 | `BannerAdCompose` | Banner ad with lifecycle management |
 | `NativeBannerSmallCompose` | Small native banner (80dp) |
 | `NativeBannerMediumCompose` | Medium native banner (120dp) |
@@ -86,6 +86,18 @@ NativeAdTemplate.GRID_ITEM        // Compact grid item
 NativeAdTemplate.TOP_ICON_MEDIA   // Top icon, media center
 NativeAdTemplate.ICON_LEFT        // Left icon column layout
 
+// Flat-design family (10 styles, v3.6.0+)
+NativeAdTemplate.FLAT_INLINE_ROW
+NativeAdTemplate.FLAT_CARD_RATING
+NativeAdTemplate.FLAT_MEDIA_TOP
+NativeAdTemplate.FLAT_TEXT_MINIMAL
+NativeAdTemplate.FLAT_COMPACT_PILL
+NativeAdTemplate.FLAT_CAROUSEL
+NativeAdTemplate.FLAT_BANNER
+NativeAdTemplate.FLAT_FEATURE_LIST
+NativeAdTemplate.FLAT_SPONSORED_STORY
+NativeAdTemplate.FLAT_FOOTER_SLIM
+
 // Video Templates
 NativeAdTemplate.VIDEO_SMALL      // 120x120dp
 NativeAdTemplate.VIDEO_MEDIUM     // 180dp height
@@ -111,13 +123,75 @@ NativeVideoLargeCompose(adUnitId = adUnitId)
 NativeVideoSquareCompose(adUnitId = adUnitId)
 ```
 
+### Custom Templates & Shimmer (v4.3.0+)
+
+If none of the 38 built-in templates fit your design, pass your own layout instead of a `template`:
+
+```kotlin
+NativeTemplateCompose(
+    adUnitId = "ca-app-pub-xxx/yyy",
+    customLayoutResId = R.layout.my_native_ad,
+    customShimmerResId = R.layout.my_native_ad_shimmer,  // strongly recommended, see below
+    customSizeHint = NativeAdSize.MEDIUM
+)
+```
+
+`customLayoutResId` takes precedence over `template` when both are set.
+
+**Layout requirements.** The root must be (or inflate as) a Next-Gen SDK `NativeAdView`, and the asset views must reuse the standard ids so the library can bind them:
+
+`ad_headline`, `ad_body`, `ad_call_to_action`, `ad_app_icon`, `ad_advertiser`, `ad_media`, `ad_stars`, `ad_choices_view`
+
+Any id you omit is simply not populated — but the headline and call-to-action should always be present, and the call-to-action must remain fully visible and tappable or the native ad validator flags a policy violation.
+
+#### The shimmer parameter is optional, but omitting it rarely does what you want
+
+`customShimmerResId` is not required. If you leave it out, the shimmer falls back to **the shimmer belonging to `template`** — which defaults to `CARD_MODERN`:
+
+```kotlin
+// NativeTemplateView.kt
+get() = customShimmerResId ?: currentTemplate.shimmerResId
+```
+
+So a custom layout with no custom shimmer still shows a placeholder — just one shaped like a completely different ad. The usual symptom is a placeholder that visibly jumps to a different size when the real ad arrives.
+
+Two ways to get this right:
+
+```kotlin
+// 1. Supply a shimmer matching your layout (recommended)
+NativeTemplateCompose(
+    adUnitId = adUnitId,
+    customLayoutResId = R.layout.my_native_ad,
+    customShimmerResId = R.layout.my_native_ad_shimmer
+)
+
+// 2. No custom shimmer: set `template` to whichever built-in most resembles your
+//    layout, so the fallback is at least the right shape. Every template carries
+//    its own shimmer (NativeAdTemplate.shimmerResId), and that is what gets used.
+NativeTemplateCompose(
+    adUnitId = adUnitId,
+    template = NativeAdTemplate.MEDIUM_HORIZONTAL,  // example: its shimmer is the fallback
+    customLayoutResId = R.layout.my_native_ad
+)
+```
+
+Passing `0` for `customShimmerResId` is treated the same as omitting it.
+
+**`customSizeHint`** classifies the ad for the cache and gives the Yandex waterfall a fallback size, since a custom layout has no built-in size bucket. Values are `NativeAdSize.SMALL` (icon + title + CTA), `MEDIUM` (adds body), `LARGE` (adds media). Pick whichever matches your layout's content; it does not affect how your layout is measured.
+
+The same feature in XML and code is documented in the [NativeTemplateView guide](NATIVE_TEMPLATE_VIEW.md#custom-templates).
+
 ---
 
 ## Loading Strategies (NEW in 2.6.0)
 
-Native ad Compose components support `loadingStrategy` parameter with `ON_DEMAND` and `HYBRID`:
+Native ad Compose components accept a `loadingStrategy` parameter. All four strategies
+are supported for native ads — `ON_DEMAND`, `ONLY_CACHE`, `HYBRID` (default) and
+`FRESH_WITH_CACHE_FALLBACK`.
 
-> **Note:** `ONLY_CACHE` is only available for Interstitial and App Open ads, not for native ads.
+> **`ONLY_CACHE` on native ads** shows a cached ad if one is ready and otherwise hides
+> the container, rather than blocking the UI with a dialog the way interstitial and app
+> open ads do. See the [Ad Loading Strategies guide](AD_LOADING_STRATEGIES.md) for the full matrix.
 
 ```kotlin
 // ON_DEMAND - Always fetch fresh ad
