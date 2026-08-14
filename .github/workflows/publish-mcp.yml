@@ -91,10 +91,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Deliberately NO `registry-url`. Setting it makes setup-node write an
+      # .npmrc containing `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`
+      # and export NODE_AUTH_TOKEN as the placeholder `XXXXX-XXXXX-XXXXX-XXXXX`.
+      # npm then sees a credential, never falls through to OIDC, and sends that
+      # dummy token to the registry - which answers `E404 Not Found - PUT`,
+      # indistinguishable from the expired-token failure this was meant to fix.
+      # Omitting it leaves npm on its default registry (registry.npmjs.org, and
+      # package.json sets no publishConfig) with no .npmrc auth line, which is
+      # what lets Trusted Publishing engage.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: "https://registry.npmjs.org"
 
       # The runner image ships npm 10.x, which predates OIDC entirely. Trusted
       # Publishing needs >= 11.5.1, so upgrade before anything touches the registry.
@@ -143,6 +151,24 @@ jobs:
           # Applied in the runner only. Not committed back to main, so this
           # workflow can never re-trigger itself.
           npm version "$TARGET" --no-git-tag-version --allow-same-version
+
+      # A stray credential silently disables OIDC and the registry reports it as
+      # a bare 404, which reads exactly like an expired token - so assert the
+      # environment is clean while the cause is still obvious.
+      - name: Assert no credential is shadowing OIDC
+        run: |
+          set -euo pipefail
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NODE_AUTH_TOKEN is set. npm will use it instead of OIDC and publishing will fail with a misleading 404."
+            exit 1
+          fi
+          for f in "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}" ./.npmrc; do
+            if [ -f "$f" ] && grep -q "_authToken" "$f"; then
+              echo "::error::$f contains an _authToken line, which shadows OIDC."
+              exit 1
+            fi
+          done
+          echo "No token present; Trusted Publishing can proceed."
 
       # No NODE_AUTH_TOKEN: npm exchanges the runner's OIDC identity for a
       # short-lived credential. Setting a token here would take precedence over
