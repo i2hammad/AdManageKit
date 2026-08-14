@@ -15,6 +15,21 @@ name: Publish MCP Server
 # trigger too. In practice that is fine - an mcp-v* tag is cut on a commit that
 # bumps mcp-server/package.json, which matches mcp-server/** - and
 # workflow_dispatch ignores path filters entirely if a forced publish is ever needed.
+#
+# Authentication is npm Trusted Publishing (OIDC), not a long-lived token. The
+# runner mints a short-lived credential from its GitHub identity, which is why
+# the job needs `id-token: write` and why no NPM_TOKEN appears below. This
+# replaces an automation token that expired on npm's schedule and failed with a
+# misleading `E404 Not Found - PUT` (npm masks unauthorized publishes as 404 so
+# it does not leak package existence) - the second credential outage in as many
+# quarters. Nothing expires now, so there is nothing to rotate.
+#
+# Two requirements come with it:
+#   - npm >= 11.5.1, hence the explicit `npm install -g npm@latest`. The Node 22
+#     runner image ships npm 10.x, which has no OIDC support at all.
+#   - a trusted publisher configured on npmjs.com for admanagekit-mcp-server,
+#     pinned to this repository AND this workflow's filename (publish-mcp.yml).
+#     Renaming this file breaks publishing until the setting is updated to match.
 on:
   push:
     branches: [main]
@@ -29,6 +44,9 @@ on:
 
 permissions:
   contents: read
+  # Required for Trusted Publishing: lets the runner mint the OIDC token npm
+  # exchanges for a short-lived publish credential.
+  id-token: write
 
 concurrency:
   group: publish-mcp
@@ -45,7 +63,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - run: npm ci
       - run: npm run build
@@ -75,8 +93,15 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           registry-url: "https://registry.npmjs.org"
+
+      # The runner image ships npm 10.x, which predates OIDC entirely. Trusted
+      # Publishing needs >= 11.5.1, so upgrade before anything touches the registry.
+      - name: Upgrade npm for Trusted Publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       # `npm publish` runs the prepublishOnly script, which re-runs `tsc` and
       # bundle-docs. That needs node_modules in *this* job — downloading the
@@ -90,10 +115,10 @@ jobs:
       # docs-triggered publishes possible: republishing an unchanged version is a
       # hard 403 from the registry ("You cannot publish over the previously
       # published versions").
+      # `npm view` is an unauthenticated read of a public package, so this step
+      # needs no credential of its own.
       - name: Resolve publish version
         id: version
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           PKG=$(node -p "require('./package.json').name")
@@ -119,9 +144,11 @@ jobs:
           # workflow can never re-trigger itself.
           npm version "$TARGET" --no-git-tag-version --allow-same-version
 
+      # No NODE_AUTH_TOKEN: npm exchanges the runner's OIDC identity for a
+      # short-lived credential. Setting a token here would take precedence over
+      # OIDC and reintroduce exactly the expiry that broke this workflow.
+      # Provenance attestation is generated automatically under Trusted Publishing.
       - run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Summary
         run: |
