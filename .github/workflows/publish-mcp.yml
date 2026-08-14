@@ -168,7 +168,20 @@ jobs:
               exit 1
             fi
           done
-          echo "No token present; Trusted Publishing can proceed."
+          echo "No token present."
+
+          # Separates the two ways Trusted Publishing can fail. If the OIDC
+          # endpoint is missing, GitHub never granted id-token and the fault is
+          # in this workflow or repo settings. If it is present and npm still
+          # reports ENEEDAUTH, the exchange was refused at the registry - which
+          # means no trusted publisher is configured for this package on
+          # npmjs.com, or it does not match this repo/workflow filename.
+          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            echo "OIDC endpoint: present (GitHub granted id-token: write)"
+          else
+            echo "::error::OIDC endpoint absent - GitHub did not grant id-token: write. npm cannot use Trusted Publishing."
+            exit 1
+          fi
 
       # No NODE_AUTH_TOKEN: npm exchanges the runner's OIDC identity for a
       # short-lived credential. Setting a token here would take precedence over
