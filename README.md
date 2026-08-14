@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.4.2`** is a bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could **crash the app** (every show-path callback, including `onRewardEarned`, was delivered on a background thread), a **completed purchase could fail to disable ads** until the next launch, **blank gaps** were left where banner/native slots should have collapsed for premium users and after failed loads (in both XML and Compose), and app open ads could appear over screens excluded via `disableAppOpenAdsTemporarily()`. Also fixes a `BannerAdView` leak that kept requesting ads after detach. Two deliberate behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose. See [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md).
+**Latest Version `4.4.3`** is a bug-fix and dependency release. No API changed. Two silent-failure bugs are fixed, both of which cost money: a **rewarded load the manager had given up on could sabotage the load that replaced it** — discarding an ad a newer load had just delivered, and clearing the "loading" flag out from under a request still in flight — and **billing could stop acknowledging purchases for the rest of the process**, which lets Play auto-refund a completed purchase on day 3. Acknowledgment also no longer requires the purchase to match a configured product id. Picks up the Next-Gen GMA SDK **1.3.1**, Yandex Mobile Ads **8.3.0**, and refreshed AndroidX/Firebase/Compose BOMs. See [Release Notes v4.4.3](docs/release-notes/RELEASE_NOTES_v4.4.3.md).
+
+**Version `4.4.2`** is a bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could **crash the app** (every show-path callback, including `onRewardEarned`, was delivered on a background thread), a **completed purchase could fail to disable ads** until the next launch, **blank gaps** were left where banner/native slots should have collapsed for premium users and after failed loads (in both XML and Compose), and app open ads could appear over screens excluded via `disableAppOpenAdsTemporarily()`. Also fixes a `BannerAdView` leak that kept requesting ads after detach. Two deliberate behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose. See [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md).
 
 **Version `4.4.1`** is a patch release that updates the Google Mobile Ads Next-Gen SDK to **1.3.0** (from 1.2.1) and repairs three documentation-delivery channels that had silently gone stale: the API docs build had failed on every release since the Dokka 2.x upgrade, leaving [the published KDoc](https://i2hammad.github.io/AdManageKit/) without any 4.x types; MCP server npm publishing had been broken since January 2026; and the MCP tool schemas hardcoded which versions and classes existed, so they rejected `4.4.0` as an unknown version. No AdManageKit API changed. See [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md).
 
@@ -29,7 +31,7 @@ Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads
 
 ## Next-Gen GMA SDK
 
-As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.3.0` as of 4.4.1) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
+As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.3.1` as of 4.4.3) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
 
 ### Why the move
 
@@ -193,15 +195,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.3'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.3'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.3'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -775,6 +777,7 @@ Register it **before** `initBilling`. Products land in `unfetched` when the id i
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.3](docs/release-notes/RELEASE_NOTES_v4.4.3.md)
 - [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md)
 - [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md)
 - [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md)

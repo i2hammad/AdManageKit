@@ -6,22 +6,22 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version: `4.4.2`**
+**Latest Version: `4.4.3`**
 
-## What's New in 4.4.2
+## What's New in 4.4.3
 
-Bug-fix release, no API changes. Two deliberate behavior changes are noted below.
+Bug-fix and dependency release, no API changes. Two silent-failure bugs, both of which cost money.
 
-- **Rewarded ads could crash** — every show-path callback, including `onRewardEarned`, was delivered on a background thread
-- **A completed purchase could fail to disable ads** until the next app launch
-- **Blank gaps** where banner/native slots should have collapsed, for premium users and after a failed load, in both XML and Compose
-- **App open ads could appear over excluded screens**, including flows protected by `disableAppOpenAdsTemporarily()`
-- **`BannerAdView` leaked its Activity** and kept requesting ads after being detached
+- **A timed-out rewarded load could sabotage the one that replaced it** — a request handed to the SDK cannot be cancelled, and when it finally reported back it could discard an ad a *newer* load had just delivered, clear the loading flag out from under a request still in flight, and fail callers waiting on a load that had not finished. Every load path now carries a generation token, and a late ad is kept for the next show instead of dropped
+- **Billing could stop acknowledging purchases for the rest of the process** — the connection flag could latch `false` after one disconnect while the client was actually ready, disabling every purchase re-query including the acknowledgment retry. Play auto-refunds an unacknowledged purchase after 3 days
+- **Acknowledgment no longer requires a configured product id** — a `PURCHASED` order the current build does not list (promo grants, dropped products, a Console typo) was never acknowledged, and so was auto-refunded on day 3
+- **Dependencies** — Next-Gen GMA SDK 1.3.1, Yandex Mobile Ads 8.3.0, Compose BOM 2026.08.00, Firebase BOM 34.17.0, AppCompat 1.8.0
 
-> **Behavior changes:** an account-hold subscription no longer disables ads (it already reported `ON_HOLD` and failed `isSubscriptionActive()`), and premium users no longer reserve ad space in Compose.
+> **Pending purchases need one thing from your app:** call `refreshPurchases()` from your main activity's `onResume()`. See [[Billing Integration]].
 
 ## Recent Highlights
 
+- **4.4.2** — Rewarded callbacks marshalled to the main thread (they could crash the app), a completed purchase could fail to disable ads, blank gaps where banner/native slots should have collapsed, and a `BannerAdView` Activity leak. Behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose
 - **4.4.1** — Google Mobile Ads Next-Gen SDK 1.3.0 (from 1.2.1), plus repairs to API doc generation and the MCP documentation server
 - **4.4.0** — Subscription offers can be **purchased individually** (`subscribe(activity, offer)`), offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`), trial eligibility, Play Billing 9 one-time product offers, and client-side **account hold** detection. See [[Subscription Offers]]
 - **4.3.x** — All standard banner sizes (`BannerAdSize`), custom native templates, and app-open ad freshness enforcement
@@ -84,15 +84,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.3'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.3'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.3'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).

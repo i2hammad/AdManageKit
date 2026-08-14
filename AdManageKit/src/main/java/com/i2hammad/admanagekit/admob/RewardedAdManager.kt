@@ -25,6 +25,7 @@ import com.i2hammad.admanagekit.core.ad.RewardedAdProvider
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.utils.AdRetryManager
 import com.i2hammad.admanagekit.waterfall.RewardedWaterfall
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * RewardedAdManager is a singleton class responsible for managing rewarded ads
@@ -71,6 +72,68 @@ object RewardedAdManager {
 
     // Callbacks attached to an in-flight load; drained when that load completes
     private val pendingLoadCallbacks = mutableListOf<OnRewardedAdLoadCallback>()
+
+    /**
+     * Incremented every time a load is started or abandoned; each load's callbacks carry the
+     * token they began with and compare it against this before touching anything shared.
+     *
+     * A load cannot be cancelled once handed to the SDK, and [loadRewardedAdWithTimeout] gives up
+     * on one while it is still running — so its callbacks can arrive long after a replacement load
+     * has started, and without a token they would act as if they still spoke for the manager:
+     * clearing [isLoading] out from under the newer load, discarding an ad that arrived in the
+     * meantime, failing callers who are waiting on a request that has not finished yet, and
+     * scheduling a retry for a request nobody is waiting on. Mirrors RewardedWaterfall.generation.
+     */
+    private val loadGeneration = AtomicInteger(0)
+
+    /** Claims the next load generation, making every earlier in-flight load stale. */
+    private fun beginLoad(): Int = loadGeneration.incrementAndGet()
+
+    /**
+     * Gives up on the load holding [token] without waiting for it. The request itself keeps
+     * running — nothing can stop it — but from here on it speaks only for itself.
+     */
+    private fun abandonLoad(token: Int) {
+        loadGeneration.compareAndSet(token, token + 1)
+    }
+
+    /** True once a newer load has taken over, or this one has been abandoned. */
+    private fun isStale(token: Int): Boolean = token != loadGeneration.get()
+
+    /**
+     * Takes on an ad that arrived from a load the manager had already given up on.
+     *
+     * The ad is real and perfectly showable no matter which request produced it, so it is kept
+     * rather than dropped — but only when nothing better is already in hand, and without touching
+     * the state a newer load now owns.
+     *
+     * @return true if the ad was taken on, so waiting callers can be told an ad is ready
+     */
+    private fun adoptStaleAd(ad: RewardedAd): Boolean {
+        if (rewardedAd != null) {
+            AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Ad already in hand, dropping the late one", true)
+            return false
+        }
+        rewardedAd = ad
+        AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
+        return true
+    }
+
+    /**
+     * Takes on a chain that finished loading after the manager had given up on it, for the same
+     * reason as [adoptStaleAd]: the ad inside it is showable whoever asked for it.
+     *
+     * @return true if the chain was taken on
+     */
+    private fun adoptStaleWaterfall(waterfall: RewardedWaterfall): Boolean {
+        if (rewardedWaterfall?.isAdReady() == true) {
+            AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Waterfall ad already ready, dropping the late chain", true)
+            return false
+        }
+        rewardedWaterfall = waterfall
+        AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Waterfall ad saved for next show", true)
+        return true
+    }
 
     // Waterfall support
     private var rewardedWaterfall: RewardedWaterfall? = null
@@ -209,6 +272,7 @@ object RewardedAdManager {
         }
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
 
         // Cancel any pending retry since we're manually loading
@@ -224,8 +288,16 @@ object RewardedAdManager {
 
         RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
             override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
+                if (isStale(token)) {
+                    // A request the manager has already moved on from. It speaks for nothing that
+                    // is still current, so it clears no flags, fails no waiting callers and asks
+                    // for no retry — the load that replaced it will answer for all of those.
+                    Log.d(TAG, "Stale load failed, ignoring: ${adError.message}")
+                    return@runOnMain
+                }
                 isLoading = false
-                rewardedAd = null
+                // No blind clearing of rewardedAd: a failure means this request produced nothing,
+                // not that an ad picked up elsewhere has stopped being showable.
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded ad failed: ${adError.message}", false)
 
@@ -261,6 +333,12 @@ object RewardedAdManager {
             }
 
             override fun onAdLoaded(ad: RewardedAd) = runOnMain {
+                if (isStale(token)) {
+                    // Late, but an ad is an ad — keep it if nothing better is in hand and let
+                    // anyone waiting for one have it. isLoading belongs to the newer load now.
+                    if (adoptStaleAd(ad)) notifyPendingLoadSuccess()
+                    return@runOnMain
+                }
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0 // Reset retry count on success
@@ -317,6 +395,7 @@ object RewardedAdManager {
         }
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
         logAdRequest()
 
@@ -324,8 +403,15 @@ object RewardedAdManager {
 
         RewardedAd.load(adRequest, object : AdLoadCallback<RewardedAd> {
             override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
+                // This caller is owed an answer either way — it has no other source of one — but a
+                // stale request answers for itself alone and leaves the shared state to whichever
+                // load is current.
+                if (isStale(token)) {
+                    Log.d(TAG, "Stale load failed, answering its own caller only: ${adError.message}")
+                    callback.onAdFailedToLoad(adError)
+                    return@runOnMain
+                }
                 isLoading = false
-                rewardedAd = null
                 Log.d(TAG, "Ad failed to load: ${adError.message}")
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded ad failed: ${adError.message}", false)
 
@@ -340,6 +426,12 @@ object RewardedAdManager {
             }
 
             override fun onAdLoaded(ad: RewardedAd) = runOnMain {
+                if (isStale(token)) {
+                    val adopted = adoptStaleAd(ad)
+                    callback.onAdLoaded()
+                    if (adopted) notifyPendingLoadSuccess()
+                    return@runOnMain
+                }
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0
@@ -426,6 +518,7 @@ object RewardedAdManager {
         }
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
         logAdRequest()
 
@@ -437,8 +530,16 @@ object RewardedAdManager {
             // Both callbacks post to main BEFORE touching callbackCalled/isLoading, so those
             // flags are main-thread-confined and cannot race the (main-thread) timeout below.
             override fun onAdFailedToLoad(adError: LoadAdError) = runOnMain {
+                // The timeout below gives up on this request without being able to stop it, so a
+                // failure arriving afterwards is speaking about a request nobody is waiting on:
+                // it must not clear the replacement load's isLoading, must not throw away an ad
+                // that turned up in the meantime, and must not fail callers queued behind a load
+                // that is still running. callbackCalled already covers this call's own caller.
+                if (isStale(token)) {
+                    Log.d(TAG, "Stale load failed, ignoring: ${adError.message}")
+                    return@runOnMain
+                }
                 isLoading = false
-                rewardedAd = null
 
                 // Notify callbacks that attached to this in-flight load
                 notifyPendingLoadFailure(adError)
@@ -459,6 +560,12 @@ object RewardedAdManager {
             }
 
             override fun onAdLoaded(ad: RewardedAd) = runOnMain {
+                if (isStale(token)) {
+                    // Arrived after the manager gave up on it. The ad is still good, so it is kept
+                    // for the next show — but the state a newer load owns is left alone.
+                    if (adoptStaleAd(ad)) notifyPendingLoadSuccess()
+                    return@runOnMain
+                }
                 isLoading = false
                 rewardedAd = ad
                 retryAttempts = 0
@@ -466,24 +573,23 @@ object RewardedAdManager {
                 // Notify callbacks that attached to this in-flight load
                 notifyPendingLoadSuccess()
 
-                if (!callbackCalled) {
-                    callbackCalled = true
-                    Log.d(TAG, "Ad was loaded within timeout.")
-                    AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded ad loaded within timeout", true)
-                    logAdFill()
-                    callback.onAdLoaded()
-                } else {
-                    // Ad loaded after timeout - saved for next use
-                    AdDebugUtils.logEvent(adUnitId, "onAdLoadedAfterTimeout", "Ad saved for next show", true)
-                }
+                callbackCalled = true
+                Log.d(TAG, "Ad was loaded within timeout.")
+                AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded ad loaded within timeout", true)
+                logAdFill()
+                callback.onAdLoaded()
             }
         })
 
         // Timeout handler
         Handler(Looper.getMainLooper()).postDelayed({
-            if (!callbackCalled && isLoading) {
+            if (!callbackCalled && !isStale(token)) {
                 callbackCalled = true
                 isLoading = false
+                // Stop speaking for this request before walking away from it: it cannot be
+                // cancelled, and whatever it reports from here must not be mistaken for the
+                // answer to whatever the caller does next.
+                abandonLoad(token)
                 Log.d(TAG, "Ad loading timed out")
                 AdDebugUtils.logEvent(adUnitId, "onTimeout", "Rewarded ad loading timed out", false)
 
@@ -751,6 +857,7 @@ object RewardedAdManager {
         if (rewardedWaterfall?.isAdReady() == true) return
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
         logAdRequest()
 
@@ -759,6 +866,10 @@ object RewardedAdManager {
 
         waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
             override fun onAdLoaded() {
+                if (isStale(token)) {
+                    if (adoptStaleWaterfall(waterfall)) notifyPendingLoadSuccess()
+                    return
+                }
                 isLoading = false
                 retryAttempts = 0
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded", true)
@@ -767,8 +878,14 @@ object RewardedAdManager {
             }
 
             override fun onAdFailedToLoad(error: AdKitAdError) {
+                if (isStale(token)) {
+                    Log.d(TAG, "Stale waterfall load failed, ignoring: ${error.message}")
+                    return
+                }
                 isLoading = false
-                rewardedWaterfall = null
+                // Only drop the chain if it is still the one this load installed - a newer load,
+                // or a late chain adopted in the meantime, is not this failure's to discard.
+                if (rewardedWaterfall === waterfall) rewardedWaterfall = null
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded waterfall failed: ${error.message}", false)
 
                 val params = Bundle().apply {
@@ -817,6 +934,7 @@ object RewardedAdManager {
         }
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
         logAdRequest()
 
@@ -825,6 +943,12 @@ object RewardedAdManager {
 
         waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
             override fun onAdLoaded() {
+                if (isStale(token)) {
+                    val adopted = adoptStaleWaterfall(waterfall)
+                    callback.onAdLoaded()
+                    if (adopted) notifyPendingLoadSuccess()
+                    return
+                }
                 isLoading = false
                 retryAttempts = 0
                 AdDebugUtils.logEvent(adUnitId, "onAdLoaded", "Rewarded waterfall ad loaded with callback", true)
@@ -834,8 +958,17 @@ object RewardedAdManager {
             }
 
             override fun onAdFailedToLoad(error: AdKitAdError) {
+                // Its own caller is still owed an answer; the shared state is not this stale
+                // request's to touch.
+                if (isStale(token)) {
+                    Log.d(TAG, "Stale waterfall load failed, answering its own caller only: ${error.message}")
+                    callback.onAdFailedToLoad(
+                        LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
+                    )
+                    return
+                }
                 isLoading = false
-                rewardedWaterfall = null
+                if (rewardedWaterfall === waterfall) rewardedWaterfall = null
                 AdDebugUtils.logEvent(adUnitId, "onFailedToLoad", "Rewarded waterfall failed: ${error.message}", false)
 
                 val params = Bundle().apply {
@@ -866,6 +999,7 @@ object RewardedAdManager {
         if (rewardedWaterfall?.isAdReady() == true) { callback.onAdLoaded(); return }
 
         isLoading = true
+        val token = beginLoad()
         initializeFirebase(context)
         logAdRequest()
 
@@ -876,32 +1010,41 @@ object RewardedAdManager {
 
         waterfall.load(context, object : RewardedAdProvider.RewardedAdCallback {
             override fun onAdLoaded() {
+                if (isStale(token)) {
+                    if (adoptStaleWaterfall(waterfall)) notifyPendingLoadSuccess()
+                    return
+                }
                 isLoading = false
                 retryAttempts = 0
                 notifyPendingLoadSuccess()
-                if (!callbackCalled) {
-                    callbackCalled = true
-                    logAdFill()
-                    callback.onAdLoaded()
-                }
+                callbackCalled = true
+                logAdFill()
+                callback.onAdLoaded()
             }
 
             override fun onAdFailedToLoad(error: AdKitAdError) {
+                // Abandoned at the timeout below and speaking for nothing current - see the
+                // AdMob path for the full reasoning. callbackCalled covers its own caller.
+                if (isStale(token)) {
+                    Log.d(TAG, "Stale waterfall load failed, ignoring: ${error.message}")
+                    return
+                }
                 isLoading = false
-                rewardedWaterfall = null
+                if (rewardedWaterfall === waterfall) rewardedWaterfall = null
                 val loadAdError = LoadAdError(LoadAdError.ErrorCode.INTERNAL_ERROR, error.message, null)
                 notifyPendingLoadFailure(loadAdError)
-                if (!callbackCalled) {
-                    callbackCalled = true
-                    callback.onAdFailedToLoad(loadAdError)
-                }
+                callbackCalled = true
+                callback.onAdFailedToLoad(loadAdError)
             }
         })
 
         Handler(Looper.getMainLooper()).postDelayed({
-            if (!callbackCalled && isLoading) {
+            if (!callbackCalled && !isStale(token)) {
                 callbackCalled = true
                 isLoading = false
+                // Stop speaking for this chain before walking away from it - the providers keep
+                // going and their late verdict is no longer an answer to anything.
+                abandonLoad(token)
                 callback.onAdFailedToLoad(
                     LoadAdError(LoadAdError.ErrorCode.TIMEOUT, "Ad loading timed out", null)
                 )

@@ -5,6 +5,30 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.3] - 2026-08-15
+
+Bug-fix and dependency release. No API changed. Two silent-failure bugs that cost money: a rewarded load the manager had given up on could sabotage the load that replaced it, and billing could stop acknowledging purchases for the rest of the process — which lets Play auto-refund a completed purchase on day 3.
+
+### Fixed
+
+- **A timed-out rewarded load could sabotage the one that replaced it.** `loadRewardedAdWithTimeout(...)` stops waiting once its timeout elapses, but a request handed to the SDK cannot be cancelled — it keeps running and reports back later, and its callbacks ran the full success/failure path as if they still spoke for the manager. A late callback could discard an ad a *newer* load had just delivered (the failure path ran `rewardedAd = null` unconditionally), clear `isLoading` out from under a request still in flight (letting a duplicate load start), fail callers queued behind a load that had not finished, and schedule a retry nobody was waiting on. Every load path now claims a generation token and checks it before touching shared state — the mechanism `RewardedWaterfall` already used internally. A stale callback answers its own caller and leaves everything else alone; a late ad is **adopted for the next show** rather than dropped, on both the AdMob and waterfall paths. The waterfall failure path also clears `rewardedWaterfall` only when the chain reported on is still the one it installed
+- **Billing could stop acknowledging purchases for the rest of the process.** Every re-query was gated on `isServiceConnected`, written only by `onBillingSetupFinished` and cleared by `onBillingServiceDisconnected`. The library enables `enableAutoServiceReconnection()` and the SDK restores the connection without necessarily re-firing that callback, so after one disconnect the flag could stay `false` permanently while the client was ready — silently disabling `verifyPurchased`, `updatePurchaseStatus`, `refreshPurchases` (**including the acknowledgment retry**), `consumePurchase`, `queryProductDetails`, and `connectToGooglePlayBilling`, which skipped reconnecting because it believed it was still connected. Since Play auto-refunds any purchase left unacknowledged for 3 days, a user could be charged, granted the entitlement, then silently refunded with the app still treating them as paying. All paths now consult `billingClient.isReady()`. `onBillingServiceDisconnected` no longer clears `isBillingAvailable` — `isAvailable()` ANDs it with the live readiness check, so it reports `false` only while actually down
+- **Acknowledgment required the purchase to match a configured product id.** In `verifyPurchased(...)` and `updatePurchaseStatus()`, `acknowledgePurchaseIfNeeded(purchase)` sat *inside* the loop matching against `inAppProductIdList` / `subProductIdList`, so a `PURCHASED` order whose id the current build does not list was never acknowledged — and auto-refunded on day 3. That covers promo-code grants, products dropped from a newer release, a Console id typo, and users on a build configuring fewer ids than the one they purchased on. Acknowledgment now happens before the id match, unconditionally for every `PURCHASED` purchase; entitlement still requires a configured id
+
+### Changed
+
+- Dependency updates: Google Mobile Ads Next-Gen SDK **1.3.0 → 1.3.1**, Yandex Mobile Ads **8.2.0 → 8.3.0**, Compose BOM **2026.06.01 → 2026.08.00**, Firebase BOM **34.15.0 → 34.17.0**, AppCompat **1.7.1 → 1.8.0**, ConstraintLayout **2.2.1 → 2.2.2**, org.json (test only) **20250517 → 20260719**. Play Billing stays at 9.1.0, Kotlin at 2.2.10
+- The `app` sample module now compiles at **JVM 17**, matching the five published modules — it was the only one still pinned to `jvmTarget = "1.8"`, and Compose BOM 2026.08.00 ships artifacts compiled at JVM 11+ that cannot be inlined into 1.8 bytecode, which broke `assembleDebug` on the sample. **No effect on the published artifacts**, whose compile options were already 17
+
+### Documentation
+
+- **`docs/APP_PURCHASE_GUIDE.md` now covers pending purchases.** A pending order (cash, bank transfer, parental approval) can complete while the app is closed, and `onPurchasesUpdated` only fires if the app is running — so Play requires re-querying owned purchases on every foreground. `AppPurchase` queries on billing init, which never runs again if the process survives. The guide now shows calling `refreshPurchases()` from the main activity's `onResume()`, and why that is what stops a completed pending order from being auto-cancelled on day 3
+
+### Notes
+
+- 3 new `RewardedAdManagerStaleLoadTest` cases cover the stale-load contract; 176 tests pass
+- The billing changes are not test-covered — both depend on `BillingClient` connection-state transitions the existing harness cannot drive; on-device verification against a Play test track is recommended
+
 ## [4.4.2] - 2026-07-29
 
 Bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could crash the app, a completed purchase could fail to disable ads, blank gaps were left where banner/native slots should have collapsed, and app open ads could appear over excluded screens.

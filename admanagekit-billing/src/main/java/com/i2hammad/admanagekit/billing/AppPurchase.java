@@ -216,7 +216,23 @@ public class AppPurchase {
     }
 
     public boolean isAvailable() {
-        return isBillingAvailable && isServiceConnected.get();
+        return isBillingAvailable && isClientReady();
+    }
+
+    /**
+     * Whether the billing client can serve a request right now.
+     *
+     * <p>Reads the client's own state rather than {@link #isServiceConnected},
+     * which is written only by {@code onBillingSetupFinished} and cleared on
+     * {@code onBillingServiceDisconnected}. With
+     * {@code enableAutoServiceReconnection()} the SDK restores the connection
+     * without necessarily re-firing that callback, so the flag can stay
+     * {@code false} for the rest of the process — which would silently disable
+     * every purchase re-query, including the acknowledgment retry that keeps a
+     * purchase from being auto-refunded after 3 days.</p>
+     */
+    private boolean isClientReady() {
+        return billingClient != null && billingClient.isReady();
     }
 
     public Boolean getInitBillingFinish() {
@@ -561,7 +577,7 @@ public class AppPurchase {
     }
 
     public void verifyPurchased(boolean isCallback) {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             Log.e(Tag, "Billing client not connected. Cannot verify purchases.");
             if (isCallback) {
                 notifyInitBillingFinished(BillingClient.BillingResponseCode.SERVICE_DISCONNECTED);
@@ -580,10 +596,14 @@ public class AppPurchase {
                             if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) {
                                 continue;
                             }
+                            // Acknowledge before matching against the configured ids: Play
+                            // auto-refunds ANY purchase left unacknowledged for 3 days,
+                            // including ids this build does not list (promo codes, products
+                            // dropped from a newer release, a Console id typo).
+                            acknowledgePurchaseIfNeeded(purchase);
                             for (String productId : inAppProductIdList) {
                                 if (purchase.getProducts().contains(productId)) {
                                     Log.d(Tag, "verifyPurchased INAPP: true");
-                                    acknowledgePurchaseIfNeeded(purchase);
                                     if (!ownedInApp.contains(productId)) {
                                         ownedInApp.add(productId);
                                     }
@@ -608,10 +628,12 @@ public class AppPurchase {
                             if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) {
                                 continue;
                             }
+                            // See the INAPP branch: acknowledgment must not depend on the
+                            // purchase matching a configured product id.
+                            acknowledgePurchaseIfNeeded(purchase);
                             for (String productId : subProductIdList) {
                                 if (purchase.getProducts().contains(productId)) {
                                     Log.d(Tag, "verifyPurchased SUBS: true");
-                                    acknowledgePurchaseIfNeeded(purchase);
                                     addOwnedSubscription(ownedSubs, toSubsPurchaseResult(purchase), productId);
                                     idPurchased = productId;
                                 }
@@ -708,7 +730,7 @@ public class AppPurchase {
     }
 
     public void updatePurchaseStatus() {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             Log.e(Tag, "Billing client not connected. Cannot update purchase status.");
             return;
         }
@@ -722,9 +744,11 @@ public class AppPurchase {
                             if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) {
                                 continue;
                             }
+                            // Unconditional: an unacknowledged purchase is auto-refunded
+                            // after 3 days whether or not this build lists its product id.
+                            acknowledgePurchaseIfNeeded(purchase);
                             for (String productId : inAppProductIdList) {
                                 if (purchase.getProducts().contains(productId)) {
-                                    acknowledgePurchaseIfNeeded(purchase);
                                     if (!ownedInApp.contains(productId)) {
                                         ownedInApp.add(productId);
                                     }
@@ -748,9 +772,9 @@ public class AppPurchase {
                             if (purchase.getPurchaseState() != Purchase.PurchaseState.PURCHASED) {
                                 continue;
                             }
+                            acknowledgePurchaseIfNeeded(purchase);
                             for (String productId : subProductIdList) {
                                 if (purchase.getProducts().contains(productId)) {
-                                    acknowledgePurchaseIfNeeded(purchase);
                                     addOwnedSubscription(ownedSubs, toSubsPurchaseResult(purchase), productId);
                                     idPurchased = productId;
                                 }
@@ -1320,7 +1344,7 @@ public class AppPurchase {
      * @param productId The product ID to consume.
      */
     public void consumePurchase(String productId) {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             Log.e(Tag, "Billing client not connected. Cannot consume purchase.");
             return;
         }
@@ -1371,7 +1395,7 @@ public class AppPurchase {
      * @param productType BillingClient.ProductType.INAPP or BillingClient.ProductType.SUBS
      */
     public void refreshPurchases(String productType) {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             Log.e(Tag, "Billing client not connected. Cannot refresh purchases.");
             return;
         }
@@ -2661,7 +2685,7 @@ public class AppPurchase {
     }
 
     public void connectToGooglePlayBilling() {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             billingClient.startConnection(new BillingClientStateListener() {
                 @Override
                 public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
@@ -2691,15 +2715,20 @@ public class AppPurchase {
                 @Override
                 public void onBillingServiceDisconnected() {
                     isServiceConnected.set(false);
-                    isBillingAvailable = false;
-                    Log.w(Tag, "Billing service disconnected. Attempting to reconnect...");
+                    // isBillingAvailable is deliberately left set: the client was set up
+                    // successfully and enableAutoServiceReconnection() restores the
+                    // connection on its own. isAvailable() ANDs it with the client's live
+                    // isReady() state, so it reports false only while actually down —
+                    // instead of latching false for the rest of the process and blocking
+                    // every later purchase re-query and acknowledgment retry.
+                    Log.w(Tag, "Billing service disconnected. Reconnecting automatically...");
                 }
             });
         }
     }
 
     public void queryProductDetails(List<String> productIds, String productType) {
-        if (!isServiceConnected.get()) {
+        if (!isClientReady()) {
             Log.e(Tag, "Billing client not connected. Cannot query product details.");
             return;
         }

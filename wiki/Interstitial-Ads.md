@@ -1,10 +1,10 @@
-# Interstitial Ads - AdManageKit v4.4.2
+# Interstitial Ads - AdManageKit v4.4.3
 
 ## Overview
 
 AdManageKit provides a complete interstitial ad stack with `AdManager` and the fluent `InterstitialAdBuilder`. Features include loading strategies, automatic retry, frequency controls, splash screen support, and Jetpack Compose utilities.
 
-**Library Version**: v4.4.2
+**Library Version**: v4.4.3
 
 ## What's New
 
@@ -23,11 +23,11 @@ AdManageKit provides a complete interstitial ad stack with `AdManager` and the f
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.2'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.3'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.3'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.3'
     // Optional - Jetpack Compose
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.3'
 }
 ```
 

@@ -128,6 +128,24 @@ PurchaseItem("premium_yearly", null, TYPE_IAP.SUBSCRIPTION)
 > call `consumePurchase(productId)` after granting items — consuming both lets
 > the item be bought again and satisfies Play's acknowledgment requirement.
 
+> **Pending purchases need one thing from you.** A pending order (cash, bank
+> transfer, parental approval) can complete hours or days later, while your app
+> is closed. `onPurchasesUpdated` only fires if the app happens to be running,
+> so Play requires apps to re-query owned purchases on every foreground.
+> `AppPurchase` queries on billing init; if your process stays alive across the
+> transition, that never runs again — so call `refreshPurchases()` from your
+> main activity's `onResume()`:
+>
+> ```kotlin
+> override fun onResume() {
+>     super.onResume()
+>     AppPurchase.getInstance().refreshPurchases()
+> }
+> ```
+>
+> It acknowledges every unacknowledged `PURCHASED` purchase it finds, which is
+> what stops a completed pending order from being auto-cancelled on day 3.
+
 ### In-App Products
 
 ```kotlin

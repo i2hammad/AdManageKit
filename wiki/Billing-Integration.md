@@ -7,8 +7,8 @@ AdManageKit provides a comprehensive billing integration module (`admanagekit-bi
 ### 1. Add Dependency
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.2'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.3'
 ```
 
 ### 2. Define Products
@@ -51,6 +51,24 @@ class MyApp : Application() {
 > paths — preventing Google Play's 3-day auto-refund of unacknowledged purchases.
 > Only `PurchaseState.PURCHASED` grants entitlement (pending purchases do not).
 > Consumables still require a manual `consumePurchase(productId)` after granting.
+
+> **Pending purchases need one thing from you (v4.4.3).** A pending order (cash,
+> bank transfer, parental approval) can complete hours or days later, while your
+> app is closed. `onPurchasesUpdated` only fires if the app happens to be
+> running, so Play requires apps to re-query owned purchases on every foreground.
+> `AppPurchase` queries on billing init; if your process stays alive across the
+> transition, that never runs again — so call `refreshPurchases()` from your main
+> activity's `onResume()`:
+>
+> ```kotlin
+> override fun onResume() {
+>     super.onResume()
+>     AppPurchase.getInstance().refreshPurchases()
+> }
+> ```
+>
+> It acknowledges every unacknowledged `PURCHASED` purchase it finds, which is
+> what stops a completed pending order from being auto-cancelled on day 3.
 
 ### 4. Make Purchases
 
