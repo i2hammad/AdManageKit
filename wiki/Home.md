@@ -6,11 +6,21 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version: `4.4.3`**
+**Latest Version: `4.4.4`**
+
+## What's New in 4.4.4
+
+Critical billing hotfix, no API changes. **If you ship the billing module on 4.4.3, upgrade.**
+
+- **Billing never connected on 4.4.3** — `connectToGooglePlayBilling()` guarded on `billingClient.isReady()`, which reports `true` the instant a client is built, so `startConnection(...)` was skipped on every fresh client. Setup never ran, no product details or entitlement were fetched, and there was no failure callback and no error log to explain it. The guard is back on `isServiceConnected`; the re-query paths keep the 4.4.3 `isReady()` fix
+- **A timed-out setup reported itself as initialized** — the `setBillingListener(listener, timeout)` timeout path set `isBillingInitialized = true` before delivering `SERVICE_TIMEOUT`, so host-app guards of the form `if (!initBillingFinish) initBilling()` went permanently quiet and the connection could never be retried. It now sets `false`
+- **Billing connection lifecycle logging** — `initBilling`, `connectToGooglePlayBilling` and both `BillingClientStateListener` callbacks now log their state at `DEBUG` under the `AppPurchase` tag, so this class of failure is visible in `logcat`
 
 ## What's New in 4.4.3
 
 Bug-fix and dependency release, no API changes. Two silent-failure bugs, both of which cost money.
+
+> ⚠️ 4.4.3's billing regression makes purchases unusable — use 4.4.4.
 
 - **A timed-out rewarded load could sabotage the one that replaced it** — a request handed to the SDK cannot be cancelled, and when it finally reported back it could discard an ad a *newer* load had just delivered, clear the loading flag out from under a request still in flight, and fail callers waiting on a load that had not finished. Every load path now carries a generation token, and a late ad is kept for the next show instead of dropped
 - **Billing could stop acknowledging purchases for the rest of the process** — the connection flag could latch `false` after one disconnect while the client was actually ready, disabling every purchase re-query including the acknowledgment retry. Play auto-refunds an unacknowledged purchase after 3 days
@@ -84,15 +94,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.3'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.4'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.4'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.3'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.4'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).

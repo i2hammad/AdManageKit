@@ -133,6 +133,8 @@ public class AppPurchase {
             isServiceConnected.set(false);
         }
         initBillingFinishedNotified.set(false);
+        Log.d(Tag, "initBilling: building client, debugMode=" + debugMode
+                + " inapp=" + inAppProductIdList.size() + " subs=" + subProductIdList.size());
         billingClient = BillingClient.newBuilder(application)
                 .setListener(purchasesUpdatedListener)
                 .enablePendingPurchases(PendingPurchasesParams.newBuilder().enableOneTimeProducts().build())
@@ -167,7 +169,15 @@ public class AppPurchase {
         Runnable runnable = () -> {
             Log.d(Tag, "setBillingListener: timeout run");
             if (initBillingFinishedNotified.compareAndSet(false, true)) {
-                this.isBillingInitialized = Boolean.TRUE;
+                // FALSE, not TRUE. This path means Play did not answer in time, so setup did not
+                // finish — the same outcome the onBillingSetupFinished failure branch reports, and
+                // it sets FALSE. Reporting TRUE here told every caller billing was up when it was
+                // not: `if (!isBillingInitialized) initBilling()` guards across the host app went
+                // permanently quiet, so a connection that timed out once could never be retried
+                // for the life of the process, and screens rendered "no offers" for what was
+                // really a dead client. The listener still receives SERVICE_TIMEOUT either way,
+                // so callers that only wait on the callback are unaffected.
+                this.isBillingInitialized = Boolean.FALSE;
                 billingListener.onInitBillingFinished(BillingClient.BillingResponseCode.SERVICE_TIMEOUT);
             }
         };
@@ -2685,10 +2695,21 @@ public class AppPurchase {
     }
 
     public void connectToGooglePlayBilling() {
-        if (!isClientReady()) {
+        Log.d(Tag, "connectToGooglePlayBilling: client=" + (billingClient == null ? "null" : "set")
+                + " isReady=" + (billingClient != null && billingClient.isReady())
+                + " serviceConnected=" + isServiceConnected.get());
+        // Guard on isServiceConnected — our own flag, written only by onBillingSetupFinished — and
+        // NOT on the client's isReady(). Since enableAutoServiceReconnection() was added, a client
+        // reports isReady() == true the instant it is built, before any setup has run. The old
+        // isClientReady() guard therefore skipped startConnection() on every fresh client: setup
+        // never began, neither callback branch ever fired, isBillingAvailable stayed false and
+        // billing was dead for the life of the process with no error anywhere to show for it.
+        if (billingClient != null && !isServiceConnected.get()) {
             billingClient.startConnection(new BillingClientStateListener() {
                 @Override
                 public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
+                    Log.d(Tag, "onBillingSetupFinished: code=" + billingResult.getResponseCode()
+                            + " debug=" + billingResult.getDebugMessage());
                     if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                         isServiceConnected.set(true);
                         Log.d(Tag, "Billing setup finished. Connected to Google Play.");
@@ -2714,6 +2735,7 @@ public class AppPurchase {
 
                 @Override
                 public void onBillingServiceDisconnected() {
+                    Log.d(Tag, "onBillingServiceDisconnected");
                     isServiceConnected.set(false);
                     // isBillingAvailable is deliberately left set: the client was set up
                     // successfully and enableAutoServiceReconnection() restores the

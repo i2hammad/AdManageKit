@@ -5,6 +5,24 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.4] - 2026-08-15
+
+Critical billing hotfix. No API changed. Repairs a v4.4.3 regression that stopped the Play Billing connection from ever being started — billing was dead for the life of the process, with no failure callback and no error log to explain it.
+
+### Fixed
+
+- **Billing never connected on 4.4.3 (regression).** v4.4.3 switched every billing path from the latched `isServiceConnected` flag to the client's live `billingClient.isReady()`. That was correct for the re-query paths, but it was also applied to `connectToGooglePlayBilling()` — and since `enableAutoServiceReconnection()` was added, a `BillingClient` reports `isReady() == true` the instant it is built, before any setup has run. The `if (!isClientReady())` guard was therefore false on every fresh client, so `startConnection(...)` was skipped: setup never began, neither branch of `onBillingSetupFinished` ever fired, `isBillingAvailable`/`isBillingInitialized` stayed `false`, `queryProductDetails` and `verifyPurchased` never ran, and `setBillingListener(...)` could only ever report `SERVICE_TIMEOUT`. Paywalls rendered no prices and no purchase could be launched. `connectToGooglePlayBilling()` now guards on `isServiceConnected` — the right question for "has setup run?", as distinct from "can the client serve a call right now?", which is what `isClientReady()` answers for the re-query paths. Those paths are unchanged and keep the 4.4.3 acknowledgment fix intact
+- **A timed-out billing setup reported itself as initialized.** The `setBillingListener(listener, timeout)` timeout runnable set `isBillingInitialized = TRUE` before delivering `SERVICE_TIMEOUT` — but that path means Play did not answer, so setup did not finish; it is the same outcome the `onBillingSetupFinished` failure branch reports, and that branch sets `FALSE`. Host-app guards of the form `if (!initBillingFinish) initBilling()` went permanently quiet, so a connection that timed out once could never be retried for the life of the process. Now sets `FALSE`; the listener still receives `SERVICE_TIMEOUT` either way, so callers that only wait on the callback are unaffected. Predates 4.4.3, but was largely masked until the regression above made timeouts the normal outcome
+
+### Changed
+
+- **Billing connection lifecycle logging.** `initBilling`, `connectToGooglePlayBilling`, `onBillingSetupFinished` and `onBillingServiceDisconnected` now log their state at `DEBUG` under the existing `AppPurchase` tag — client built/null, `isReady()`, `isServiceConnected`, and the setup response code and debug message. The failure above produced complete silence; this class of problem is now visible in `logcat` without attaching a debugger
+
+### Notes
+
+- Neither fix is test-covered — both depend on `BillingClient` connection-state transitions the current harness cannot drive, the same limitation noted in 4.4.3; on-device verification against a Play test track is recommended. The existing 176 tests are unaffected
+- No dependency updates and no ad-side changes in this release
+
 ## [4.4.3] - 2026-08-15
 
 Bug-fix and dependency release. No API changed. Two silent-failure bugs that cost money: a rewarded load the manager had given up on could sabotage the load that replaced it, and billing could stop acknowledging purchases for the rest of the process — which lets Play auto-refund a completed purchase on day 3.
