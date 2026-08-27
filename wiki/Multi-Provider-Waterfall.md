@@ -38,11 +38,11 @@ This is fully backward compatible -- if no provider chains are configured, all e
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.4"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.4"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.5"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.5"
 
     // Add Yandex provider
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.4"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.5"
 }
 ```
 

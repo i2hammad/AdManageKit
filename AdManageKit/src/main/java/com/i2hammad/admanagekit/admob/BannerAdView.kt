@@ -521,7 +521,11 @@ class BannerAdView @JvmOverloads constructor(
             
             // Make sure the banner is visible after successful load
             visibility = View.VISIBLE
-            
+
+            // The AdView was attached after the last layout pass - force a fresh one, or it
+            // stays at 0x0 inside a container still sized for the shimmer (blank banner).
+            forceRelayoutAfterAdSwap()
+
             // Start auto-refresh if enabled
             if (autoRefreshEnabled) {
                 scheduleNextRefresh()
@@ -622,6 +626,69 @@ class BannerAdView @JvmOverloads constructor(
             AdDebugUtils.logEvent(adUnitId, "onPaidEvent", "Ad revenue: $adValueInStandardUnits ${adValue.currencyCode}", true)
 
             callback?.onPaidEvent(adValue)
+        }
+    }
+
+    /**
+     * Force a real measure/layout pass after the loaded ad view replaces the shimmer.
+     *
+     * Swapping the children of [layBannerAd] raises an ordinary [requestLayout], but that
+     * request only travels up while each ancestor reports `isLayoutRequested == false`
+     * (see `View.requestLayout`). Inside Compose's `AndroidView` interop the request has to
+     * reach `AndroidViewsHandler`, which is the ONLY place that turns a View layout request
+     * into a `LayoutNode.requestRemeasure()`; if any ancestor - the `ViewFactoryHolder`
+     * included - still carries a pending layout flag, the request stops there and Compose
+     * never re-measures the interop subtree. The banner then keeps the measurement it had
+     * while the shimmer was mounted and the freshly attached AdView is left at 0x0: the ad
+     * loads, reports success, and the slot renders blank until something unrelated
+     * (rotation, a resize) forces a full traversal.
+     *
+     * Recomposition alone does not fix it either - a semantics/testTag change does not
+     * invalidate measurement - so the pass has to be forced from here.
+     */
+    private fun forceRelayoutAfterAdSwap() {
+        // Walk up flagging every ancestor, stopping at Compose's interop holder when there
+        // is one. forceLayout() makes View.measure() re-run even though the MeasureSpecs
+        // are unchanged, which is exactly what a swapped-in child needs.
+        val chain = ArrayList<View>()
+        var current: View? = this
+        var composeHolder: View? = null
+        while (current != null) {
+            chain.add(current)
+            if (current.javaClass.name.startsWith("androidx.compose.ui.viewinterop.")) {
+                composeHolder = current
+                break
+            }
+            current = current.parent as? View
+        }
+        chain.forEach { it.forceLayout() }
+
+        if (composeHolder != null) {
+            // Ask from ABOVE the flagged chain: AndroidViewsHandler.requestLayout() checks
+            // `child.isLayoutRequested` (now true) and requests the node remeasure, which
+            // re-measures and re-lays out the holder and everything under it.
+            (composeHolder.parent as? View)?.requestLayout()
+        } else {
+            // Plain View host: normal propagation works once the chain is flagged.
+            requestLayout()
+        }
+        invalidate()
+
+        // A request raised while a layout pass is already running can still be dropped
+        // (ViewRootImpl.requestLayoutDuringLayout); repeat once on the next frame.
+        post {
+            chain.forEach { it.forceLayout() }
+            if (composeHolder != null) {
+                (composeHolder.parent as? View)?.requestLayout()
+            } else {
+                requestLayout()
+            }
+            invalidate()
+            AdDebugUtils.logDebug(
+                "BannerAdView",
+                "post-swap layout: container=${layBannerAd.width}x${layBannerAd.height} " +
+                    "ad=${layBannerAd.getChildAt(0)?.width}x${layBannerAd.getChildAt(0)?.height}"
+            )
         }
     }
 
@@ -746,6 +813,10 @@ class BannerAdView @JvmOverloads constructor(
                     isAdLoading.set(false)
                     loadAttempt.set(0)
                     visibility = View.VISIBLE
+
+                    // Same reason as the AdMob path: the swapped-in banner view needs a
+                    // forced measure/layout pass or it is left at 0x0 under Compose interop.
+                    forceRelayoutAfterAdSwap()
 
                     if (autoRefreshEnabled) { scheduleNextRefresh() }
 

@@ -5,6 +5,23 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.5] - 2026-08-27
+
+Patch release. No API changed. Fixes a `BannerAdView` bug that renders a blank banner slot inside Jetpack Compose — the ad loads, reports success and logs a billed impression, but nothing is drawn. Also picks up the Next-Gen GMA SDK 1.4.0.
+
+### Fixed
+
+- **A banner loaded successfully but rendered blank under Compose interop.** `BannerAdView` swaps the shimmer placeholder for the real `AdView` on load, which raises an ordinary `requestLayout()` — enough in a plain View hierarchy, but not inside Compose's `AndroidView`. `View.requestLayout()` only propagates while each ancestor reports `isLayoutRequested == false`, and for an interop subtree the request must reach `AndroidViewsHandler`, the only place that converts a View layout request into a `LayoutNode.requestRemeasure()`. If any ancestor on the way up (the `ViewFactoryHolder` included) already carried a pending layout flag, the request stopped there and Compose never re-measured the subtree: the banner kept the measurement it had while the shimmer was mounted and the freshly attached `AdView` stayed at 0×0. `onAdLoaded` and `onAdImpression` both fired, the impression was logged and billed, and the slot stayed blank until something unrelated (a rotation, a resize) forced a full traversal. Recomposition did not help either — a semantics/`testTag` change does not invalidate measurement. Both success paths (AdMob `handleAdLoadSuccess` and the `BannerWaterfall` `onBannerLoaded`) now call a new private `forceRelayoutAfterAdSwap()`, which flags the ancestor chain with `forceLayout()`, requests the layout from above Compose's interop holder where `AndroidViewsHandler` will see the pending flag, and repeats once on the next frame in case the request was raised during an in-flight layout pass (`ViewRootImpl.requestLayoutDuringLayout`). No behavior change for XML-hosted banners — the extra pass is a no-op when the layout is already correct
+
+### Changed
+
+- Dependency updates: Google Mobile Ads Next-Gen SDK **1.3.1 → 1.4.0**, Android Gradle Plugin **9.3.0 → 9.3.2**, Firebase BOM **34.17.0 → 34.18.0**, org.json (test only) **20260719 → 20260814**. Play Billing stays at 9.1.0, Kotlin at 2.2.10, Yandex Mobile Ads at 8.3.0, Compose BOM at 2026.08.00
+
+### Notes
+
+- The fix is not test-covered — it depends on a real Compose interop measure/layout traversal that the Robolectric harness cannot drive faithfully; verified on-device against a Compose-hosted banner slot. The existing 176 tests are unaffected
+- No billing changes in this release
+
 ## [4.4.4] - 2026-08-15
 
 Critical billing hotfix. No API changed. Repairs a v4.4.3 regression that stopped the Play Billing connection from ever being started — billing was dead for the life of the process, with no failure callback and no error log to explain it.

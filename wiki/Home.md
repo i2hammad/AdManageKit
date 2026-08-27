@@ -6,7 +6,14 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version: `4.4.4`**
+**Latest Version: `4.4.5`**
+
+## What's New in 4.4.5
+
+Patch release, no API changes.
+
+- **A banner loaded successfully but rendered blank under Compose** — `BannerAdView` swaps the shimmer placeholder for the loaded `AdView`, which raises an ordinary `requestLayout()`. That request cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag, so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was logged and billed, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves; XML-hosted banners are unaffected
+- **Dependencies** — Next-Gen GMA SDK 1.4.0, Android Gradle Plugin 9.3.2, Firebase BOM 34.18.0
 
 ## What's New in 4.4.4
 
@@ -20,7 +27,7 @@ Critical billing hotfix, no API changes. **If you ship the billing module on 4.4
 
 Bug-fix and dependency release, no API changes. Two silent-failure bugs, both of which cost money.
 
-> ⚠️ 4.4.3's billing regression makes purchases unusable — use 4.4.4.
+> ⚠️ 4.4.3's billing regression makes purchases unusable — use 4.4.4 or newer.
 
 - **A timed-out rewarded load could sabotage the one that replaced it** — a request handed to the SDK cannot be cancelled, and when it finally reported back it could discard an ad a *newer* load had just delivered, clear the loading flag out from under a request still in flight, and fail callers waiting on a load that had not finished. Every load path now carries a generation token, and a late ad is kept for the next show instead of dropped
 - **Billing could stop acknowledging purchases for the rest of the process** — the connection flag could latch `false` after one disconnect while the client was actually ready, disabling every purchase re-query including the acknowledgment retry. Play auto-refunds an unacknowledged purchase after 3 days
@@ -94,15 +101,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.4'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.5'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.5'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.4'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.5'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
