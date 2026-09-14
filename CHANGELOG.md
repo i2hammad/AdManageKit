@@ -5,6 +5,31 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.6] - 2026-09-14
+
+Maintenance release. No API changed and no library code changed — this release is entirely a dependency pass. The one change that matters to hosts is a **deliberate downgrade of WorkManager to 2.9.1**, pinning away from a defect in 2.10/2.11 that kills the process at startup on ROMs that spoof API 34.
+
+### Changed
+
+- **WorkManager pinned back: `androidx.work:work-runtime` 2.11.2 → 2.9.1 (downgrade).** WorkManager **2.10 and 2.11** call `android.app.job.JobScheduler.forNamespace` whenever `Build.VERSION.SDK_INT >= 34`. Modified or spoofed ROMs that report API 34 while running an older framework have no such method, so constructing the WorkManager singleton throws `NoSuchMethodError` — and since `androidx.startup` brings WorkManager up from `InitializationProvider`, a `ContentProvider` that `ActivityThread` installs after `attachBaseContext` but before `Application.onCreate`, that throw takes the **whole process down during bind**, with no user code on the stack to catch it. The report reads `Unable to get provider androidx.startup.InitializationProvider: ... NoSuchMethodError: No virtual method forNamespace(...)`. 2.9.1 is the last release without that call, which is why the pin lands there and not on a newer 2.10.x/2.11.x patch. AdManageKit contains no WorkManager code at all — the dependency is declared only to control the version the ads SDK drags in (the SDK itself asks for 2.7.0), so this pin changes nothing about the library's behavior or surface. It is an `implementation` dependency, which means it lands in the published POM at `runtime` scope and Gradle still resolves the **highest** version across the whole graph: a host app that declares 2.10/2.11 itself, or depends on something that does, keeps that version and keeps the crash. Pin it in the app too:
+
+  ```kotlin
+  implementation("androidx.work:work-runtime:2.9.1")
+  ```
+
+  Hosts that need 2.10+ APIs should stay there and instead remove `WorkManagerInitializer` from `androidx.startup`, initializing WorkManager themselves inside a guard so the failure degrades one feature instead of killing the process. Nothing in AdManageKit depends on which version resolves, or on WorkManager being initialized at all
+
+- Dependency updates: Android Gradle Plugin **9.3.2 → 9.4.0**, Firebase BOM **34.18.0 → 34.19.0**, Compose BOM **2026.08.00 → 2026.09.00**, Yandex Mobile Ads **8.3.0 → 8.4.0**, Robolectric (test only) **4.16.1 → 4.17**. Google Mobile Ads Next-Gen SDK stays at 1.4.0, Play Billing at 9.1.0, Kotlin at 2.2.10, UMP at 4.0.0
+
+### Fixed
+
+- **A stray leading space in the `workRuntime` version catalog entry.** The downgraded value was written as `" 2.9.1"`, which Gradle treats as a distinct, unresolvable version string rather than 2.9.1. Caught before release; the published 4.4.6 resolves `androidx.work:work-runtime:2.9.1` cleanly
+
+### Notes
+
+- No source file changed in any of the five modules — the diff is `gradle/libs.versions.toml`, the five publication blocks, and docs. The existing 176 tests pass unchanged
+- Upgrade is a one-line version bump from 4.4.5; there is nothing to migrate
+
 ## [4.4.5] - 2026-08-27
 
 Patch release. No API changed. Fixes a `BannerAdView` bug that renders a blank banner slot inside Jetpack Compose — the ad loads, reports success and logs a billed impression, but nothing is drawn. Also picks up the Next-Gen GMA SDK 1.4.0.

@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.4.5`** is a **patch release**. No API changed. It fixes a `BannerAdView` bug that renders a **blank banner slot inside Jetpack Compose**: swapping the shimmer placeholder for the loaded `AdView` raises an ordinary `requestLayout()`, which cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag — so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was **logged and billed**, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves. Also picks up the Next-Gen GMA SDK **1.4.0**, AGP **9.3.2** and Firebase BOM **34.18.0**. See [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md).
+**Latest Version `4.4.6`** is a **maintenance release**. No API changed and no library source file changed — the whole diff is dependencies and docs. It **downgrades** `androidx.work:work-runtime` **2.11.2 → 2.9.1**: WorkManager **2.10 and 2.11** call `JobScheduler.forNamespace` whenever `SDK_INT >= 34`, and modified or spoofed ROMs that report API 34 over an older framework have no such method — the `NoSuchMethodError` then kills the **whole process during bind** (`Unable to get provider androidx.startup.InitializationProvider`), because `androidx.startup` builds WorkManager in a `ContentProvider` installed before `Application.onCreate` runs. 2.9.1 is the last release without that call. AdManageKit has no WorkManager code of its own; the pin only steers the version the ads SDK pulls in, and since Gradle resolves the **highest** version in the graph, an app that declares 2.10/2.11 itself keeps the crash — pin `androidx.work:work-runtime:2.9.1` in your app too. Also picks up AGP **9.4.0**, Firebase BOM **34.19.0**, Compose BOM **2026.09.00** and Yandex Mobile Ads **8.4.0**. See [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md).
+
+**Version `4.4.5`** is a **patch release**. No API changed. It fixes a `BannerAdView` bug that renders a **blank banner slot inside Jetpack Compose**: swapping the shimmer placeholder for the loaded `AdView` raises an ordinary `requestLayout()`, which cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag — so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was **logged and billed**, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves. Also picks up the Next-Gen GMA SDK **1.4.0**, AGP **9.3.2** and Firebase BOM **34.18.0**. See [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md).
 
 **Version `4.4.4`** is a **critical billing hotfix**. No API changed. It repairs a regression introduced in 4.4.3, where the Play Billing connection was never started at all: `connectToGooglePlayBilling()` guarded on `billingClient.isReady()`, which reports `true` the instant a client is built, so `startConnection(...)` was skipped on every fresh client. Setup never ran, no product details or entitlement were ever fetched, and there was **no failure callback and no error log** to explain it. **If you ship the billing module on 4.4.3, upgrade.** Also fixes a long-standing bug where a timed-out setup reported itself as initialized — permanently suppressing the host app's `if (!initBillingFinish) initBilling()` retry — and adds `DEBUG` logging across the billing connection lifecycle. See [Release Notes v4.4.4](docs/release-notes/RELEASE_NOTES_v4.4.4.md).
 
@@ -37,7 +39,7 @@ Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads
 
 ## Next-Gen GMA SDK
 
-As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.4.0` as of 4.4.5) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
+As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.4.0` as of 4.4.6) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
 
 ### Why the move
 
@@ -201,15 +203,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.6'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.6'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.6'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -783,6 +785,7 @@ Register it **before** `initBilling`. Products land in `unfetched` when the id i
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md)
 - [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md)
 - [Release Notes v4.4.4](docs/release-notes/RELEASE_NOTES_v4.4.4.md)
 - [Release Notes v4.4.3](docs/release-notes/RELEASE_NOTES_v4.4.3.md)
