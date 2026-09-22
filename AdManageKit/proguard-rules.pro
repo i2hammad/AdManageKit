@@ -1,33 +1,18 @@
-# Add project specific ProGuard rules here.
-# You can control the set of applied configuration files using the
-# proguardFiles setting in build.gradle.
+# Rules applied when THIS module is minified.
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
+# It is not: `isMinifyEnabled = false` for the release build type, deliberately.
+# A published AAR must keep its public API under its real names or consumers
+# cannot compile against it, and shrinking here would only remove code the
+# consuming app's R8 removes anyway — with far better whole-program
+# information. Minification for this library happens in the consuming app.
+#
+# This file therefore has no effect today; it exists so the build keeps working
+# if minification is ever switched on for a local experiment. The rules that
+# actually ship to consumers live in `consumer-rules.pro`.
+#
+# Previously this file ended with `-keep class * { *; }`, which would have
+# disabled shrinking, optimization and obfuscation for the entire program the
+# moment anyone flipped `isMinifyEnabled` to true.
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
-
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
+# Preserve stack traces through the library's frames.
 -keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
-
--keep class com.google.android.gms.* {*;}
-
--keep class com.i2hammad.admanagekit.admob.*{*;}
--keep class com.i2hammad.admanagekit.ump.*{*;}
--keep class com.android.billingclient.*{*;}
--keep class com.android.billingclient.api.*{*;}
--keep class com.google.ads.consent.* { *; }
-
--keep class * {
-    *;
-}

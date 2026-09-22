@@ -11,6 +11,8 @@ android {
 
     defaultConfig {
         minSdk = 24
+
+        consumerProguardFiles("consumer-rules.pro")
     }
 
     buildTypes {
@@ -55,7 +57,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-yandex"
-                version = "4.4.6"
+                version = "4.4.7"
             }
         }
     }

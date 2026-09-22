@@ -5,7 +5,9 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version `4.4.6`** is a **maintenance release**. No API changed and no library source file changed — the whole diff is dependencies and docs. It **downgrades** `androidx.work:work-runtime` **2.11.2 → 2.9.1**: WorkManager **2.10 and 2.11** call `JobScheduler.forNamespace` whenever `SDK_INT >= 34`, and modified or spoofed ROMs that report API 34 over an older framework have no such method — the `NoSuchMethodError` then kills the **whole process during bind** (`Unable to get provider androidx.startup.InitializationProvider`), because `androidx.startup` builds WorkManager in a `ContentProvider` installed before `Application.onCreate` runs. 2.9.1 is the last release without that call. AdManageKit has no WorkManager code of its own; the pin only steers the version the ads SDK pulls in, and since Gradle resolves the **highest** version in the graph, an app that declares 2.10/2.11 itself keeps the crash — pin `androidx.work:work-runtime:2.9.1` in your app too. Also picks up AGP **9.4.0**, Firebase BOM **34.19.0**, Compose BOM **2026.09.00** and Yandex Mobile Ads **8.4.0**. See [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md).
+**Latest Version `4.4.7`** is a **build and packaging release**. No API changed and no library source file changed — the subject is the library's **consumer ProGuard rules**, which were pinning several thousand classes as un-shrinkable in every app that depends on AdManageKit. `ad-manage-kit-compose` shipped `-keep class androidx.compose.** { *; }`, a rule R8 applies to every consuming app with no way to opt out: it retained **7221 classes, 57262 methods and 23964 fields** of the Compose runtime whether the app used them or not — and even for apps that never call an AdManageKit composable. All five modules now ship a wired, **deliberately empty** `consumer-rules.pro`; the library uses no reflection, JNI or serialization, and AAPT2 already emits the view-constructor keeps each app actually needs. On the sample app this is **11.99 MB → 7.89 MB** of APK (−34%) and 21.3 MB → **12.5 MB** of dex (−41%). **If you run R8, you get this by upgrading** — nothing to configure, and you can delete any defensive `-keep class com.i2hammad.admanagekit.** { *; }` you carry. See [Release Notes v4.4.7](docs/release-notes/RELEASE_NOTES_v4.4.7.md).
+
+**Version `4.4.6`** is a **maintenance release**. No API changed and no library source file changed — the whole diff is dependencies and docs. It **downgrades** `androidx.work:work-runtime` **2.11.2 → 2.9.1**: WorkManager **2.10 and 2.11** call `JobScheduler.forNamespace` whenever `SDK_INT >= 34`, and modified or spoofed ROMs that report API 34 over an older framework have no such method — the `NoSuchMethodError` then kills the **whole process during bind** (`Unable to get provider androidx.startup.InitializationProvider`), because `androidx.startup` builds WorkManager in a `ContentProvider` installed before `Application.onCreate` runs. 2.9.1 is the last release without that call. AdManageKit has no WorkManager code of its own; the pin only steers the version the ads SDK pulls in, and since Gradle resolves the **highest** version in the graph, an app that declares 2.10/2.11 itself keeps the crash — pin `androidx.work:work-runtime:2.9.1` in your app too. Also picks up AGP **9.4.0**, Firebase BOM **34.19.0**, Compose BOM **2026.09.00** and Yandex Mobile Ads **8.4.0**. See [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md).
 
 **Version `4.4.5`** is a **patch release**. No API changed. It fixes a `BannerAdView` bug that renders a **blank banner slot inside Jetpack Compose**: swapping the shimmer placeholder for the loaded `AdView` raises an ordinary `requestLayout()`, which cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag — so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was **logged and billed**, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves. Also picks up the Next-Gen GMA SDK **1.4.0**, AGP **9.3.2** and Firebase BOM **34.18.0**. See [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md).
 
@@ -39,7 +41,7 @@ Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads
 
 ## Next-Gen GMA SDK
 
-As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.4.0` as of 4.4.6) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
+As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.4.0` as of 4.4.7) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
 
 ### Why the move
 
@@ -203,15 +205,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.6'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.6'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.7'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.7'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.7'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.6'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.7'
 ```
 
 **Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
@@ -785,6 +787,7 @@ Register it **before** `initBilling`. Products land in `unfetched` when the id i
 - [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
 - [Yandex Integration](docs/YANDEX_INTEGRATION.md)
 - [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
+- [Release Notes v4.4.7](docs/release-notes/RELEASE_NOTES_v4.4.7.md)
 - [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md)
 - [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md)
 - [Release Notes v4.4.4](docs/release-notes/RELEASE_NOTES_v4.4.4.md)
