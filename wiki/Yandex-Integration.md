@@ -10,9 +10,9 @@ The `admanagekit-yandex` module provides Yandex Ads SDK providers for the multi-
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.5"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.5"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.5"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8"
 }
 ```
 
@@ -126,9 +126,9 @@ All Yandex providers automatically report paid events via the waterfall callback
 
 ## Yandex SDK Requirements
 
-- **Min SDK**: 21+
-- **Yandex SDK Version**: 7.18.1+ (included transitively)
-- **Kotlin**: 1.7.10+
+- **Min SDK**: 24+ (the library minimum)
+- **Yandex SDK Version**: 8.6.0 as of AdManageKit 4.4.8 (included transitively)
+- **Kotlin**: 2.3+
 - **Hardware acceleration**: Required for video ads
 
 ## Troubleshooting

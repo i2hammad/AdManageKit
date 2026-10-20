@@ -6,47 +6,21 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version: `4.4.5`**
+**Latest Version: `4.4.8`** · [Changelog](https://github.com/i2hammad/AdManageKit/blob/main/CHANGELOG.md) · [Release Notes](https://github.com/i2hammad/AdManageKit/tree/main/docs/release-notes)
 
-## What's New in 4.4.5
+> **Requires Kotlin 2.3+** in your app as of 4.4.8 (AdManageKit and Firebase BOM 35 ship Kotlin 2.4 metadata). ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
-Patch release, no API changes.
+## Recent Releases
 
-- **A banner loaded successfully but rendered blank under Compose** — `BannerAdView` swaps the shimmer placeholder for the loaded `AdView`, which raises an ordinary `requestLayout()`. That request cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag, so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was logged and billed, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves; XML-hosted banners are unaffected
-- **Dependencies** — Next-Gen GMA SDK 1.4.0, Android Gradle Plugin 9.3.2, Firebase BOM 34.18.0
+- **4.4.8**: Google Mobile Ads Next-Gen SDK 1.5.0, Firebase BOM 35.0.2, Kotlin 2.4, AGP 9.4.1, Yandex Mobile Ads 8.6.0. Apps now need Kotlin 2.3+
+- **4.4.7**: Consumer ProGuard rules no longer pin the Compose runtime; apps that run R8 build smaller with nothing to configure
+- **4.4.6**: WorkManager pinned to 2.9.1 to avoid a startup crash on ROMs that spoof API 34. Pin it in your app too
+- **4.4.5**: Fixed a banner that loaded but rendered blank inside Jetpack Compose
+- **4.4.4**: Critical billing fix: the Play Billing connection never started on 4.4.3
+- **4.4.0**: Subscription offers can be bought individually, plus price comparison, trial eligibility and client-side account hold. See [[Subscription Offers]]
+- **4.2.0**: Migrated to the Google Mobile Ads **Next-Gen SDK** and Play Billing 9. `MobileAds.initialize()` must now be called explicitly before any ad request
 
-## What's New in 4.4.4
-
-Critical billing hotfix, no API changes. **If you ship the billing module on 4.4.3, upgrade.**
-
-- **Billing never connected on 4.4.3** — `connectToGooglePlayBilling()` guarded on `billingClient.isReady()`, which reports `true` the instant a client is built, so `startConnection(...)` was skipped on every fresh client. Setup never ran, no product details or entitlement were fetched, and there was no failure callback and no error log to explain it. The guard is back on `isServiceConnected`; the re-query paths keep the 4.4.3 `isReady()` fix
-- **A timed-out setup reported itself as initialized** — the `setBillingListener(listener, timeout)` timeout path set `isBillingInitialized = true` before delivering `SERVICE_TIMEOUT`, so host-app guards of the form `if (!initBillingFinish) initBilling()` went permanently quiet and the connection could never be retried. It now sets `false`
-- **Billing connection lifecycle logging** — `initBilling`, `connectToGooglePlayBilling` and both `BillingClientStateListener` callbacks now log their state at `DEBUG` under the `AppPurchase` tag, so this class of failure is visible in `logcat`
-
-## What's New in 4.4.3
-
-Bug-fix and dependency release, no API changes. Two silent-failure bugs, both of which cost money.
-
-> ⚠️ 4.4.3's billing regression makes purchases unusable — use 4.4.4 or newer.
-
-- **A timed-out rewarded load could sabotage the one that replaced it** — a request handed to the SDK cannot be cancelled, and when it finally reported back it could discard an ad a *newer* load had just delivered, clear the loading flag out from under a request still in flight, and fail callers waiting on a load that had not finished. Every load path now carries a generation token, and a late ad is kept for the next show instead of dropped
-- **Billing could stop acknowledging purchases for the rest of the process** — the connection flag could latch `false` after one disconnect while the client was actually ready, disabling every purchase re-query including the acknowledgment retry. Play auto-refunds an unacknowledged purchase after 3 days
-- **Acknowledgment no longer requires a configured product id** — a `PURCHASED` order the current build does not list (promo grants, dropped products, a Console typo) was never acknowledged, and so was auto-refunded on day 3
-- **Dependencies** — Next-Gen GMA SDK 1.3.1, Yandex Mobile Ads 8.3.0, Compose BOM 2026.08.00, Firebase BOM 34.17.0, AppCompat 1.8.0
-
-> **Pending purchases need one thing from your app:** call `refreshPurchases()` from your main activity's `onResume()`. See [[Billing Integration]].
-
-## Recent Highlights
-
-- **4.4.2** — Rewarded callbacks marshalled to the main thread (they could crash the app), a completed purchase could fail to disable ads, blank gaps where banner/native slots should have collapsed, and a `BannerAdView` Activity leak. Behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose
-- **4.4.1** — Google Mobile Ads Next-Gen SDK 1.3.0 (from 1.2.1), plus repairs to API doc generation and the MCP documentation server
-- **4.4.0** — Subscription offers can be **purchased individually** (`subscribe(activity, offer)`), offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`), trial eligibility, Play Billing 9 one-time product offers, and client-side **account hold** detection. See [[Subscription Offers]]
-- **4.3.x** — All standard banner sizes (`BannerAdSize`), custom native templates, and app-open ad freshness enforcement
-- **4.2.0** — Migrated to the Google Mobile Ads **Next-Gen SDK** and Play Billing 9. `MobileAds.initialize()` must now be called explicitly before any ad request
-
-> Upgrading from 3.x or earlier? Read the [Migrating to 4.2.0](https://github.com/i2hammad/AdManageKit#migrating-to-420) notes first — it is the one release in the 4.x line that is not source-compatible.
-
-Full details: [Changelog](https://github.com/i2hammad/AdManageKit/blob/main/CHANGELOG.md) · [Release Notes](https://github.com/i2hammad/AdManageKit/tree/main/docs/release-notes)
+> Upgrading from 3.x or earlier? Read the [Migrating to 4.2.0](https://github.com/i2hammad/AdManageKit#migrating-to-420) notes first. It's the one release in the 4.x line that isn't source-compatible.
 
 ## Features
 
@@ -101,18 +75,18 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.5'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.5'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8'
 ```
 
-**Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
+**Step 3:** Ensure your app uses `compileSdk` **37+** (since 4.2.0) and **Kotlin 2.3+** (since 4.4.8).
 
 **Step 4:** Sync your project with Gradle.
 
