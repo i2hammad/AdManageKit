@@ -1,7 +1,16 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
+
+// Modules use AGP built-in Kotlin, which compiles with the Kotlin Gradle plugin found on
+// this classpath. AGP 9 only depends on KGP 2.2.x, so without this pin every module
+// would silently compile with 2.2 instead of the catalog's `kotlin` version.
+buildscript {
+    dependencies {
+        classpath(libs.kotlin.gradle.plugin)
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application) apply false
-    alias(libs.plugins.jetbrains.kotlin.android) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.dokka)
 }

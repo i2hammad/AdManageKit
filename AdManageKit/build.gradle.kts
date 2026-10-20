@@ -1,8 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.dokka)
     id("maven-publish")
 }
@@ -33,6 +30,13 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    publishing {
+        // withSourcesJar keeps the -sources.jar the kotlin-android plugin used to add on its own
+        singleVariant("release") {
+            withSourcesJar()
+        }
     }
 
     packaging {
@@ -82,16 +86,5 @@ afterEvaluate {
 
 
         }
-    }
-}
-
-
-
-
-
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
     }
 }

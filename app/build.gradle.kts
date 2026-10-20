@@ -1,8 +1,5 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.compose.compiler)
 }
 
@@ -68,10 +65,4 @@ dependencies {
 configurations.configureEach {
     exclude(group = "com.google.android.gms", module = "play-services-ads")
     exclude(group = "com.google.android.gms", module = "play-services-ads-lite")
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
 }

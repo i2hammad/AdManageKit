@@ -27,6 +27,9 @@ mockk = "1.14.11"
 androidxTestCore = "1.7.0"
 
 [libraries]
+# Built-in Kotlin (AGP 9) compiles with whatever KGP is on the root buildscript classpath;
+# AGP alone only brings 2.2.x. Pinned in build.gradle.kts so `kotlin` above is the compiler version.
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { module = "androidx.compose:compose-bom", version.ref = "composeBom" }
 androidx-compose-foundation = { module = "androidx.compose.foundation:foundation" }
@@ -61,7 +64,6 @@ androidx-test-core = { module = "androidx.test:core", version.ref = "androidxTes
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
