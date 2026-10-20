@@ -5,6 +5,21 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.8] - 2026-10-20
+
+Dependency release. No API changed and no library code changed. The change that affects host apps is the **Kotlin requirement**: Firebase BOM 35 ships Kotlin 2.4 metadata, so the library now compiles with Kotlin 2.4 and **consuming apps need Kotlin 2.3 or newer**.
+
+### Changed
+
+- Dependency updates: Google Mobile Ads Next-Gen SDK **1.4.0 → 1.5.0**, Firebase BOM **34.19.0 → 35.0.2**, Kotlin **2.2.10 → 2.4.21** (Compose compiler plugin follows), Android Gradle Plugin **9.4.0 → 9.4.1**, Yandex Mobile Ads **8.4.0 → 8.6.0**. Play Billing stays at 9.1.0, UMP at 4.0.0, WorkManager pinned at 2.9.1
+- **Kotlin 2.4 is forced by Firebase BOM 35.** It resolves `play-services-measurement` 24.0.0, whose Kotlin 2.4 metadata a Kotlin 2.2 compiler rejects with "Module was compiled with an incompatible version of Kotlin". Kotlin compilers read metadata one minor version ahead, so hosts need Kotlin 2.3+
+- **Build scripts moved from `kotlinOptions` to `kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_17) } }`** in all six modules. Kotlin 2.4 removed the `kotlinOptions` DSL. The bytecode target is unchanged
+
+### Notes
+
+- Next-Gen SDK 1.5.0 adds `SwipeableInterstitialAd` signal/rendering APIs (private beta) and `excludedAppIds` on icon ad requests. AdManageKit does not wrap either yet
+- Verified: `assembleDebug`, all 176 unit tests, and the sample app's R8-minified release build. The R8 configuration analyzer still shows no keep rule originating from a project file
+
 ## [4.4.7] - 2026-09-22
 
 Build and packaging release. No API changed and no library code changed. The library's **consumer ProGuard rules** are the entire subject: they were pinning several thousand classes as un-shrinkable in every app that depends on AdManageKit, and they are now empty. Apps that run R8 get the win by upgrading; nothing needs to be configured.
