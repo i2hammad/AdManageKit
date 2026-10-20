@@ -7,7 +7,7 @@ AdManageKit provides native Jetpack Compose components for all ad types with ful
 ## Installation
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.2'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
 ```
 
 ## Available Components

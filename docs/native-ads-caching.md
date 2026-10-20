@@ -1,7 +1,7 @@
-# Native Ads Caching · AdManageKit v2.5.0
+# Native Ads Caching · AdManageKit
 
 ## Overview
-AdManageKit 2.5.0 combines `NativeAdManager`, `NativeAdIntegrationManager`, and Compose-first components to deliver screen-aware caching, retry-aware loading, and runtime analytics for every native ad format (Small/Medium/Large banners + programmatic layouts). The system keeps backward compatibility with the original APIs while layering on multi-screen cache segregation, LRU eviction, and Compose wrappers.
+AdManageKit combines `NativeAdManager`, `NativeAdIntegrationManager`, and Compose-first components to deliver screen-aware caching, retry-aware loading, and runtime analytics for every native ad format (Small/Medium/Large banners + programmatic layouts). The system keeps backward compatibility with the original APIs while layering on multi-screen cache segregation, LRU eviction, and Compose wrappers.
 
 ---
 
@@ -18,10 +18,10 @@ AdManageKit 2.5.0 combines `NativeAdManager`, `NativeAdIntegrationManager`, and 
 ## Installation
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.5.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.5.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.5.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.5.0" // for Compose
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8" // for Compose
 }
 ```
 

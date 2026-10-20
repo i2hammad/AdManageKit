@@ -1,13 +1,10 @@
-# App Open Ads - AdManageKit v3.3.5
+# App Open Ads - AdManageKit
 
 ## Overview
 
 AdManageKit provides lifecycle-aware app open ad management through the `AppOpenManager` class. App open ads display when users launch or return to your app, with full support for loading strategies, welcome dialogs, activity exclusion, and single-activity architecture.
 
-**Library Version**: v3.3.5
-**Last Updated**: January 2025
-
-## What's New in v3.3.5
+## Highlights
 
 ### Loading Strategy Support
 - **Full AdLoadingStrategy Integration**: AppOpenManager now properly uses `appOpenLoadingStrategy` config
@@ -434,30 +431,6 @@ AppOpenManager automatically logs these events:
 | `ad_failed_to_load` | Load failure with error code |
 | `ad_request` | Ad request initiated |
 | `ad_fill` | Ad successfully loaded |
-
----
-
-## Changelog
-
-### v3.3.5 (January 2025)
-- Full `AdLoadingStrategy` support (ON_DEMAND, ONLY_CACHE, HYBRID)
-- Ad freshness tracking with `appOpenAdFreshnessThreshold`
-- Auto-reload configuration with `appOpenAutoReload`
-- Deprecated `appOpenFetchFreshAd` in favor of `appOpenLoadingStrategy`
-- Fixed auto-reload after ad dismissal
-
-### v3.2.0
-- Single-activity architecture support
-- Screen/fragment tag exclusion
-- Temporary disable/enable
-
-### v3.0.0
-- Ad prefetching with `prefetchNextAd()`
-- `isAdLoading()` status check
-
-### v2.8.0
-- Welcome dialog with customization
-- Loading strategy configuration
 
 ---
 

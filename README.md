@@ -18,7 +18,7 @@ An Android library that takes the boilerplate out of **Google AdMob** ads, **Goo
 | **Ad formats** | Banner (all standard sizes, adaptive, collapsible), native (small / medium / large and 38 `NativeTemplateView` templates), interstitial, rewarded, app open |
 | **Loading strategies** | `ON_DEMAND`, `ONLY_CACHE`, `HYBRID` per ad type; screen-aware native ad caching with LRU and expiry |
 | **Frequency control** | Time- and count-based interstitial gating, ad pools, splash `showOrWaitForAd()`, app open activity/screen exclusion |
-| **Reliability** | Retry with exponential backoff, circuit breaker for failing ad units, main-thread callback delivery |
+| **Reliability** | Retry with exponential backoff, main-thread callback delivery |
 | **Waterfall** | AdMob → Yandex (or any provider) fallback per ad type, with no changes to your ad calls |
 | **Billing** | Play Billing 9: subscriptions, one-time products, consumables, offers and paywalls, trial eligibility, account hold recovery |
 | **Privacy** | UMP consent (GDPR/CCPA); ads hidden automatically for purchased users |

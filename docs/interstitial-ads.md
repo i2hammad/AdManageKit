@@ -1,20 +1,12 @@
-# Interstitial Ads · AdManageKit v2.8.0
+# Interstitial Ads · AdManageKit
 
 ## Overview
-`AdManageKit` 2.8.0 ships a complete interstitial stack that spans `AdManager`, the fluent `InterstitialAdBuilder`, and brand-new Jetpack Compose utilities. The stack now includes automatic retry with exponential backoff, lifecycle-safe splash loading, fallback ad units, activity-aware purchase gating, and Compose state helpers. Everything is fully backward compatible with the traditional view-based APIs while enabling declarative use in Compose apps.
+`AdManageKit` ships a complete interstitial stack that spans `AdManager`, the fluent `InterstitialAdBuilder`, and Jetpack Compose utilities. The stack now includes automatic retry with exponential backoff, lifecycle-safe splash loading, fallback ad units, activity-aware purchase gating, and Compose state helpers. Everything is fully backward compatible with the traditional view-based APIs while enabling declarative use in Compose apps.
 
-**What's new in v2.8.0**
-- `forceShowInterstitial()` now respects global loading strategy
-- New `forceShowInterstitialAlways()` for explicit force fetch
+**Highlights**
+- `forceShowInterstitial()` respects the global loading strategy; `forceShowInterstitialAlways()` always fetches
 - Global `interstitialAutoReload` config with per-call override
-- All AdManager methods use global auto-reload config as default
-
-**What's new in v2.7.0**
-- Smart splash screen with `waitForLoading()` in InterstitialAdBuilder
-- New `isLoading()` and `showOrWaitForAd()` methods
-- Frequency controls: `everyNthTime`, `maxShows`, `minInterval`
-
-**What's new since v1.x**
+- Smart splash screens with `showOrWaitForAd()` and `waitForLoading()` in `InterstitialAdBuilder`
 - Jetpack Compose helpers: `rememberInterstitialAd`, `InterstitialAdEffect`, `rememberInterstitialAdState`
 - Fluent builder with frequency controls (`everyNthTime`, `maxShows`, `minInterval`, `.force()`) and fallback chains
 - Automatic retry via `AdRetryManager` (circuit breaker removed to maximize show rate)
@@ -24,15 +16,15 @@
 ---
 
 ## Installation
-Add the v2.8.0 artifacts plus Compose (if needed):
+Add the artifacts plus Compose (if needed):
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v2.8.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v2.8.0"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v2.8.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8"
     // Optional – Jetpack Compose helpers:
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v2.8.0"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8"
 }
 ```
 

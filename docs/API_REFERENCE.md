@@ -996,35 +996,4 @@ enum class TYPE_IAP {
 
 ## Changelog
 
-### v4.4.0
-- Purchase a **specific** offer: `subscribe(activity, offer)`, `subscribe(activity, subsId, offerToken)`, `purchase(activity, offer)`, `purchase(activity, productId, offerToken)`, and a 5-argument `updateSubscription(...)`. Previously the library always resolved the token itself and could charge for whichever offer Play listed last
-- Offer lookup: `getIntroOffer`, `getOfferById`, `getOfferByBasePlanId`, `getOfferByTag` / `getOffersByTag`, `getBestValueOffer`, `getCheapestFirstCycleOffer`
-- New `BillingPeriod` type parses ISO-8601 billing periods and normalizes prices across cadences (`savingsPercent`, `pricePerMonthMicros`)
-- `OfferInfo` gained derived pricing (`pricePerMonthMicros`, `firstCyclePrice`, `introDiscountPercent`, `trialDays`, `introTotalDays`, parsed periods, `isBaseOffer`, `hasTag`) and installment-plan details
-- `getSavingsPercent(monthlyId, yearlyId)`, `getFormattedPricePerMonth(productId)`, `AppPurchase.formatPrice(micros, currency)`
-- Trial eligibility: `isEligibleForFreeTrial()`, `isEligibleForIntroPrice()`
-- New `OneTimeOfferInfo` + `getOneTimeOffers()`, `getOneTimeOffer()`, `getBestOneTimeOffer()` for Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity)
-- Account hold detected client-side: `PurchaseResult.isSuspended()`, `hasSubscriptionOnHold()`. **Behavior change** — `getSubscriptionState()` returns `ON_HOLD` and `isSubscriptionActive()` returns `false` for those purchases
-- Play payment recovery: `showInAppMessages(activity, listener)` with `InAppMessageListener`
-- Pending plan changes: `hasPendingSubscriptionChange()`, `PurchaseResult.hasPendingPurchaseUpdate()`
-- Flow configuration: `setObfuscatedAccountId()`, `setObfuscatedProfileId()`, `setOfferPersonalized()`
-- Product-details diagnostics: `setProductDetailsListener()`, `getUnfetchedProducts()`, `isProductDetailsLoaded()`, `areAllProductDetailsLoaded()`
-
-### v3.5.7
-- Added structured offer API to `AppPurchase`: `getOffers()`, `getTrialOffer()`, `getBaseOffer()` returning typed `OfferInfo`
-- New `OfferInfo` data class classifies trial / intro / base pricing phases by recurrence and price (handles multi-offer products correctly)
-- Fixed `getIntroductorySubPrice()`, `getPriceSub()`, `getBillingPeriod()`, `getPricePricingPhaseList()` — now walk all offers and return the correct phase instead of relying on list position
-
-### v3.4.1
-- Added product metadata APIs to AppPurchase: `getProductTitle()`, `getProductName()`, `getProductDescription()`, `getProductDetails()`
-- Added free trial detection: `hasFreeTrial()`, `getFreeTrialPeriod()`
-- Added billing period query: `getBillingPeriod()`
-
-### v2.5.0
-- Removed circuit breaker to maximize ad show rates
-- Added custom ad unit support to AppOpenManager
-- Enhanced retry logic with configurable exponential backoff
-- Added performance metrics tracking
-- Improved thread safety across all components
-
-This API reference covers all major components of AdManageKit. For more detailed examples and usage patterns, refer to the main README and sample project.
+See [CHANGELOG.md](../CHANGELOG.md) and [release notes](release-notes/).

@@ -1,6 +1,6 @@
 # AppPurchase - Complete Billing Integration Guide
 
-`AppPurchase` is a comprehensive wrapper for Google Play Billing Library v8, providing simplified APIs for in-app purchases, subscriptions, and purchase management.
+`AppPurchase` is a comprehensive wrapper for Google Play Billing Library v9, providing simplified APIs for in-app purchases, subscriptions, and purchase management.
 
 ## Table of Contents
 
@@ -24,8 +24,8 @@
 ### 1. Add Dependencies
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v3.5.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v3.5.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
 ```
 
 ### 2. Initialize in Application Class

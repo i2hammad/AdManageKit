@@ -93,7 +93,7 @@ public class GameActivity extends AppCompatActivity {
 ### Example 4: With All Callbacks
 ```java
 import com.i2hammad.admanagekit.admob.InterstitialAdCallback;
-import com.google.android.gms.ads.LoadAdError;
+import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError;
 
 InterstitialAdBuilder.with(this)
     .adUnit("ca-app-pub-xxxxx/yyyyy")
@@ -480,7 +480,7 @@ public class MyAdCallback implements InterstitialAdCallback {
     public void onAdFailed(LoadAdError error) {
         Log.e("MyApp", "Ad failed: " + error.getMessage());
         Bundle bundle = new Bundle();
-        bundle.putInt("error_code", error.getCode());
+        bundle.putString("error_code", error.getCode().name());
         bundle.putString("error_message", error.getMessage());
         FirebaseAnalytics.getInstance(activity)
             .logEvent("ad_failed", bundle);
