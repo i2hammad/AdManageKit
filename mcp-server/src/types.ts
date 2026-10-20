@@ -15,6 +15,7 @@ export interface SearchResult {
 }
 
 export const TOPIC_MAP: Record<string, string[]> = {
+  "getting-started": ["README.md", "wiki/Home.md"],
   interstitial: [
     "docs/interstitial-ads.md",
     "docs/INTERSTITIAL_BUILDER_GUIDE.md",

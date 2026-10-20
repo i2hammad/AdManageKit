@@ -80,7 +80,7 @@ export function registerDocumentationTools(server: McpServer) {
   // Tool 2: get_doc_by_topic
   server.tool(
     "get_doc_by_topic",
-    "Get documentation for a specific AdManageKit topic. Topics include ad types (interstitial, native, banner, app-open, rewarded), features (loading-strategies, configuration, compose), and billing (billing-integration, subscriptions, etc.).",
+    "Get documentation for a specific AdManageKit topic. Topics include getting-started (installation, requirements, setup), ad types (interstitial, native, banner, app-open, rewarded), features (loading-strategies, configuration, compose), and billing (billing-integration, subscriptions, etc.).",
     {
       topic: z
         .enum(topicKeys)
