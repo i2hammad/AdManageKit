@@ -719,25 +719,25 @@ class AdManager() {
     /**
      * Always forces fetch and display of a fresh interstitial ad.
      * Ignores loading strategy - always loads new ad with dialog.
-     * Used internally by InterstitialAdBuilder for explicit force behavior.
+     * Unlike [forceShowInterstitial], this bypasses [AdManageKitConfig.interstitialLoadingStrategy].
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      */
-    internal fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback) {
+    fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback) {
         forceShowInterstitialInternal(activity, callback, null)
     }
 
     /**
      * Always forces fetch and display of a fresh interstitial ad with specified ad unit.
      * Ignores loading strategy - always loads new ad with dialog.
-     * Used internally by InterstitialAdBuilder for explicit force behavior.
+     * Unlike [forceShowInterstitial], this bypasses [AdManageKitConfig.interstitialLoadingStrategy].
      *
      * @param activity The activity used to display the ad.
      * @param callback The callback to handle actions after the ad is closed.
      * @param adUnitId The ad unit ID to use for loading (overrides the default).
      */
-    internal fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback, adUnitId: String) {
+    fun forceShowInterstitialAlways(activity: Activity, callback: AdManagerCallback, adUnitId: String) {
         forceShowInterstitialInternal(activity, callback, adUnitId)
     }
 

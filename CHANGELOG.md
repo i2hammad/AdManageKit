@@ -5,6 +5,16 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `AdManager.forceShowInterstitialAlways(activity, callback)` and its `adUnitId` overload are now **public**. They were documented since v2.8.0 but declared `internal`, so calls from an app failed to compile
+
+### Changed
+
+- Build: migrated to AGP built-in Kotlin and the new AGP DSL (the `org.jetbrains.kotlin.android` plugin is removed). Published artifacts, coordinates, dependencies and the sources jar are unchanged
+
 ## [4.4.8] - 2026-10-20
 
 Dependency release. No API changed and no library code changed. The change that affects host apps is the **Kotlin requirement**: Firebase BOM 35 ships Kotlin 2.4 metadata, so the library now compiles with Kotlin 2.4 and **consuming apps need Kotlin 2.3 or newer**.
