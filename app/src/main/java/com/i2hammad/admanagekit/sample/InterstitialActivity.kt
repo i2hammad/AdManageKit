@@ -18,6 +18,7 @@ import com.i2hammad.admanagekit.admob.BannerAdView
 import com.i2hammad.admanagekit.admob.NativeAdManager
 import com.i2hammad.admanagekit.admob.NativeBannerMedium
 import com.i2hammad.admanagekit.admob.NativeBannerSmall
+import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import android.util.Log
@@ -53,7 +54,7 @@ class InterstitialActivity : AppCompatActivity() {
 
         var nativeBannerMedium: NativeBannerMedium = findViewById(R.id.nativeBannerMedium)
         nativeBannerMedium.loadNativeBannerAd(this, "ca-app-pub-3940256099942544/2247696110",
-            useCachedAd = true, object : AdLoadCallback() {
+            object : AdLoadCallback() {
                 override fun onAdLoaded() {
                     Log.d("AdManageKit", "✅ NativeBannerMedium loaded in InterstitialActivity")
                 }
@@ -61,7 +62,7 @@ class InterstitialActivity : AppCompatActivity() {
                 override fun onFailedToLoad(error: LoadAdError?) {
                     Log.e("InterstitialActivity", "❌ NativeBannerMedium failed in InterstitialActivity: ${error?.message}")
                 }
-            })
+            }, AdLoadingStrategy.HYBRID)
 
         statusTextView = findViewById<TextView>(R.id.statusTextView)
 

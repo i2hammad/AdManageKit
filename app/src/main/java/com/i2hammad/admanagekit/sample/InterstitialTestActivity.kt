@@ -125,8 +125,8 @@ class InterstitialTestActivity : AppCompatActivity() {
                     updateStatus("Ad Loaded")
                 }
 
-                override fun onAdFailedToLoad(error: LoadAdError) {
-                    log("❌ AdManager.loadInterstitialAd failed: ${error.message}")
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    log("❌ AdManager.loadInterstitialAd failed: ${adError.message}")
                     updateStatus("Load Failed")
                 }
             }

@@ -75,16 +75,12 @@ class MyApplication : Application() {
             nativeCacheExpiry = 2.hours
             maxCachedAdsPerUnit = 3
             maxCacheMemoryMB = 50
-            enableWelcomeBackDialog = true
-            appOpenFetchFreshAd = false
             appOpenAutoReload = true
             welcomeDialogAppIcon = R.mipmap.ic_launcher_round
             
             // =================== RELIABILITY FEATURES ===================
             autoRetryFailedAds = true
             maxRetryAttempts = 3
-            circuitBreakerThreshold = 3 // Lower threshold for testing
-            circuitBreakerResetTimeout = 60.seconds // Shorter reset for testing
             enableExponentialBackoff = true
             baseRetryDelay = 1.seconds
             maxRetryDelay = 10.seconds
