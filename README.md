@@ -3,196 +3,53 @@
 ![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
 
-AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
+An Android library that takes the boilerplate out of **Google AdMob** ads, **Google Play Billing** and **UMP consent**, with optional multi-network waterfalls (Yandex) and Jetpack Compose support.
 
-**Latest Version `4.4.8`** is a **dependency release**. No API changed and no library source file changed. It moves to Google Mobile Ads Next-Gen SDK **1.5.0**, Firebase BOM **35.0.2**, **Kotlin 2.4.21**, AGP **9.4.1** and Yandex Mobile Ads **8.6.0**. **Your app now needs Kotlin 2.3 or newer**: AdManageKit and Firebase 35 both ship Kotlin 2.4 metadata, which a Kotlin 2.2 compiler rejects with "Module was compiled with an incompatible version of Kotlin". See [Release Notes v4.4.8](docs/release-notes/RELEASE_NOTES_v4.4.8.md).
+**Latest version: `4.4.8`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.8.md) · [Changelog](CHANGELOG.md)
 
-**Version `4.4.7`** is a **build and packaging release**. No API changed and no library source file changed — the subject is the library's **consumer ProGuard rules**, which were pinning several thousand classes as un-shrinkable in every app that depends on AdManageKit. `ad-manage-kit-compose` shipped `-keep class androidx.compose.** { *; }`, a rule R8 applies to every consuming app with no way to opt out: it retained **7221 classes, 57262 methods and 23964 fields** of the Compose runtime whether the app used them or not — and even for apps that never call an AdManageKit composable. All five modules now ship a wired, **deliberately empty** `consumer-rules.pro`; the library uses no reflection, JNI or serialization, and AAPT2 already emits the view-constructor keeps each app actually needs. On the sample app this is **11.99 MB → 7.89 MB** of APK (−34%) and 21.3 MB → **12.5 MB** of dex (−41%). **If you run R8, you get this by upgrading** — nothing to configure, and you can delete any defensive `-keep class com.i2hammad.admanagekit.** { *; }` you carry. See [Release Notes v4.4.7](docs/release-notes/RELEASE_NOTES_v4.4.7.md).
+> **Requires Kotlin 2.3+** in your app as of 4.4.8. ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
-**Version `4.4.6`** is a **maintenance release**. No API changed and no library source file changed — the whole diff is dependencies and docs. It **downgrades** `androidx.work:work-runtime` **2.11.2 → 2.9.1**: WorkManager **2.10 and 2.11** call `JobScheduler.forNamespace` whenever `SDK_INT >= 34`, and modified or spoofed ROMs that report API 34 over an older framework have no such method — the `NoSuchMethodError` then kills the **whole process during bind** (`Unable to get provider androidx.startup.InitializationProvider`), because `androidx.startup` builds WorkManager in a `ContentProvider` installed before `Application.onCreate` runs. 2.9.1 is the last release without that call. AdManageKit has no WorkManager code of its own; the pin only steers the version the ads SDK pulls in, and since Gradle resolves the **highest** version in the graph, an app that declares 2.10/2.11 itself keeps the crash — pin `androidx.work:work-runtime:2.9.1` in your app too. Also picks up AGP **9.4.0**, Firebase BOM **34.19.0**, Compose BOM **2026.09.00** and Yandex Mobile Ads **8.4.0**. See [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md).
+[Features](#features) · [Requirements](#requirements) · [Installation](#installation) · [Quick Start](#quick-start) · [Usage](#usage) · [Documentation](#documentation) · [Migration Guide](#migration-guide)
 
-**Version `4.4.5`** is a **patch release**. No API changed. It fixes a `BannerAdView` bug that renders a **blank banner slot inside Jetpack Compose**: swapping the shimmer placeholder for the loaded `AdView` raises an ordinary `requestLayout()`, which cannot cross Compose's `AndroidView` interop boundary once any ancestor already carries a pending layout flag — so Compose never re-measured the subtree and the freshly attached `AdView` was left at 0×0. The ad loaded, `onAdLoaded`/`onAdImpression` fired and the impression was **logged and billed**, but the slot stayed blank until a rotation or resize forced a full traversal. Both the AdMob and `BannerWaterfall` success paths now force the measure/layout pass themselves. Also picks up the Next-Gen GMA SDK **1.4.0**, AGP **9.3.2** and Firebase BOM **34.18.0**. See [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md).
+## Features
 
-**Version `4.4.4`** is a **critical billing hotfix**. No API changed. It repairs a regression introduced in 4.4.3, where the Play Billing connection was never started at all: `connectToGooglePlayBilling()` guarded on `billingClient.isReady()`, which reports `true` the instant a client is built, so `startConnection(...)` was skipped on every fresh client. Setup never ran, no product details or entitlement were ever fetched, and there was **no failure callback and no error log** to explain it. **If you ship the billing module on 4.4.3, upgrade.** Also fixes a long-standing bug where a timed-out setup reported itself as initialized — permanently suppressing the host app's `if (!initBillingFinish) initBilling()` retry — and adds `DEBUG` logging across the billing connection lifecycle. See [Release Notes v4.4.4](docs/release-notes/RELEASE_NOTES_v4.4.4.md).
+| Area | What you get |
+|---|---|
+| **Ad formats** | Banner (all standard sizes, adaptive, collapsible), native (small / medium / large and 38 `NativeTemplateView` templates), interstitial, rewarded, app open |
+| **Loading strategies** | `ON_DEMAND`, `ONLY_CACHE`, `HYBRID` per ad type; screen-aware native ad caching with LRU and expiry |
+| **Frequency control** | Time- and count-based interstitial gating, ad pools, splash `showOrWaitForAd()`, app open activity/screen exclusion |
+| **Reliability** | Retry with exponential backoff, circuit breaker for failing ad units, main-thread callback delivery |
+| **Waterfall** | AdMob → Yandex (or any provider) fallback per ad type, with no changes to your ad calls |
+| **Billing** | Play Billing 9: subscriptions, one-time products, consumables, offers and paywalls, trial eligibility, account hold recovery |
+| **Privacy** | UMP consent (GDPR/CCPA); ads hidden automatically for purchased users |
+| **Compose** | Composable wrappers for every ad format |
+| **Analytics** | Firebase `ad_impression`, `ad_paid_event` and `ad_failed_to_load` events for tROAS |
 
-> ⚠️ **4.4.3 is superseded.** Its billing regression makes purchases unusable; use 4.4.4 or newer.
+| Module | Artifact | Purpose |
+|---|---|---|
+| Ads | `ad-manage-kit` | Ad managers, views, waterfall, UMP |
+| Core | `ad-manage-kit-core` | Shared interfaces and provider registry |
+| Billing | `ad-manage-kit-billing` | Google Play Billing wrapper (`AppPurchase`) |
+| Compose | `ad-manage-kit-compose` | Jetpack Compose components |
+| Yandex | `ad-manage-kit-yandex` | Yandex Mobile Ads waterfall provider |
 
-**Version `4.4.3`** is a bug-fix and dependency release. No API changed. Two silent-failure bugs are fixed, both of which cost money: a **rewarded load the manager had given up on could sabotage the load that replaced it** — discarding an ad a newer load had just delivered, and clearing the "loading" flag out from under a request still in flight — and **billing could stop acknowledging purchases for the rest of the process**, which lets Play auto-refund a completed purchase on day 3. Acknowledgment also no longer requires the purchase to match a configured product id. Picks up the Next-Gen GMA SDK **1.3.1**, Yandex Mobile Ads **8.3.0**, and refreshed AndroidX/Firebase/Compose BOMs. See [Release Notes v4.4.3](docs/release-notes/RELEASE_NOTES_v4.4.3.md).
+## Requirements
 
-**Version `4.4.2`** is a bug-fix release. No API changed, but several fixes are user-visible and two affect revenue: rewarded ads could **crash the app** (every show-path callback, including `onRewardEarned`, was delivered on a background thread), a **completed purchase could fail to disable ads** until the next launch, **blank gaps** were left where banner/native slots should have collapsed for premium users and after failed loads (in both XML and Compose), and app open ads could appear over screens excluded via `disableAppOpenAdsTemporarily()`. Also fixes a `BannerAdView` leak that kept requesting ads after detach. Two deliberate behavior changes: an account-hold subscription no longer disables ads, and premium users no longer reserve ad space in Compose. See [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md).
+- `minSdk` **24**, `compileSdk` **37+**
+- **Kotlin 2.3+** (the library and Firebase BOM 35 ship Kotlin 2.4 metadata)
+- An explicit `MobileAds.initialize()` call before the first ad request (see [Quick Start](#quick-start))
 
-**Version `4.4.1`** is a patch release that updates the Google Mobile Ads Next-Gen SDK to **1.3.0** (from 1.2.1) and repairs three documentation-delivery channels that had silently gone stale: the API docs build had failed on every release since the Dokka 2.x upgrade, leaving [the published KDoc](https://i2hammad.github.io/AdManageKit/) without any 4.x types; MCP server npm publishing had been broken since January 2026; and the MCP tool schemas hardcoded which versions and classes existed, so they rejected `4.4.0` as an unknown version. No AdManageKit API changed. See [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md).
+### Next-Gen GMA SDK
 
-**Version `4.4.0`** is a minor release focused on the billing module. Subscription offers can now be **purchased individually** — `subscribe(activity, offer)` buys exactly the plan the user tapped, where previously the library always resolved the token itself and could charge for whichever offer Play listed last. It also adds offer lookup by id/base plan/tag, cross-cadence price normalization (`BillingPeriod`, `getSavingsPercent`, `getFormattedPricePerMonth`), trial-eligibility checks, Play Billing 9 one-time product offers (discounts, rentals, pre-orders, limited quantity), client-side **account hold** detection, Play payment-recovery messaging, and product-details diagnostics. Purely additive, with one behavior change: an on-hold subscription now reports `ON_HOLD` and is no longer `isSubscriptionActive()`. See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md).
+Since **4.2.0**, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, `1.5.0` as of 4.4.8) instead of the legacy `play-services-ads`. Three things differ from the legacy SDK:
 
-**Version `4.3.5`** is a patch release that makes `appOpenAdFreshnessThreshold` (default 4 hours) actually enforced on every app open show path. Previously only `ON_DEMAND` consulted it — `HYBRID`, `ONLY_CACHE`, and the multi-provider waterfall checked only whether an ad object existed and could show a day-old cached ad. Stale ads are now discarded and replaced instead of shown. It also settles the `appOpenAdTimeout` default at **10 seconds** (the property said 4s while `resetToDefaults()` said 10s — 4s was too short for the fetch-with-dialog paths). No API changes. See [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md).
+- **Initialization is explicit.** The SDK no longer lazy-inits on first use. AdManageKit doesn't call `MobileAds.initialize()` for you, because it doesn't own your consent flow.
+- **Callbacks fire on a background thread.** Every AdManageKit manager, provider and view re-posts its callbacks to the main thread, so this is transparent to you.
+- **Error and value types changed.** `AdKitError`, `AdKitLoadError` and `AdKitValue` now resolve to Next-Gen SDK types. Callback implementations don't need to change, only code that reads legacy-only fields. See [Migrating to 4.2.0](#migrating-to-420).
 
-**Version `4.3.4`** is a patch release that restores the pre-4.2.0 default adaptive banner height: `ADAPTIVE` again requests the standard anchored adaptive size (~50-90dp) instead of the taller *large anchored adaptive* format the Next-Gen migration had switched to. The taller format is now opt-in via `BannerAdSize.ADAPTIVE_LARGE` (`app:bannerAdSize="adaptive_large"` in XML). See [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md).
+## Installation
 
-**Version `4.3.3`** is a patch release that improves native ad media quality: every native request now sends a media-aspect-ratio hint matched to each template's `MediaView` slot shape and carries global `VideoOptions` (start-muted by default). New `AdManageKitConfig` fields and a per-view `NativeTemplateView.setMediaAspect(...)` override expose the behavior; all defaults preserve prior request behavior. See [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md).
-
-**Version `4.3.2`** is a patch release that fixes banner shimmer sizing — the placeholder now reserves the real adaptive-banner height from the first frame and in the layout preview instead of collapsing to ~50dp — and stops the Compose native ad from clipping its call-to-action button. Also bumps the Android Gradle Plugin to 9.3.0. See [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md).
-
-**Version `4.3.1`** is a patch release fixing crashes from Next-Gen SDK callbacks delivered on background threads — interstitial `onNextAction`, banner/native waterfall chains, and `NativeTemplateView.onFailedToLoad` are now marshalled to the main thread — plus a load-site guard for app open ads. See [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md).
-
-**Version `4.3.0`** adds all standard AdMob banner sizes (`BannerAdSize`), fully custom native ad templates on `NativeTemplateView`, and a redesigned size-adaptive banner shimmer with night-mode support. See [What's New in 4.3.0](#whats-new-in-430).
-
-Since **4.2.0** the library runs on the Google Mobile Ads **Next-Gen SDK** (`ads-mobile-sdk`, stable) and Google Play Billing Library **9.1.0** — see [Next-Gen GMA SDK](#next-gen-gma-sdk) below and [Migrating to 4.2.0](#migrating-to-420) if you're upgrading from 3.x/4.1.
-
----
-
-## Next-Gen GMA SDK
-
-As of v4.2.0, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, stable `1.5.0` as of 4.4.8) instead of the legacy `com.google.android.gms:play-services-ads`. This isn't a branch or an opt-in — it's the only version of AdManageKit going forward.
-
-### Why the move
-
-The legacy Google Mobile Ads SDK is in maintenance mode; new AdMob features (Ad Inspector improvements, mediation updates, in-app price-increase messaging, etc.) land on the Next-Gen SDK first, and Google's own guidance is to move new integrations there. AdManageKit had a separate `nextgen` branch exploring this since it was in beta and diverging from `main`'s waterfall/Yandex/billing work — now that the SDK is stable, that split is gone.
-
-### What's different under the hood
-
-- **Threading**: Next-Gen SDK callbacks fire on a background thread (the legacy SDK guaranteed main thread). Every ad manager, provider, and view in this library already wraps its callback bodies in `Handler(Looper.getMainLooper()).post {}` — this is transparent to you as a consumer.
-- **Initialization**: `MobileAds.initialize()` must be called explicitly once, before any ad request — the legacy SDK's silent lazy-init on first use no longer exists. AdManageKit doesn't call this for you (it doesn't own your app's consent flow); see the sample app's `MyApplication.kt` for the recommended pattern.
-- **Callback types**: Where AdManageKit exposes ad-network error/value types through `AdKitError`, `AdKitLoadError`, and `AdKitValue` (used by `AdManagerCallback`, `AdLoadCallback`, `AdCallback`, and friends), those aliases now resolve to Next-Gen SDK types instead of legacy ones. Your callback *implementations* (`onFailedToLoad(error)`, `onPaidEvent(value)`, etc.) don't need to change — only code that reads legacy-only members of those objects does. See [Migrating to 4.2.0](#migrating-to-420).
-
-## What's New in 4.4.0
-
-A billing-focused minor release. Everything is additive — no existing method signature changed — with one deliberate behavior change around account hold.
-
-### Buy the Offer the User Actually Tapped
-
-`AppPurchase` could already *describe* subscription offers (`getOffers`, `getTrialOffer`, `getBaseOffer` since 3.5.7), but it could not *act* on them. `subscribe(activity, subsId)` always resolved the offer token itself — the configured `trialId`, and failing that **whichever offer Play listed last**. On a product with three plans, a user tapping "Yearly" could be charged for monthly, purely because of list order.
-
-```kotlin
-val offers = AppPurchase.getInstance().getOffers("premium_sub")
-// …render them, then buy exactly what the user chose:
-AppPurchase.getInstance().subscribe(activity, offers[selectedIndex])
-```
-
-The same applies to one-time products (`purchase(activity, offer)`) and upgrades (`updateSubscription(activity, newSubsId, offerToken, oldToken, mode)`). The original no-token overloads are unchanged.
-
-### Offer Lookup by Id, Base Plan or Tag
-
-```kotlin
-billing.getIntroOffer("premium_sub")                   // first with an intro price
-billing.getOfferByBasePlanId("premium_sub", "yearly")
-billing.getOfferByTag("premium_sub", "popular")        // Play Console offer tag
-billing.getBestValueOffer("premium_sub")               // lowest cost per month
-billing.getCheapestFirstCycleOffer("premium_sub")      // cheapest way in
-```
-
-Offer **tags** are the useful one here: tag offers in the Play Console and select them by tag, and a paywall can be re-targeted without shipping an app update.
-
-### Price Comparison Without Parsing ISO-8601
-
-Play returns billing periods as raw strings (`"P1M"`, `"P1Y"`). The new `BillingPeriod` parses them and normalizes prices so plans of different cadences compare fairly:
-
-```kotlin
-val period = BillingPeriod.parse("P1Y")!!
-period.unit          // Unit.YEAR
-period.count         // 1 → getQuantityString(R.plurals.years, count, count)
-period.totalMonths   // 12.0
-
-billing.getSavingsPercent("premium_monthly", "premium_yearly")  // 50 → "Save 50%"
-billing.getFormattedPricePerMonth("premium_yearly")             // "$5.00"
-```
-
-`OfferInfo` also gained `firstCyclePrice` (what the user pays *today* — "Free", "$1.99" or "$9.99"), `pricePerMonthMicros`, `introDiscountPercent`, `trialDays`, `introTotalDays`, `isBaseOffer` and `hasTag(...)`.
-
-### Trial Eligibility
-
-Google Play filters offers per account — a user who already used a trial simply doesn't receive that offer. So offer presence *is* the eligibility signal, now named explicitly:
-
-```kotlin
-button.text = if (billing.isEligibleForFreeTrial("premium_sub")) "Start free trial" else "Subscribe"
-```
-
-This stops a paywall promising a trial the user cannot claim and then having Play charge them immediately.
-
-### Play Billing 9 Features That Were Unused
-
-- **One-time product offers** — a single INAPP product can carry several offers (a full price plus a launch discount, a rental, a pre-order, a limited-quantity drop). New `OneTimeOfferInfo` + `getOneTimeOffers()` / `getBestOneTimeOffer()`; the legacy `getOneTimePurchaseOfferDetails()` exposes only one of them
-- **Payment recovery** — `showInAppMessages(activity, listener)` shows Play's fix-your-payment flow for declined subscriptions
-- **Product-details diagnostics** — `setProductDetailsListener(...)` and `getUnfetchedProducts()` report *which* ids Play declined and why, so an empty paywall is no longer silent
-- **Installment plans** — `OfferInfo.isInstallmentPlan` and commitment payment counts
-- **Fraud prevention & EU disclosure** — `setObfuscatedAccountId()`, `setObfuscatedProfileId()`, `setOfferPersonalized()`, applied to every flow the library launches
-
-### Account Hold Detected Client-Side (behavior change)
-
-When Play cannot charge a subscriber, the subscription enters **account hold**. This previously required server-side verification; Play Billing 9 reports it client-side, so `PurchaseResult.isSuspended()` is now populated and `getSubscriptionState()` returns `ON_HOLD`.
-
-> **`isSubscriptionActive()` therefore returns `false` during account hold.** That matches Google's requirement — the user's payment was declined and they must not keep premium access. If your app deliberately keeps serving on-hold users, check `isSuspended()` explicitly.
-
-```kotlin
-if (billing.hasSubscriptionOnHold()) {
-    billing.showInAppMessages(activity, object : InAppMessageListener {
-        override fun onSubscriptionRecovered(purchaseToken: String) { refreshPremiumUi() }
-        override fun onNoActionNeeded() { }
-    })
-}
-```
-
-See [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md) and the [Subscription Offers wiki page](https://github.com/i2hammad/AdManageKit/wiki/Subscription-Offers) for full details.
-
-## What's New in 4.3.0
-
-### All Standard Banner Sizes
-`BannerAdView` and `BannerAdCompose` now support every standard AdMob banner size via the new `BannerAdSize` enum — `ADAPTIVE` (default, unchanged behavior), `BANNER` (320x50), `LARGE_BANNER` (320x100), `MEDIUM_RECTANGLE` (300x250), `FULL_BANNER` (468x60), `LEADERBOARD` (728x90). Select programmatically (`loadBanner(activity, adUnitId, BannerAdSize.MEDIUM_RECTANGLE)`), in XML (`app:bannerAdSize="medium_rectangle"`), or in Compose (`adSize = BannerAdSize.MEDIUM_RECTANGLE`). The size carries through retries, auto-refresh, and the multi-provider waterfall. See the [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md).
-
-### Custom Native Ad Templates
-If none of the 38 built-in `NativeTemplateView` presets fit your design, supply your own layout: `setCustomTemplate(layoutResId, shimmerResId, sizeHint)` programmatically, `app:customAdLayout`/`app:customAdShimmerLayout` in XML, or `customLayoutResId` on `NativeTemplateCompose`. The layout's root must be a Next-Gen SDK `NativeAdView` reusing the standard asset ids. See the [NativeTemplateView guide](docs/NATIVE_TEMPLATE_VIEW.md#custom-templates).
-
-### Redesigned Banner Shimmer + Night Mode
-The banner loading placeholder now adapts to the requested size (a 300x250 request shows a proper media-block placeholder, not a lone 50dp row), reserves the exact ad size on every path including waterfalls (no layout jump), centers to match the loaded ad, and follows the system dark theme instead of rendering a hardcoded white card.
-
-### App Open Ads: Late MobileAds Initialization Support
-`AppOpenManager` no longer crashes if constructed before `MobileAds.initialize()` completes: every load path is guarded, callback-driven flows (splash screens) wait for the SDK within their existing timeout and always receive a terminal callback, and the new `isMobileAdsReady()` confirms the SDK can accept requests. See the [App Open Ads guide](docs/app-open-ads.md#initialization-order--late-initialization).
-
-> **Compatibility:** source-compatible; `ADAPTIVE` keeps pre-4.3.0 behavior everywhere. Recompile against 4.3.0 rather than hot-swapping the AAR (Compose composables gained default parameters).
-
-See [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md) for full details.
-
-## What's New in 4.2.0
-
-### Google Mobile Ads Next-Gen SDK
-`com.google.android.gms:play-services-ads` is replaced by the stable **Next-Gen SDK** (`ads-mobile-sdk:1.2.1`) across every ad manager, provider, native view, and the Compose module. This is the change described in [Next-Gen GMA SDK](#next-gen-gma-sdk) above — read that section first if you're upgrading.
-
-### Google Play Billing Library 9.1.0
-Upgraded from 8.3.0. No code changes were needed in `AppPurchase` — the wrapper was already on v8+ patterns. Source- and behavior-compatible.
-
-### compileSdk 37
-Required transitively by `androidx-core-ktx` 1.19.0+. Bump your app's `compileSdk` to 37+.
-
-### Fixes
-- Native ad `MediaView` rendering blank in `NativeTemplateView` and the programmatic native provider (a leftover legacy-SDK pattern was interfering with the Next-Gen SDK's automatic media rendering)
-- `NativeAdView.mediaView` returning `null` for dynamically-inflated templates (the getter's auto-discovery needs the view to be window-attached; affected views now use `findViewById()` directly)
-- A Native Validator false-positive risk on deeply-nested templates like `CARD_MODERN`, caused by registering the ad before the view had been through a layout pass
-
-> **Compatibility:** **not** fully source-compatible — see [Migrating to 4.2.0](#migrating-to-420). Most consumers (anyone who only calls methods on AdManageKit's own callback types, without custom native XML layouts) are unaffected.
-
-See [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md) for full details.
-
-For the 3.6.0 release (Yandex template matching, waterfall-aware programmatic loader), see [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md).
-
-For previous versions, see the [Changelog](CHANGELOG.md) or individual [release notes](docs/release-notes/).
-
-## Screenshots
-
-| NativeBannerSmall Ad | Interstitial Ad | App Open Ad | UMP Consent Form |
-|----------------------|-----------------|-----------------|------------------|
-| ![NativeBannerSmall ad displayed in app](docs/assets/native_ad_small_screenshot.png) | ![Interstitial ad with loading dialog](docs/assets/interstitial_ad_screenshot.png) | ![App open ad on app launch](docs/assets/app_open_ad_screenshot.png) | ![UMP consent form](docs/assets/ump_consent_screenshot.png) |
-
-## Demo Video
-
-Watch a short demo of `AdManageKit` in action:
-
-[Watch on YouTube](https://youtube.com/shorts/h_872tOARpU)
-
-## Getting Started
-
-### Installation
-
-**Step 1:** Add JitPack to your root `build.gradle`:
+Add JitPack to `settings.gradle`:
 
 ```groovy
 dependencyResolutionManagement {
@@ -204,215 +61,76 @@ dependencyResolutionManagement {
 }
 ```
 
-**Step 2:** Add dependencies to your app's `build.gradle`:
+Add the modules you need to your app's `build.gradle`:
 
 ```groovy
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8'
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
 
-// For Jetpack Compose support
+// Optional: Jetpack Compose support
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
 
-// For Yandex Ads multi-provider support
+// Optional: Yandex Ads waterfall provider
 implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8'
 ```
 
-**Step 3:** Ensure your app's `compileSdk` is **37 or higher** (required transitively as of 4.2.0).
+## Quick Start
 
-**Step 4:** Sync your project with Gradle.
-
-## Features
-
-### NativeTemplateView (v2.6.0+)
-- **38 Template Styles**: card_modern, material3, app_store, social_feed, gradient_card, pill_banner, medium_horizontal, flexible, icon_left, top_icon_media, spotlight, plus the video_* and flat_* families
-- **XML & Programmatic**: Set templates via `app:adTemplate` or `setTemplate()`
-- **Material 3 Theming**: Automatic dark/light mode support
-- **AdChoices Control**: Configure placement position (v2.9.0+)
-- **Video-Ready**: All templates support video ads (120dp+ MediaView)
-- [View Documentation](docs/NATIVE_TEMPLATE_VIEW.md)
-
-### Ad Loading Strategies (v2.6.0+)
-- **ON_DEMAND**: Fetch fresh ads with loading dialog
-- **ONLY_CACHE**: Instant display from cache
-- **HYBRID**: Cache-first with fallback fetch (recommended)
-- [View Documentation](docs/AD_LOADING_STRATEGIES.md)
-
-### Jetpack Compose Integration
-- BannerAdCompose, NativeAdCompose, InterstitialAdCompose
-- Programmatic native ads without predefined layouts
-- ConditionalAd, CacheWarmingEffect utilities
-
-### AdMob Ads Management
-- **Banner Ads**: All standard sizes (adaptive, 320x50, 320x100, 300x250, 468x60, 728x90), auto-refresh, collapsible banners, smart retry
-- **Native Ads**: Small, Medium, Large formats with caching
-- **Interstitial Ads**: Time/count-based triggers, dialog support
-- **App Open Ads**: Lifecycle-aware with activity exclusion
-
-### Centralized Configuration
-- **AdManageKitConfig**: Single configuration point
-- Environment-specific settings (debug vs production)
-- Runtime configuration changes
-
-### Intelligent Native Ad Caching
-- Screen-aware caching prevents collisions
-- Smart preloading with usage patterns
-- LRU cache with configurable expiration
-
-### Reliability & Performance
-- Smart retry with exponential backoff
-- Circuit breaker for failing ad units
-- Memory leak prevention with WeakReference
-
-### Billing & Monetization
-- **Subscriptions & One-Time Products**: Categories (consumable, feature unlock, remove ads, lifetime premium) with automatic acknowledgment
-- **Offers**: Enumerate every trial / introductory / base offer and purchase a *specific* one (v4.4.0+)
-- **Price Comparison**: ISO-8601 period parsing, per-month normalization, "Save 40%" badges (v4.4.0+)
-- **Trial Eligibility**: Ask whether *this* account can still claim a trial before promising one (v4.4.0+)
-- **Payment Recovery**: Client-side account-hold detection plus Play's in-app recovery flow (v4.4.0+)
-- [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md)
-
-### Privacy & Compliance
-- UMP consent management (GDPR/CCPA)
-- Automatic ad hiding for purchased users
-- Obfuscated account/profile identifiers and EU personalized-pricing disclosure (v4.4.0+)
-
-### Multi-Provider Waterfall (New)
-- **Multiple Ad Networks**: Load ads from AdMob, Yandex, and more with automatic fallback
-- **Zero Code Changes**: Configure provider chains once; all existing API calls use waterfall automatically
-- **Per-Ad-Type Chains**: Configure different provider orders for each ad format
-- **Region-Based**: Prioritize providers by user locale (e.g., Yandex first for Russia)
-- [View Waterfall Documentation](docs/MULTI_PROVIDER_WATERFALL.md)
-- [Yandex Integration Guide](docs/YANDEX_INTEGRATION.md)
-
-### Multi-Module Architecture
-- **Core Module**: Shared interfaces and configuration
-- **Compose Module**: Jetpack Compose integration
-- **Billing Module**: Google Play Billing Library v9
-- **Yandex Module**: Yandex Ads SDK provider
-
----
-
-## Usage Guide
-
-### Quick Configuration
-
-Configure AdManageKit in your Application class:
+Configure the library and initialize the SDK in your `Application`:
 
 ```kotlin
 class MyApp : Application() {
-    private lateinit var appOpenManager: AppOpenManager
+    lateinit var appOpenManager: AppOpenManager
 
     override fun onCreate() {
         super.onCreate()
 
-        // Configure AdManageKit
         AdManageKitConfig.apply {
             debugMode = BuildConfig.DEBUG
-            enableSmartPreloading = true
             autoRetryFailedAds = true
-
-            // Ad Loading Strategies (v2.6.0+)
             interstitialLoadingStrategy = AdLoadingStrategy.HYBRID
             appOpenLoadingStrategy = AdLoadingStrategy.HYBRID
             nativeLoadingStrategy = AdLoadingStrategy.HYBRID
-
-            // Auto-reload ads after showing (v2.7.0+)
-            interstitialAutoReload = true  // default: true
-            appOpenAutoReload = true       // default: true
-            rewardedAutoReload = true      // default: true
         }
 
-        // Set up billing
+        // Hide ads for users who bought premium
         BillingConfig.setPurchaseProvider(BillingPurchaseProvider())
 
-        // Initialize app open ads
-        appOpenManager = AppOpenManager(this, "your-app-open-ad-unit-id")
+        // initialize() must run off the main thread, and AppOpenManager must be
+        // created only after it returns (the SDK rejects loads before that).
+        val config = InitializationConfig.Builder("ca-app-pub-xxx~yyy").build()
+        Thread {
+            MobileAds.initialize(this, config)
+            Handler(Looper.getMainLooper()).post {
+                appOpenManager = AppOpenManager(this, "ca-app-pub-xxx/yyy")
+            }
+        }.start()
     }
 }
 ```
 
-### Multi-Provider Waterfall (Optional)
-
-Add Yandex (or other providers) as fallback ad networks with zero changes to your existing ad loading code:
-
-```groovy
-// Add Yandex module
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v3.6.0'
-```
+Request consent before loading ads:
 
 ```kotlin
-// In Application.onCreate(), after AdManageKitConfig setup:
-YandexProviderRegistration.initialize(this)
-val admob = AdMobProviderRegistration.create()
-val yandex = YandexProviderRegistration.create()
-
-// Map your AdMob ad unit IDs to Yandex equivalents
-AdUnitMapping.register("ca-app-pub-xxx/your-interstitial", mapOf("yandex" to "R-M-XXXXXX-Y"))
-AdUnitMapping.register("ca-app-pub-xxx/your-native", mapOf("yandex" to "R-M-XXXXXX-Y"))
-
-// Set provider chains (order = priority)
-AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
-AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
-// ... same for banner, app open, rewarded
+AdsConsentManager.getInstance(this).requestUMP(
+    activity = this,
+    isDebug = true,
+    testDeviceId = "TEST_DEVICE_ID",
+    resetConsent = false,
+    listener = object : UMPResultListener {
+        override fun onCheckUMPSuccess(isConsentGiven: Boolean) {
+            if (isConsentGiven) {
+                AdManager.getInstance().loadInterstitialAd(activity, adUnitId)
+            }
+        }
+    }
+)
 ```
 
-See [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) and [Yandex Integration](docs/YANDEX_INTEGRATION.md) for the full guide.
+The sample app's [`MyApplication.kt`](app/src/main/java/com/i2hammad/admanagekit/sample/MyApplication.kt) shows the full setup, including test device ids and the Yandex waterfall.
 
-### NativeTemplateView (v2.6.0+)
-
-#### XML Usage
-
-```xml
-<com.i2hammad.admanagekit.admob.NativeTemplateView
-    android:id="@+id/nativeTemplateView"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    app:adTemplate="material3" />
-```
-
-#### Available Templates
-
-| Template | Best For |
-|----------|----------|
-| `card_modern` | General use |
-| `material3` | M3 apps |
-| `minimal` | Content-focused |
-| `compact_horizontal` | Lists |
-| `list_item` | RecyclerView items |
-| `magazine` | News/blog apps |
-| `app_store` | App promotion (v2.9.0+) |
-| `social_feed` | Feed integration (v2.9.0+) |
-| `gradient_card` | Premium feel (v2.9.0+) |
-| `pill_banner` | Inline placement (v2.9.0+) |
-| `medium_horizontal` | 55/45 media-content split (v3.0.0+) |
-| `spotlight` | High visibility (v2.9.0+) |
-| `media_content_split` | Balanced display (v2.9.0+) |
-| `flexible` | Adaptive layout (v3.3.2+) |
-| `icon_left` | Icon on left, GridView optimized (v3.3.2+) |
-| `top_icon_media` | Icon at top, MediaView center (v3.3.2+) |
-| `video_small/medium/large` | Video content |
-| `video_square/vertical/fullscreen` | Social feeds |
-
-#### Programmatic Usage
-
-```kotlin
-// Load with default template
-nativeTemplateView.loadNativeAd(activity, "ca-app-pub-xxx/yyy")
-
-// Change template
-nativeTemplateView.setTemplate(NativeAdTemplate.MAGAZINE)
-nativeTemplateView.loadNativeAd(activity, "ca-app-pub-xxx/yyy")
-
-// With callback
-nativeTemplateView.loadNativeAd(activity, adUnitId, object : AdLoadCallback() {
-    override fun onAdLoaded() { /* success */ }
-    override fun onFailedToLoad(error: AdError?) { /* error */ }
-})
-
-// With strategy override
-nativeTemplateView.loadNativeAd(activity, adUnitId, callback, AdLoadingStrategy.ONLY_CACHE)
-```
+## Usage
 
 ### Banner Ads
 
@@ -426,448 +144,268 @@ nativeTemplateView.loadNativeAd(activity, adUnitId, callback, AdLoadingStrategy.
 
 ```kotlin
 bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy")
-// Fixed size (BANNER, LARGE_BANNER, MEDIUM_RECTANGLE, FULL_BANNER, LEADERBOARD)
+// Fixed size: BANNER, LARGE_BANNER, MEDIUM_RECTANGLE, FULL_BANNER, LEADERBOARD
 bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy", BannerAdSize.MEDIUM_RECTANGLE)
 // Collapsible banner (adaptive size only)
 bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-xxx/yyy", true)
 ```
 
-All standard AdMob banner sizes are supported via `BannerAdSize` (v4.3.0); the
-default `ADAPTIVE` is the Google-recommended full-width anchored adaptive banner
-(~50-90dp), and `ADAPTIVE_LARGE` (v4.3.4) opts into the taller Next-Gen *large
-anchored adaptive* format.
-See [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md) for the full size table.
+`ADAPTIVE` (the default) is Google's full-width anchored adaptive banner; `ADAPTIVE_LARGE` opts into the taller large anchored format. See the [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md).
 
-### Native Ads (Traditional Views)
+### Native Ads
+
+`NativeTemplateView` renders any of 38 templates from XML or code:
 
 ```xml
-<com.i2hammad.admanagekit.admob.NativeBannerSmall
-    android:id="@+id/nativeBannerSmall"
+<com.i2hammad.admanagekit.admob.NativeTemplateView
+    android:id="@+id/nativeTemplateView"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content" />
+    android:layout_height="wrap_content"
+    app:adTemplate="material3" />
 ```
 
 ```kotlin
-nativeBannerSmall.loadNativeBannerAd(this, "ca-app-pub-xxx/yyy")
-// With caching
+nativeTemplateView.setTemplate(NativeAdTemplate.MAGAZINE)
+nativeTemplateView.loadNativeAd(activity, adUnitId, object : AdLoadCallback() {
+    override fun onAdLoaded() { }
+    override fun onFailedToLoad(error: AdError?) { }
+})
+
+// Override the loading strategy for one call
+nativeTemplateView.loadNativeAd(activity, adUnitId, callback, AdLoadingStrategy.ONLY_CACHE)
+```
+
+Popular templates: `card_modern`, `material3`, `minimal`, `compact_horizontal`, `list_item`, `magazine`, `app_store`, `social_feed`, `medium_horizontal`, `flexible`, plus the `video_*` family. See the [NativeTemplateView Guide](docs/NATIVE_TEMPLATE_VIEW.md) for all 38.
+
+The fixed-layout views `NativeBannerSmall`, `NativeBannerMedium` and `NativeLarge` work the same way:
+
+```kotlin
 nativeBannerSmall.loadNativeBannerAd(activity, adUnitId, useCachedAd = true)
 ```
 
 ### Interstitial Ads
 
 ```kotlin
-// Load
-AdManager.getInstance().loadInterstitialAd(this, "ca-app-pub-xxx/yyy")
+val ads = AdManager.getInstance()
+ads.loadInterstitialAd(this, "ca-app-pub-xxx/yyy")
 
-// Show immediately
-AdManager.getInstance().forceShowInterstitial(this, object : AdManagerCallback() {
-    override fun onNextAction() { navigateNext() }
-})
+val callback = object : AdManagerCallback() {
+    override fun onNextAction() { navigateNext() }   // fires once on show, skip or failure
+}
+ads.forceShowInterstitial(this, callback)                          // show now
+ads.forceShowInterstitialWithDialog(this, callback)                // with loading dialog
+ads.showInterstitialAdByTime(this, callback)                       // at most every 15s (default)
+ads.showInterstitialAdByCount(this, callback, maxDisplayCount = 3)
 
-// Show with dialog
-AdManager.getInstance().forceShowInterstitialWithDialog(this, callback)
-
-// Time-based (every 15 seconds)
-AdManager.getInstance().showInterstitialAdByTime(this, callback)
-
-// Count-based
-AdManager.getInstance().showInterstitialAdByCount(this, callback, maxDisplayCount = 3)
+// Splash screen: show a ready ad, or wait up to the timeout for one
+ads.showOrWaitForAd(activity = this, callback = callback, timeoutMillis = 10_000)
 ```
 
-#### Auto-Reload Configuration (v2.7.0+)
-
-Control whether interstitial ads automatically reload after being shown:
+Ads reload after showing by default. Turn that off globally with `AdManageKitConfig.interstitialAutoReload = false`, or per call:
 
 ```kotlin
-// Global config (applies to all AdManager methods)
-AdManageKitConfig.interstitialAutoReload = false  // Disable auto-reload
-
-// Per-call override via InterstitialAdBuilder
 InterstitialAdBuilder.with(activity)
     .adUnit(adUnitId)
-    .autoReload(true)  // Override global setting for this call
+    .autoReload(true)
     .show { navigateNext() }
-
-// Per-call override via AdManager
-AdManager.getInstance().showInterstitialIfReady(activity, callback, reloadAd = false)
 ```
 
-**Priority:** `InterstitialAdBuilder.autoReload()` > `AdManageKitConfig.interstitialAutoReload`
+More: [Interstitial Ads](docs/interstitial-ads.md) · [InterstitialAdBuilder](docs/INTERSTITIAL_BUILDER_GUIDE.md) · [Frequency Control](docs/AD_FREQUENCY_CONTROL.md)
 
 ### Rewarded Ads
 
 ```kotlin
-// Initialize once (e.g., in Application.onCreate())
-RewardedAdManager.initialize(context, "ca-app-pub-xxx/yyy")
+RewardedAdManager.initialize(context, "ca-app-pub-xxx/yyy")   // once, e.g. in Application
 
-// Show when ready
 if (RewardedAdManager.isAdLoaded()) {
     RewardedAdManager.showAd(activity, object : RewardedAdManager.RewardedAdCallback {
         override fun onRewardEarned(rewardType: String, rewardAmount: Int) {
             grantReward(rewardType, rewardAmount)
         }
-        override fun onAdDismissed() {
-            continueGameFlow()
-        }
+        override fun onAdDismissed() { continueGameFlow() }
     })
 }
 
-// Load with timeout (splash screens)
-RewardedAdManager.loadRewardedAdWithTimeout(context, 5000, callback)
-
-// Preload during natural pauses
-RewardedAdManager.preload(context)
-
-// Control auto-reload
-AdManageKitConfig.rewardedAutoReload = false  // Disable globally
-RewardedAdManager.showAd(activity, callback, autoReload = false)  // Per-call override
+RewardedAdManager.loadRewardedAdWithTimeout(context, 5000, callback)  // splash screens
 ```
+
+More: [Rewarded Ads](docs/rewarded-ads.md)
 
 ### App Open Ads
 
 ```kotlin
-// In Application class
-appOpenManager = AppOpenManager(this, "ca-app-pub-xxx/yyy")
-
-// Exclude activities
-appOpenManager.disableAppOpenWithActivity(MainActivity::class.java)
-
-// Force show
+appOpenManager.disableAppOpenWithActivity(SplashActivity::class.java)  // exclude screens
 appOpenManager.forceShowAdIfAvailable(activity, callback)
-
-// Skip next ad
 appOpenManager.skipNextAd()
+
+// Pause around critical flows
+appOpenManager.disableAppOpenAdsTemporarily()
+appOpenManager.enableAppOpenAds()
 ```
 
-#### Single-Activity App Support (v3.2.0+)
-
-For apps with one activity and multiple fragments:
+Single-activity apps can exclude fragments or navigation destinations instead:
 
 ```kotlin
-// Set current screen when navigating
 navController.addOnDestinationChangedListener { _, destination, _ ->
     appOpenManager.setCurrentScreenTag(destination.label?.toString())
 }
-
-// Exclude specific screens
 appOpenManager.excludeScreenTags("Payment", "Onboarding", "Checkout")
-
-// Or use fragment tag provider
-appOpenManager.setFragmentTagProvider {
-    supportFragmentManager.fragments.lastOrNull()?.tag
-}
-appOpenManager.excludeFragmentTags("PaymentFragment", "OnboardingFragment")
-
-// Temporarily disable during critical flows
-appOpenManager.disableAppOpenAdsTemporarily()
-// ... perform operation ...
-appOpenManager.enableAppOpenAds()
 ```
+
+More: [App Open Ads](docs/app-open-ads.md)
 
 ### Jetpack Compose
 
 ```kotlin
 @Composable
 fun MyScreen() {
-    // Banner
     BannerAdCompose(adUnitId = "ca-app-pub-xxx/yyy")
 
-    // NativeTemplateView with any template (v2.6.0+)
     NativeTemplateCompose(
         adUnitId = "ca-app-pub-xxx/yyy",
         template = NativeAdTemplate.MATERIAL3,
         loadingStrategy = AdLoadingStrategy.HYBRID
     )
 
-    // Native with loading strategy (ON_DEMAND or HYBRID only)
-    NativeBannerMediumCompose(
-        adUnitId = "ca-app-pub-xxx/yyy",
-        loadingStrategy = AdLoadingStrategy.HYBRID
-    )
+    val showInterstitial = rememberInterstitialAd(adUnitId = "ca-app-pub-xxx/yyy", preloadAd = true)
+    Button(onClick = { showInterstitial() }) { Text("Show Ad") }
 
-    // Interstitial
-    val showInterstitial = rememberInterstitialAd(
-        adUnitId = "ca-app-pub-xxx/yyy",
-        preloadAd = true
-    )
-    Button(onClick = { showInterstitial() }) {
-        Text("Show Ad")
-    }
-
-    // Conditional (hides for purchased users)
+    // Hidden automatically for purchased users
     ConditionalAd {
         ProgrammaticNativeBannerMediumCompose(adUnitId = "ca-app-pub-xxx/yyy")
     }
 }
 ```
 
-### UMP Consent
+More: [Jetpack Compose Integration](docs/COMPOSE_INTEGRATION.md)
+
+### Multi-Provider Waterfall
+
+Add Yandex (or another provider) as a fallback. Existing ad calls pick up the chain automatically:
 
 ```kotlin
-AdsConsentManager.getInstance(this).requestUMP(
-    activity = this,
-    isDebug = true,
-    testDeviceId = "TEST_DEVICE_ID",
-    resetConsent = false,
-    listener = object : UMPResultListener {
-        override fun onCheckUMPSuccess(isConsentGiven: Boolean) {
-            if (isConsentGiven) {
-                // Initialize and load ads here
-                AdManager.getInstance().loadInterstitialAd(activity, adUnitId)
-            }
-        }
-    }
-)
+// In Application.onCreate(), after AdManageKitConfig setup
+YandexProviderRegistration.initialize(this)
+val admob = AdMobProviderRegistration.create()
+val yandex = YandexProviderRegistration.create()
+
+// Map AdMob ad unit ids to their Yandex equivalents
+AdUnitMapping.register("ca-app-pub-xxx/your-interstitial", mapOf("yandex" to "R-M-XXXXXX-Y"))
+
+// Order = priority; set a chain per ad type
+AdProviderConfig.setInterstitialChain(listOf(admob.interstitialProvider, yandex.interstitialProvider))
+AdProviderConfig.setNativeChain(listOf(admob.nativeProvider, yandex.nativeProvider))
 ```
 
-### In-App Purchases (v2.9.0+)
+More: [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) · [Yandex Integration](docs/YANDEX_INTEGRATION.md)
+
+### In-App Purchases
 
 ```kotlin
-// Define products with categories
 val products = listOf(
     PurchaseItem("coins_100", TYPE_IAP.PURCHASE, PurchaseCategory.CONSUMABLE),
     PurchaseItem("remove_ads", TYPE_IAP.PURCHASE, PurchaseCategory.REMOVE_ADS),
     PurchaseItem("lifetime", TYPE_IAP.PURCHASE, PurchaseCategory.LIFETIME_PREMIUM),
     PurchaseItem("premium_monthly", "free_trial", TYPE_IAP.SUBSCRIPTION)
 )
+val billing = AppPurchase.getInstance()
+billing.initBilling(application, products)
 
-// Initialize
-AppPurchase.getInstance().initBilling(application, products)
+billing.purchase(activity, "remove_ads")
+billing.subscribe(activity, "premium_monthly")
 
-// Purchase
-AppPurchase.getInstance().purchase(activity, "remove_ads")
+if (billing.isPurchased()) { /* subscription, lifetime or remove_ads */ }
 
-// Subscribe
-AppPurchase.getInstance().subscribe(activity, "premium_monthly")
-
-// Check status
-if (AppPurchase.getInstance().isPurchased()) {
-    // User has premium (subscription, lifetime, or remove_ads)
-}
-
-// Track purchases and handle consumables
-AppPurchase.getInstance().setPurchaseHistoryListener(object : PurchaseHistoryListener {
+// Consumables are not auto-consumed: grant, then consume
+billing.setPurchaseHistoryListener(object : PurchaseHistoryListener {
     override fun onNewPurchase(productId: String, purchase: PurchaseResult) {
         if (productId == "coins_100") {
             addCoins(100 * purchase.quantity)
-            AppPurchase.getInstance().consumePurchase(productId) // Manual consume
+            billing.consumePurchase(productId)
         }
     }
     override fun onPurchaseConsumed(productId: String, purchase: PurchaseResult) { }
 })
 ```
 
-#### Subscription Offers & Paywalls (v4.4.0+)
+#### Subscription Offers & Paywalls
 
-A single subscription product usually carries several offers — a base plan, a free trial, an introductory discount. Play returns only the ones this account is eligible for.
+Play returns only the offers this account is eligible for. Buy the exact offer the user tapped, since `subscribe(activity, subsId)` picks one for you:
 
 ```kotlin
-val billing = AppPurchase.getInstance()
-
-// Enumerate every offer, then buy exactly the one the user tapped.
-// (subscribe(activity, subsId) picks for you, and may not pick what they chose.)
 val offers = billing.getOffers("premium_sub")
 billing.subscribe(activity, offers[selectedIndex])
 
-// Or find a specific one
-billing.getIntroOffer("premium_sub")                   // first with an intro price
 billing.getOfferByBasePlanId("premium_sub", "yearly")
 billing.getOfferByTag("premium_sub", "popular")        // Play Console offer tag
 billing.getBestValueOffer("premium_sub")               // lowest cost per month
-```
 
-Render an offer without hand-parsing `ProductDetails` or ISO-8601 periods:
-
-```kotlin
 val offer = billing.getBaseOffer("premium_yearly") ?: return
-
 priceLabel.text    = offer.basePrice                   // "$59.99"
-cycleLabel.text    = BillingPeriod.formatOf(offer.billingPeriod)   // "1 year"
 perMonthLabel.text = AppPurchase.formatPrice(offer.pricePerMonthMicros, offer.currencyCode)
 todayLabel.text    = offer.firstCyclePrice             // "Free", "$1.99" or "$59.99"
 
-// "Save 50%" badge — compares base offers, so trials don't distort it
-val savings = billing.getSavingsPercent("premium_monthly", "premium_yearly")
-savingsBadge.isVisible = savings > 0
-savingsBadge.text = "Save $savings%"
-
-// Only promise a trial the user can actually claim
-subscribeButton.text = if (billing.isEligibleForFreeTrial("premium_sub")) {
-    "Start free trial"
-} else {
-    "Subscribe"
-}
+val savings = billing.getSavingsPercent("premium_monthly", "premium_yearly")  // "Save 50%"
+subscribeButton.text = if (billing.isEligibleForFreeTrial("premium_sub")) "Start free trial" else "Subscribe"
 ```
 
-> **Localization:** `BillingPeriod.formatOf()` is an English convenience. For shipped UI use `BillingPeriod.parse(iso)` and pair `unit` + `count` with your own plurals resources.
+One-time products can carry several offers too (discounts, rentals, pre-orders): see `getBestOneTimeOffer()` in the [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md).
 
-One-time products can carry multiple offers too (discounts, rentals, pre-orders, limited quantity):
-
-```kotlin
-billing.getBestOneTimeOffer("remove_ads")?.let { offer ->
-    price.text = offer.formattedPrice
-    badge.isVisible = offer.isDiscounted
-    badge.text = "-${offer.effectiveDiscountPercent}%"
-    buyButton.isEnabled = !offer.isSoldOut && offer.isValidAt()
-    buyButton.setOnClickListener { billing.purchase(activity, offer) }
-}
-```
-
-#### Subscription Management (v2.9.0+)
+#### Subscription State & Account Hold
 
 ```kotlin
-// Check subscription state
-val state = AppPurchase.getInstance().getSubscriptionState("premium_monthly")
-when (state) {
-    SubscriptionState.ACTIVE -> showPremiumUI()
-    SubscriptionState.CANCELLED -> showRenewalPrompt()   // Still has access
-    SubscriptionState.ON_HOLD -> showFixPaymentPrompt()  // Payment declined — no access (v4.4.0+)
-    SubscriptionState.EXPIRED -> showSubscribeButton()
+when (billing.getSubscriptionState("premium_monthly")) {
+    SubscriptionState.ACTIVE    -> showPremiumUI()
+    SubscriptionState.CANCELLED -> showRenewalPrompt()     // still has access
+    SubscriptionState.ON_HOLD   -> showFixPaymentPrompt()  // payment declined, no access
+    SubscriptionState.EXPIRED   -> showSubscribeButton()
 }
 
-// Upgrade subscription
-AppPurchase.getInstance().upgradeSubscription(activity, "premium_yearly")
+billing.upgradeSubscription(activity, "premium_yearly")
+billing.downgradeSubscription(activity, "premium_basic")
 
-// Downgrade subscription
-AppPurchase.getInstance().downgradeSubscription(activity, "premium_basic")
-
-// Full control with proration mode
-AppPurchase.getInstance().changeSubscription(
-    activity,
-    "premium_monthly",
-    "premium_yearly",
-    SubscriptionReplacementMode.CHARGE_PRORATED_PRICE
-)
-```
-
-#### Account Hold & Payment Recovery (v4.4.0+)
-
-When Play cannot charge a subscriber, the subscription enters **account hold**. As of 4.4.0 this is detected client-side — earlier versions needed a server round-trip.
-
-```kotlin
+// Let Play walk the user through fixing a declined payment
 if (billing.hasSubscriptionOnHold()) {
-    // Let Play walk the user through fixing their payment method.
     billing.showInAppMessages(activity, object : InAppMessageListener {
-        override fun onSubscriptionRecovered(purchaseToken: String) {
-            refreshPremiumUi()   // isPurchased() is already up to date here
-        }
+        override fun onSubscriptionRecovered(purchaseToken: String) { refreshPremiumUi() }
         override fun onNoActionNeeded() { }
     })
 }
 ```
 
-> **Behavior change:** `isSubscriptionActive()` returns `false` during account hold, matching Google's requirement. If your app deliberately keeps serving these users, check `isSuspended()` explicitly.
+> `isSubscriptionActive()` returns `false` during account hold, as Google requires. Check `isSuspended()` if you deliberately keep serving those users.
 
-#### Debugging an Empty Paywall (v4.4.0+)
+**Empty paywall?** Register a `ProductDetailsListener` **before** `initBilling`. Its `unfetched` list names each product id Play declined and why: a misspelled id, an inactive product, or an account that can't see the release track.
 
-```kotlin
-billing.setProductDetailsListener(object : ProductDetailsListener {
-    override fun onProductDetailsLoaded(
-        productType: String,
-        loaded: List<ProductDetails>,
-        unfetched: List<UnfetchedProduct>,
-    ) {
-        unfetched.forEach { Log.e("Billing", "${it.productId}: status ${it.statusCode}") }
-    }
-    override fun onProductDetailsFailed(productType: String, responseCode: Int, debugMessage: String?) { }
-})
-```
+More: [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md) · [Subscription Offers](wiki/Subscription-Offers.md) · [Subscription Upgrades](wiki/Subscription-Upgrades.md)
 
-Register it **before** `initBilling`. Products land in `unfetched` when the id is misspelled, the product is inactive in Play Console, or the account can't see the release track.
+## Screenshots
 
----
+| NativeBannerSmall Ad | Interstitial Ad | App Open Ad | UMP Consent Form |
+|----------------------|-----------------|-----------------|------------------|
+| ![NativeBannerSmall ad displayed in app](docs/assets/native_ad_small_screenshot.png) | ![Interstitial ad with loading dialog](docs/assets/interstitial_ad_screenshot.png) | ![App open ad on app launch](docs/assets/app_open_ad_screenshot.png) | ![UMP consent form](docs/assets/ump_consent_screenshot.png) |
+
+[Watch the demo on YouTube](https://youtube.com/shorts/h_872tOARpU)
 
 ## Documentation
 
-- [NativeTemplateView Guide](docs/NATIVE_TEMPLATE_VIEW.md)
-- [Ad Loading Strategies](docs/AD_LOADING_STRATEGIES.md)
-- [Jetpack Compose Integration](docs/COMPOSE_INTEGRATION.md)
-- [Native Ads Caching](docs/native-ads-caching.md)
-- [Interstitial Ads](docs/interstitial-ads.md)
-- [Rewarded Ads](docs/rewarded-ads.md)
-- [App Open Ads](docs/app-open-ads.md)
-- [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md)
-- [Yandex Integration](docs/YANDEX_INTEGRATION.md)
-- [Billing Integration Guide](docs/APP_PURCHASE_GUIDE.md)
-- [Release Notes v4.4.8](docs/release-notes/RELEASE_NOTES_v4.4.8.md)
-- [Release Notes v4.4.7](docs/release-notes/RELEASE_NOTES_v4.4.7.md)
-- [Release Notes v4.4.6](docs/release-notes/RELEASE_NOTES_v4.4.6.md)
-- [Release Notes v4.4.5](docs/release-notes/RELEASE_NOTES_v4.4.5.md)
-- [Release Notes v4.4.4](docs/release-notes/RELEASE_NOTES_v4.4.4.md)
-- [Release Notes v4.4.3](docs/release-notes/RELEASE_NOTES_v4.4.3.md)
-- [Release Notes v4.4.2](docs/release-notes/RELEASE_NOTES_v4.4.2.md)
-- [Release Notes v4.4.1](docs/release-notes/RELEASE_NOTES_v4.4.1.md)
-- [Release Notes v4.4.0](docs/release-notes/RELEASE_NOTES_v4.4.0.md)
-- [Release Notes v4.3.5](docs/release-notes/RELEASE_NOTES_v4.3.5.md)
-- [Release Notes v4.3.4](docs/release-notes/RELEASE_NOTES_v4.3.4.md)
-- [Release Notes v4.3.3](docs/release-notes/RELEASE_NOTES_v4.3.3.md)
-- [Release Notes v4.3.2](docs/release-notes/RELEASE_NOTES_v4.3.2.md)
-- [Release Notes v4.3.1](docs/release-notes/RELEASE_NOTES_v4.3.1.md)
-- [Release Notes v4.3.0](docs/release-notes/RELEASE_NOTES_v4.3.0.md)
-- [Release Notes v4.2.0](docs/release-notes/RELEASE_NOTES_v4.2.0.md)
-- [Release Notes v3.6.0](docs/release-notes/RELEASE_NOTES_v3.6.0.md)
-- [Release Notes v3.5.9](docs/release-notes/RELEASE_NOTES_v3.5.9.md)
-- [Release Notes v3.5.8](docs/release-notes/RELEASE_NOTES_v3.5.8.md)
-- [Release Notes v3.5.7](docs/release-notes/RELEASE_NOTES_v3.5.7.md)
-- [Release Notes v3.4.6](docs/release-notes/RELEASE_NOTES_v3.4.6.md)
-- [Release Notes v3.4.5](docs/release-notes/RELEASE_NOTES_v3.4.5.md)
-- [Release Notes v3.4.4](docs/release-notes/RELEASE_NOTES_v3.4.4.md)
-- [Release Notes v3.4.3](docs/release-notes/RELEASE_NOTES_v3.4.3.md)
-- [Release Notes v3.4.2](docs/release-notes/RELEASE_NOTES_v3.4.2.md)
-- [Release Notes v3.4.1](docs/release-notes/RELEASE_NOTES_v3.4.1.md)
-- [Release Notes v3.4.0](docs/release-notes/RELEASE_NOTES_v3.4.0.md)
-- [Release Notes v3.3.9](docs/release-notes/RELEASE_NOTES_v3.3.9.md)
-- [Release Notes v3.3.8](docs/release-notes/RELEASE_NOTES_v3.3.8.md)
-- [Release Notes v3.3.7](docs/release-notes/RELEASE_NOTES_v3.3.7.md)
-- [Release Notes v3.3.6](docs/release-notes/RELEASE_NOTES_v3.3.6.md)
-- [Release Notes v3.3.5](docs/release-notes/RELEASE_NOTES_v3.3.5.md)
-- [Release Notes v3.3.4](docs/release-notes/RELEASE_NOTES_v3.3.4.md)
-- [Release Notes v3.3.3](docs/release-notes/RELEASE_NOTES_v3.3.3.md)
-- [Release Notes v3.3.2](docs/release-notes/RELEASE_NOTES_v3.3.2.md)
-- [Release Notes v3.3.0](docs/release-notes/RELEASE_NOTES_v3.3.0.md)
-- [Release Notes v3.1.0](docs/release-notes/RELEASE_NOTES_v3.1.0.md)
-- [Release Notes v3.0.0](docs/release-notes/RELEASE_NOTES_v3.0.0.md)
-- [API Reference](docs/API_REFERENCE.md)
-
-### Wiki
-- [Multi-Provider Waterfall](wiki/Multi-Provider-Waterfall.md)
-- [Yandex Integration](wiki/Yandex-Integration.md)
-- [Rewarded Ads](wiki/Rewarded-Ads.md)
-- [Billing Integration](wiki/Billing-Integration.md)
-- [Purchase Categories](wiki/Purchase-Categories.md)
-- [Consumable Products](wiki/Consumable-Products.md)
-- [Subscriptions](wiki/Subscriptions.md)
-- [Subscription Offers](wiki/Subscription-Offers.md)
-- [Subscription Upgrades](wiki/Subscription-Upgrades.md)
-
-### API Documentation (Dokka)
-
-**Online:** [https://i2hammad.github.io/AdManageKit/](https://i2hammad.github.io/AdManageKit/)
-
-Generate locally:
-
-```bash
-./gradlew dokkaGenerateHtml
-```
-
-Output: `build/dokka/html/index.html`
+| Topic | Guide |
+|---|---|
+| Configuration | [Configuration Usage](docs/CONFIGURATION_USAGE.md) · [Java Usage](docs/JAVA_USAGE_GUIDE.md) |
+| Native ads | [NativeTemplateView](docs/NATIVE_TEMPLATE_VIEW.md) · [Native Ads Caching](docs/native-ads-caching.md) · [Preloading](docs/NATIVE_AD_PRELOADING.md) |
+| Loading strategies | [Ad Loading Strategies](docs/AD_LOADING_STRATEGIES.md) · [Examples](docs/LOADING_STRATEGY_EXAMPLES.md) |
+| Full-screen ads | [Interstitial](docs/interstitial-ads.md) · [Rewarded](docs/rewarded-ads.md) · [App Open](docs/app-open-ads.md) |
+| Compose | [Jetpack Compose Integration](docs/COMPOSE_INTEGRATION.md) |
+| Waterfall | [Multi-Provider Waterfall](docs/MULTI_PROVIDER_WATERFALL.md) · [Yandex Integration](docs/YANDEX_INTEGRATION.md) |
+| Billing | [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md) · [Purchase Categories](wiki/Purchase-Categories.md) · [Consumables](wiki/Consumable-Products.md) · [Subscriptions](wiki/Subscriptions.md) |
+| Reference | [API Reference](docs/API_REFERENCE.md) · [Dokka API docs](https://i2hammad.github.io/AdManageKit/) (`./gradlew dokkaGenerateHtml` to build locally) |
+| History | [Changelog](CHANGELOG.md) · [Release notes](docs/release-notes/) |
 
 ### MCP Server (AI Integration)
 
 [![npm](https://img.shields.io/npm/v/admanagekit-mcp-server)](https://www.npmjs.com/package/admanagekit-mcp-server)
 
-AdManageKit provides an [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) server that integrates with AI tools like Claude Code, Claude Desktop, Cursor, and other MCP-compatible clients. It provides **10 tools** for documentation lookup and code generation.
-
-#### Tools
-
-| Category | Tools |
-|----------|-------|
-| **Documentation** | `search_docs`, `get_doc_by_topic`, `get_api_reference`, `get_release_notes`, `get_migration_guide`, `list_documentation` |
-| **Code Generation** | `generate_config`, `generate_ad_integration`, `generate_billing_code`, `generate_compose_code` |
-
-#### Setup
-
-**Claude Desktop / Cursor** (`claude_desktop_config.json`):
+An [MCP](https://modelcontextprotocol.io/) server lets Claude Code, Claude Desktop, Cursor and other MCP clients search these docs and generate AdManageKit integration code (ads, billing, Compose; Kotlin or Java):
 
 ```json
 {
@@ -880,29 +418,7 @@ AdManageKit provides an [MCP (Model Context Protocol)](https://modelcontextproto
 }
 ```
 
-**Claude Code** (auto-configured via `.mcp.json` when working in this repo):
-
-```json
-{
-  "mcpServers": {
-    "admanagekit": {
-      "command": "node",
-      "args": ["mcp-server/dist/index.js"]
-    }
-  }
-}
-```
-
-#### What It Does
-
-- **Search documentation** across all docs, wiki pages, and API references
-- **Look up API references** for any class (AdManager, AppOpenManager, NativeAdManager, etc.)
-- **Generate integration code** for any ad type with display modes, loading strategies, and callbacks
-- **Generate billing code** for purchases, subscriptions, consumables, and expiry verification
-- **Generate Compose code** for all Compose ad components
-- Supports both **Kotlin** and **Java** output
-
-See [mcp-server/](mcp-server/) for more details.
+It's configured automatically when you work in this repo. See [mcp-server/](mcp-server/).
 
 ---
 
