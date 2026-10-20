@@ -20,11 +20,11 @@ Add the artifacts plus Compose (if needed):
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.9"
     // Optional – Jetpack Compose helpers:
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.9"
 }
 ```
 

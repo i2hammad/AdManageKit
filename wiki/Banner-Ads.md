@@ -1,10 +1,10 @@
-# Banner Ads - AdManageKit v4.4.8
+# Banner Ads - AdManageKit v4.4.9
 
 ## Overview
 
 AdManageKit provides `BannerAdView` for banner ad integration with every standard AdMob size, adaptive banners, collapsible banners, a size-aware loading shimmer, auto-refresh, and smart retry logic.
 
-**Library Version**: v4.4.8
+**Library Version**: v4.4.9
 
 ## Features
 
@@ -23,8 +23,8 @@ AdManageKit provides `BannerAdView` for banner ad integration with every standar
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9'
 }
 ```
 

@@ -6,12 +6,13 @@
 
 AdManageKit is a comprehensive Android library designed to simplify the integration and management of Google AdMob ads, Google Play Billing, and User Messaging Platform (UMP) consent.
 
-**Latest Version: `4.4.8`** · [Changelog](https://github.com/i2hammad/AdManageKit/blob/main/CHANGELOG.md) · [Release Notes](https://github.com/i2hammad/AdManageKit/tree/main/docs/release-notes)
+**Latest Version: `4.4.9`** · [Changelog](https://github.com/i2hammad/AdManageKit/blob/main/CHANGELOG.md) · [Release Notes](https://github.com/i2hammad/AdManageKit/tree/main/docs/release-notes)
 
 > **Requires Kotlin 2.3+** in your app as of 4.4.8 (AdManageKit and Firebase BOM 35 ship Kotlin 2.4 metadata). ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
 ## Recent Releases
 
+- **4.4.9**: `AdManager.forceShowInterstitialAlways()` is now public (it was documented but `internal`, so app calls failed to compile). Build moved to AGP built-in Kotlin; artifacts unchanged
 - **4.4.8**: Google Mobile Ads Next-Gen SDK 1.5.0, Firebase BOM 35.0.2, Kotlin 2.4, AGP 9.4.1, Yandex Mobile Ads 8.6.0. Apps now need Kotlin 2.3+
 - **4.4.7**: Consumer ProGuard rules no longer pin the Compose runtime; apps that run R8 build smaller with nothing to configure
 - **4.4.6**: WorkManager pinned to 2.9.1 to avoid a startup crash on ROMs that spoof API 34. Pin it in your app too
@@ -75,15 +76,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.9'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.9'
 ```
 
 **Step 3:** Ensure your app uses `compileSdk` **37+** (since 4.2.0) and **Kotlin 2.3+** (since 4.4.8).

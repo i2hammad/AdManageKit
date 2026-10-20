@@ -2,14 +2,38 @@
 [![JitPack](https://jitpack.io/v/i2hammad/AdManageKit.svg)](https://jitpack.io/#i2hammad/AdManageKit)
 ![API](https://img.shields.io/badge/API-24%2B-brightgreen.svg?style=flat)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg)
+[![MCP server on npm](https://img.shields.io/npm/v/admanagekit-mcp-server?label=MCP%20server)](https://www.npmjs.com/package/admanagekit-mcp-server)
 
 An Android library that takes the boilerplate out of **Google AdMob** ads, **Google Play Billing** and **UMP consent**, with optional multi-network waterfalls (Yandex) and Jetpack Compose support.
 
-**Latest version: `4.4.8`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.8.md) · [Changelog](CHANGELOG.md)
+**Latest version: `4.4.9`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.9.md) · [Changelog](CHANGELOG.md)
 
 > **Requires Kotlin 2.3+** in your app as of 4.4.8. ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
-[Features](#features) · [Requirements](#requirements) · [Installation](#installation) · [Quick Start](#quick-start) · [Usage](#usage) · [Documentation](#documentation) · [Migration Guide](#migration-guide)
+[MCP Server](#mcp-server) · [Features](#features) · [Requirements](#requirements) · [Installation](#installation) · [Quick Start](#quick-start) · [Usage](#usage) · [Documentation](#documentation) · [Migration Guide](#migration-guide)
+
+## MCP Server
+
+Using an AI coding assistant? The [AdManageKit MCP server](mcp-server/) lets Claude Code, Claude Desktop, Cursor and other [MCP](https://modelcontextprotocol.io/) clients search these docs and generate integration code for ads, billing and Compose, in Kotlin or Java.
+
+```bash
+claude mcp add admanagekit -- npx -y admanagekit-mcp-server
+```
+
+Other clients:
+
+```json
+{
+  "mcpServers": {
+    "admanagekit": {
+      "command": "npx",
+      "args": ["-y", "admanagekit-mcp-server"]
+    }
+  }
+}
+```
+
+It's configured automatically when you work in this repo.
 
 ## Features
 
@@ -64,15 +88,15 @@ dependencyResolutionManagement {
 Add the modules you need to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.8'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9'
 
 // Optional: Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.9'
 
 // Optional: Yandex Ads waterfall provider
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.9'
 ```
 
 ## Quick Start
@@ -400,25 +424,7 @@ More: [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md) · [Subscription Offer
 | Billing | [In-App Purchase Guide](docs/APP_PURCHASE_GUIDE.md) · [Purchase Categories](wiki/Purchase-Categories.md) · [Consumables](wiki/Consumable-Products.md) · [Subscriptions](wiki/Subscriptions.md) |
 | Reference | [API Reference](docs/API_REFERENCE.md) · [Dokka API docs](https://i2hammad.github.io/AdManageKit/) (`./gradlew dokkaGenerateHtml` to build locally) |
 | History | [Changelog](CHANGELOG.md) · [Release notes](docs/release-notes/) |
-
-### MCP Server (AI Integration)
-
-[![npm](https://img.shields.io/npm/v/admanagekit-mcp-server)](https://www.npmjs.com/package/admanagekit-mcp-server)
-
-An [MCP](https://modelcontextprotocol.io/) server lets Claude Code, Claude Desktop, Cursor and other MCP clients search these docs and generate AdManageKit integration code (ads, billing, Compose; Kotlin or Java):
-
-```json
-{
-  "mcpServers": {
-    "admanagekit": {
-      "command": "npx",
-      "args": ["-y", "admanagekit-mcp-server"]
-    }
-  }
-}
-```
-
-It's configured automatically when you work in this repo. See [mcp-server/](mcp-server/).
+| AI tools | [MCP server](mcp-server/) for Claude Code, Cursor and other MCP clients |
 
 ---
 

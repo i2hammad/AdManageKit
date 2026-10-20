@@ -10,9 +10,9 @@ The `admanagekit-yandex` module provides Yandex Ads SDK providers for the multi-
 
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.8"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.9"
 }
 ```
 

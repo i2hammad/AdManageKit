@@ -1,18 +1,18 @@
-# Jetpack Compose Integration - AdManageKit v4.4.8
+# Jetpack Compose Integration - AdManageKit v4.4.9
 
 ## Overview
 
 AdManageKit provides first-class Jetpack Compose support with composable functions for all ad types, state management helpers, and programmatic native ad loading.
 
-**Library Version**: v4.4.8
+**Library Version**: v4.4.9
 
 ## Installation
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.8'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.8'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.8'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.9'
 }
 ```
 

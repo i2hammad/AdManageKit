@@ -5,7 +5,9 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.4.9] - 2026-10-21
+
+Bug-fix release. One API that the docs have described since v2.8.0 is now actually callable from apps, and the build moved to AGP built-in Kotlin. No behavior changed.
 
 ### Fixed
 
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Build: migrated to AGP built-in Kotlin and the new AGP DSL (the `org.jetbrains.kotlin.android` plugin is removed). Published artifacts, coordinates, dependencies and the sources jar are unchanged
+- README: the MCP server section moved to the top
 
 ## [4.4.8] - 2026-10-20
 
