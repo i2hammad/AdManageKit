@@ -1,4 +1,4 @@
-# Configuration - AdManageKit v4.4.9
+# Configuration - AdManageKit v4.4.10
 
 ## Overview
 
@@ -41,6 +41,7 @@ class MyApp : Application() {
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `defaultAdTimeout` | Timeout for ad loading | 15 seconds |
+| `mobileAdsInitTimeout` | How long a load waits for `MobileAds.initialize()` before failing with TIMEOUT | 10 seconds |
 | `nativeCacheExpiry` | Cache expiry for native ads | 1 hour |
 | `maxCachedAdsPerUnit` | Max cached ads per unit | 3 |
 

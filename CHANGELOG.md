@@ -5,6 +5,28 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.10] - 2026-11-10
+
+Bug-fix release. Ad loads no longer crash when they run before the app's `MobileAds.initialize()` has finished.
+
+### Fixed
+
+- **`IllegalStateException: MobileAds.initialize must be called before using the Google Mobile Ads SDK`.** The Next-Gen SDK rejects any request made before initialization, and only `AppOpenManager` waited for it. A screen that loaded a banner or native ad in `onCreate` crashed whenever it ran before the host app's init completed: a cold start straight into that screen from a shortcut, a Quick Settings tile or a deep link, and Play pre-launch robots. Every AdMob load now waits: `NativeBannerSmall`, `NativeBannerMedium`, `NativeLarge`, `NativeTemplateView`, `BannerAdView`, `AdManager` (splash, pool, callback and force-show loads), `RewardedAdManager`, `ProgrammaticNativeAdLoader` and the five `AdMob*Provider`s (so every waterfall too)
+- When the SDK is already initialized, which is the usual case, nothing changes: the load starts immediately. Otherwise it is held until init completes. If init doesn't complete within `mobileAdsInitTimeout`, the load fails through its normal failure path with `LoadAdError.ErrorCode.TIMEOUT`: native and banner views hide, callbacks get `onFailedToLoad`, splash and force-show move on via `onNextAction()`, and a waterfall falls through to its next provider
+- A view destroyed while its load is waiting never loads
+
+### Added
+
+- `AdManageKitConfig.mobileAdsInitTimeout` (default 10 seconds), covered by `resetToDefaults()`
+
+### Changed
+
+- `AppOpenManager.isMobileAdsReady()` uses the shared readiness check; its behavior is unchanged
+
+### Notes
+
+- Verified: `assembleDebug` and all 185 unit tests, including new `MobileAdsGateTest` and `NativeBannerSmallInitGateTest`
+
 ## [4.4.9] - 2026-10-21
 
 Bug-fix release. One API that the docs have described since v2.8.0 is now actually callable from apps, and the build moved to AGP built-in Kotlin. No behavior changed.

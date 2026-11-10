@@ -12,6 +12,7 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ## Recent Releases
 
+- **4.4.10**: Every AdMob load now waits for `MobileAds.initialize()` instead of crashing with "MobileAds.initialize must be called before using the Google Mobile Ads SDK" when a screen loads an ad first. New `mobileAdsInitTimeout` (10 s)
 - **4.4.9**: `AdManager.forceShowInterstitialAlways()` is now public (it was documented but `internal`, so app calls failed to compile). Build moved to AGP built-in Kotlin; artifacts unchanged
 - **4.4.8**: Google Mobile Ads Next-Gen SDK 1.5.0, Firebase BOM 35.0.2, Kotlin 2.4, AGP 9.4.1, Yandex Mobile Ads 8.6.0. Apps now need Kotlin 2.3+
 - **4.4.7**: Consumer ProGuard rules no longer pin the Compose runtime; apps that run R8 build smaller with nothing to configure
@@ -76,15 +77,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.9'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.10'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.10'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.10'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.10'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.9'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.10'
 ```
 
 **Step 3:** Ensure your app uses `compileSdk` **37+** (since 4.2.0) and **Kotlin 2.3+** (since 4.4.8).
