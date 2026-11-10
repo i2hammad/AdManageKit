@@ -36,7 +36,19 @@ object AdManageKitConfig {
      * Default: 15 seconds
      */
     var defaultAdTimeout: Duration = 15.seconds
-    
+
+    /**
+     * How long an ad load waits for MobileAds.initialize() to complete before giving up.
+     *
+     * The Next-Gen SDK throws if an ad is requested before initialization, so every AdMob
+     * load waits for it. When this passes first, the load fails with a TIMEOUT error through
+     * its normal failure path instead.
+     * Default: 10 seconds
+     *
+     * @since 4.4.10
+     */
+    var mobileAdsInitTimeout: Duration = 10.seconds
+
     /**
      * Cache expiry time for native ads.
      * Default: 1 hour
@@ -514,6 +526,7 @@ object AdManageKitConfig {
      */
     fun resetToDefaults() {
         defaultAdTimeout = 15.seconds
+        mobileAdsInitTimeout = 10.seconds
         nativeCacheExpiry = 1.hours
         maxCachedAdsPerUnit = 3
         enableCrossAdUnitFallback = false

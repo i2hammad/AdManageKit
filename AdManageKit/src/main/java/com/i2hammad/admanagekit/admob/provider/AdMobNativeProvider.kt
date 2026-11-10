@@ -17,6 +17,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoader
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallback
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
+import com.i2hammad.admanagekit.admob.MobileAdsGate
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.NativeAdProvider
@@ -60,7 +61,7 @@ class AdMobNativeProvider : NativeAdProvider {
             .applyMediaConfig()
             .build()
 
-        NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
+        val loadCallback = object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
                 // Next-Gen SDK callbacks fire on a background thread; all the work below
                 // touches views, so it must run on the main thread.
@@ -102,7 +103,14 @@ class AdMobNativeProvider : NativeAdProvider {
                     callback.onNativeAdFailedToLoad(adError.toAdKitError())
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above,
+        // which lets the waterfall move on to the next provider.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { loadCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) { NativeAdLoader.load(nativeAdRequest, loadCallback) }
     }
 
     /** Inflate the template for [sizeHint], populate its asset views and bind [nativeAd]. */

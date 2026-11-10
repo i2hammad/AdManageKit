@@ -12,6 +12,7 @@ import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAd
 import com.google.android.libraries.ads.mobile.sdk.interstitial.InterstitialAdEventCallback
+import com.i2hammad.admanagekit.admob.MobileAdsGate
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.InterstitialAdProvider
@@ -43,7 +44,7 @@ class AdMobInterstitialProvider : InterstitialAdProvider {
     ) {
         val adRequest = AdRequest.Builder(adUnitId).build()
 
-        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
+        val loadCallback = object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(ad: InterstitialAd) {
                 Handler(Looper.getMainLooper()).post {
                     loadedAds[adUnitId] = ad
@@ -60,7 +61,14 @@ class AdMobInterstitialProvider : InterstitialAdProvider {
                     callback.onAdFailedToLoad(adError.toAdKitError())
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above,
+        // which lets the waterfall move on to the next provider.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { loadCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) { InterstitialAd.load(adRequest, loadCallback) }
     }
 
     override fun showAd(activity: Activity, callback: InterstitialAdProvider.InterstitialShowCallback) {

@@ -118,6 +118,10 @@ class NativeTemplateView @JvmOverloads constructor(
     // Currently displayed native ad, destroyed when replaced or via destroy()
     private var currentNativeAd: NativeAd? = null
 
+    // Bumped by destroy() so a load still waiting for MobileAds.initialize() is dropped.
+    @Volatile
+    private var initWaitGeneration = 0
+
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
     private var waterfallNativeAdRef: Any? = null
@@ -784,6 +788,18 @@ class NativeTemplateView @JvmOverloads constructor(
                 }
             }
 
+            // The Next-Gen SDK throws if a request is made before MobileAds.initialize()
+            // completes, so wait for it here. A wait that times out fails through the
+            // callback above; one outlived by destroy() is dropped.
+            val generation = initWaitGeneration
+            if (!MobileAdsGate.awaitReady()) {
+                if (generation == initWaitGeneration) {
+                    nativeAdLoaderCallback.onAdFailedToLoad(MobileAdsGate.timeoutError())
+                }
+                return@launch
+            }
+            if (generation != initWaitGeneration) return@launch
+
             // Load ad on main thread (required by AdMob)
             withContext(Dispatchers.Main) {
                 NativeAdLoader.load(nativeAdRequest, nativeAdLoaderCallback)
@@ -1113,6 +1129,7 @@ class NativeTemplateView @JvmOverloads constructor(
      * RecyclerView detach/reattach cycles with its ad intact.
      */
     fun destroy() {
+        initWaitGeneration++
         val displayedAd = currentNativeAd
         currentNativeAd = null
         displayedAd?.destroy()

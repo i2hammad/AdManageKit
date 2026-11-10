@@ -17,6 +17,7 @@ import com.google.android.libraries.ads.mobile.sdk.common.AdLoadCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.PrecisionType
+import com.i2hammad.admanagekit.admob.MobileAdsGate
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
@@ -121,7 +122,7 @@ class AdMobBannerProvider(
             requestBuilder.setGoogleExtrasBundle(extras)
         }
 
-        bannerView.loadAd(requestBuilder.build(), object : AdLoadCallback<BannerAd> {
+        val loadCallback = object : AdLoadCallback<BannerAd> {
             override fun onAdLoaded(bannerAd: BannerAd) {
                 if (!pendingViews.remove(bannerView)) {
                     // destroy() already destroyed this in-flight view; do not hand it out.
@@ -162,7 +163,17 @@ class AdMobBannerProvider(
                 }
                 callback.onBannerFailedToLoad(error.toAdKitError())
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above,
+        // which lets the waterfall move on to the next provider.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { if (bannerView in pendingViews) loadCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) {
+            // destroy() while waiting drops the pending view; don't load into it
+            if (bannerView in pendingViews) bannerView.loadAd(requestBuilder.build(), loadCallback)
+        }
     }
 
     override fun pause() {

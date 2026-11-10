@@ -12,6 +12,7 @@ import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.FullScreenContentError
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
+import com.i2hammad.admanagekit.admob.MobileAdsGate
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
@@ -67,7 +68,7 @@ class AdMobAppOpenProvider : AppOpenAdProvider {
     ) {
         val adRequest = AdRequest.Builder(adUnitId).build()
 
-        AppOpenAd.load(adRequest, object : AdLoadCallback<AppOpenAd> {
+        val loadCallback = object : AdLoadCallback<AppOpenAd> {
             override fun onAdLoaded(ad: AppOpenAd) {
                 Handler(Looper.getMainLooper()).post {
                     loadedAds[adUnitId] = TimedAppOpenAd(ad, System.currentTimeMillis())
@@ -84,7 +85,14 @@ class AdMobAppOpenProvider : AppOpenAdProvider {
                     callback.onAdFailedToLoad(adError.toAdKitError())
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above,
+        // which lets the waterfall move on to the next provider.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { loadCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) { AppOpenAd.load(adRequest, loadCallback) }
     }
 
     override fun showAd(activity: Activity, callback: AppOpenAdProvider.AppOpenShowCallback) {

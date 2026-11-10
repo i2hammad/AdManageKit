@@ -320,6 +320,24 @@ class AdManager() {
             return
         }
 
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize()
+        // completes. Wait for it inside the splash's own timeout, then load with what is
+        // left of it; if init doesn't finish in time the splash proceeds without an ad.
+        if (!MobileAdsGate.isReady()) {
+            val waitStart = android.os.SystemClock.uptimeMillis()
+            MobileAdsGate.runWhenReady(
+                timeoutMillis = timeoutMillis,
+                onTimeout = {
+                    callback.onNextAction()
+                    callback.onFailedToLoad(MobileAdsGate.timeoutError())
+                },
+            ) {
+                val remaining = (timeoutMillis - (android.os.SystemClock.uptimeMillis() - waitStart)).coerceAtLeast(0L)
+                loadInterstitialAdForSplash(context, adUnitId, remaining, callback)
+            }
+            return
+        }
+
         this.adUnitId = adUnitId
         initializeFirebase(context)
         val adRequest = AdRequest.Builder(adUnitId).build()
@@ -449,6 +467,18 @@ class AdManager() {
         // Set primary ad unit if not set
         if (this.adUnitId == null) {
             this.adUnitId = adUnitId
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize()
+        // completes. Hold the load (before the unit is marked as loading, so a wait that
+        // times out leaves nothing stuck) and re-enter once ready; the guards above dedupe.
+        if (!MobileAdsGate.isReady()) {
+            MobileAdsGate.runWhenReady(
+                onTimeout = {
+                    AdDebugUtils.logEvent(adUnitId, "onTimeout", MobileAdsGate.TIMEOUT_MESSAGE, false)
+                },
+            ) { loadInterstitialAd(context, adUnitId) }
+            return
         }
 
         initializeFirebase(context)
@@ -594,6 +624,14 @@ class AdManager() {
                     null
                 )
             )
+            return
+        }
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize()
+        // completes. Hold the load until it has; a wait that times out fails to the caller.
+        if (!MobileAdsGate.isReady()) {
+            MobileAdsGate.runWhenReady(
+                onTimeout = { interstitialAdLoadCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+            ) { loadInterstitialAd(context, adUnitId, interstitialAdLoadCallback) }
             return
         }
         this.adUnitId = adUnitId
@@ -912,7 +950,7 @@ class AdManager() {
             return false
         }
 
-        InterstitialAd.load(adRequest, object : AdLoadCallback<InterstitialAd> {
+        val freshLoadCallback = object : AdLoadCallback<InterstitialAd> {
             override fun onAdLoaded(interstitialAd: InterstitialAd) {
                 // Always save the ad (even when the timeout already won the race)
                 mInterstitialAd = interstitialAd
@@ -957,7 +995,14 @@ class AdManager() {
                     }
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
+        // Hold the load until it has; if it hasn't by timeoutMillis, the timeout below shows the
+        // cached fallback or moves on, and this wait has nothing left to do.
+        MobileAdsGate.runWhenReady(timeoutMillis = timeoutMillis, onTimeout = {}) {
+            if (!resolved.get()) InterstitialAd.load(adRequest, freshLoadCallback)
+        }
 
         // Timeout handler
         Handler(Looper.getMainLooper()).postDelayed({

@@ -21,6 +21,7 @@ import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdLoaderCallba
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdRequest
 import com.google.android.libraries.ads.mobile.sdk.nativead.NativeAdView
 import com.google.firebase.analytics.FirebaseAnalytics
+import com.i2hammad.admanagekit.admob.MobileAdsGate
 import com.i2hammad.admanagekit.R
 import com.i2hammad.admanagekit.admob.AdKitError
 import com.i2hammad.admanagekit.admob.applyMediaConfig
@@ -506,7 +507,7 @@ object ProgrammaticNativeAdLoader {
             .applyMediaConfig()
             .build()
 
-        NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
+        val loaderCallback = object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
                 // Next-Gen SDK callbacks fire on a background thread.
                 Handler(Looper.getMainLooper()).post {
@@ -533,7 +534,13 @@ object ProgrammaticNativeAdLoader {
                     onFailed(adError)
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { loaderCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) { NativeAdLoader.load(nativeAdRequest, loaderCallback) }
     }
 
     private fun loadNewNativeAd(
@@ -548,7 +555,7 @@ object ProgrammaticNativeAdLoader {
             .applyMediaConfig()
             .build()
 
-        NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
+        val loaderCallback = object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
                 // Next-Gen SDK callbacks fire on a background thread; everything below
                 // touches views, so it must run on the main thread.
@@ -622,7 +629,15 @@ object ProgrammaticNativeAdLoader {
                     callback.onAdFailedToLoad(adError)
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the callback above.
+        MobileAdsGate.runWhenReady(
+            onTimeout = { if (!handle.isCancelled) loaderCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) {
+            if (!handle.isCancelled) NativeAdLoader.load(nativeAdRequest, loaderCallback)
+        }
     }
 
     private fun populateNativeAdView(nativeAd: NativeAd, nativeAdView: NativeAdView, size: NativeAdSize) {

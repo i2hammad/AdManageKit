@@ -51,6 +51,9 @@ class NativeLarge @JvmOverloads constructor(
     // Currently displayed native ad, destroyed when replaced or via destroy()
     private var currentNativeAd: NativeAd? = null
 
+    // An ad load held until MobileAds.initialize() completes; cancelled by destroy().
+    private var pendingInitWait: MobileAdsGate.Wait? = null
+
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
     private var waterfallNativeAdRef: Any? = null
@@ -255,7 +258,7 @@ class NativeLarge @JvmOverloads constructor(
             .applyMediaConfig(NativeMediaAspect.LANDSCAPE)
             .build()
 
-        NativeAdLoader.load(nativeAdRequest, object : NativeAdLoaderCallback {
+        val loaderCallback = object : NativeAdLoaderCallback {
             override fun onNativeAdLoaded(nativeAd: NativeAd) {
                 // Next-Gen SDK callbacks fire on a background thread; everything below
                 // touches views, so it must run on the main thread.
@@ -339,7 +342,14 @@ class NativeLarge @JvmOverloads constructor(
                     callback?.onFailedToLoad(adError)
                 }
             }
-        })
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes,
+        // so hold the load until it has. A wait that times out fails through the path above.
+        pendingInitWait?.cancel()
+        pendingInitWait = MobileAdsGate.runWhenReady(
+            onTimeout = { loaderCallback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+        ) { NativeAdLoader.load(nativeAdRequest, loaderCallback) }
     }
 
     fun displayAd(preloadedNativeAd: NativeAd) {
@@ -586,6 +596,8 @@ class NativeLarge @JvmOverloads constructor(
      * RecyclerView detach/reattach cycles with its ad intact.
      */
     fun destroy() {
+        pendingInitWait?.cancel()
+        pendingInitWait = null
         val displayedAd = currentNativeAd
         currentNativeAd = null
         displayedAd?.destroy()

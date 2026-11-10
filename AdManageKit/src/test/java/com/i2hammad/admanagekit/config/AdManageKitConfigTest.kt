@@ -34,6 +34,7 @@ class AdManageKitConfigTest {
     fun `documented defaults are in place`() {
         // Performance
         assertEquals(15.seconds, AdManageKitConfig.defaultAdTimeout)
+        assertEquals(10.seconds, AdManageKitConfig.mobileAdsInitTimeout)
         assertEquals(1.hours, AdManageKitConfig.nativeCacheExpiry)
         assertEquals(3, AdManageKitConfig.maxCachedAdsPerUnit)
         assertFalse(AdManageKitConfig.enableCrossAdUnitFallback)
@@ -107,6 +108,7 @@ class AdManageKitConfigTest {
         // Mutate a broad slice of the config
         AdManageKitConfig.apply {
             defaultAdTimeout = 99.seconds
+            mobileAdsInitTimeout = 99.seconds
             nativeCacheExpiry = 9.hours
             maxCachedAdsPerUnit = 7
             enableCrossAdUnitFallback = true
@@ -159,6 +161,7 @@ class AdManageKitConfigTest {
         AdManageKitConfig.resetToDefaults()
 
         assertEquals(15.seconds, AdManageKitConfig.defaultAdTimeout)
+        assertEquals(10.seconds, AdManageKitConfig.mobileAdsInitTimeout)
         assertEquals(1.hours, AdManageKitConfig.nativeCacheExpiry)
         assertEquals(3, AdManageKitConfig.maxCachedAdsPerUnit)
         assertFalse(AdManageKitConfig.enableCrossAdUnitFallback)

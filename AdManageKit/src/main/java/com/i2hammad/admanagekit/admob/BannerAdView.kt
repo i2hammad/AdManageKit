@@ -76,6 +76,9 @@ class BannerAdView @JvmOverloads constructor(
     private var currentPlacement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM
     private var currentBannerSize: BannerAdSize = BannerAdSize.ADAPTIVE
     private var isAdLoading = AtomicBoolean(false)
+
+    // A load held until MobileAds.initialize() completes; cancelled by cleanup().
+    private var pendingInitWait: MobileAdsGate.Wait? = null
     private var loadAttempt = AtomicInteger(0)
     private var refreshHandler: Handler? = null
     private var refreshRunnable: Runnable? = null
@@ -302,6 +305,19 @@ class BannerAdView @JvmOverloads constructor(
         callback: AdLoadCallback? = null
     ) {
         if (useWaterfall) { loadBannerViaWaterfall(adUnitId, collapsible, placement, callback); return }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
+        // Hold the load until it has, before claiming isAdLoading, so a wait that times out
+        // leaves nothing stuck; it then fails through the normal failure path.
+        if (!MobileAdsGate.isReady()) {
+            pendingInitWait?.cancel()
+            pendingInitWait = MobileAdsGate.runWhenReady(
+                onTimeout = {
+                    handleAdLoadFailure(adUnitId, MobileAdsGate.timeoutError(), callback, MobileAdsGate.TIMEOUT_MESSAGE)
+                },
+            ) { loadBannerInternal(adUnitId, collapsible, placement, callback) }
+            return
+        }
 
         // Prevent concurrent loads
         if (!isAdLoading.compareAndSet(false, true)) {
@@ -950,6 +966,8 @@ class BannerAdView @JvmOverloads constructor(
     private fun cleanup() {
         try {
             stopAutoRefresh()
+            pendingInitWait?.cancel()
+            pendingInitWait = null
             adView?.destroy()
 
             // Unregister from the host lifecycle - it holds a strong reference to this

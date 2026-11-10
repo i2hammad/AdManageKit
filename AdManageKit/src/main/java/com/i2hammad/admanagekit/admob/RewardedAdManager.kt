@@ -271,6 +271,16 @@ object RewardedAdManager {
             return
         }
 
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
+        // Hold the load until it has, before isLoading/beginLoad() are claimed, so a wait that
+        // times out leaves nothing stuck; once ready, re-enter so the guards above apply again.
+        if (!MobileAdsGate.isReady()) {
+            MobileAdsGate.runWhenReady(
+                onTimeout = { AdDebugUtils.logEvent(adUnitId, "onTimeout", MobileAdsGate.TIMEOUT_MESSAGE, false) },
+            ) { loadRewardedAd(context) }
+            return
+        }
+
         isLoading = true
         val token = beginLoad()
         initializeFirebase(context)
@@ -394,6 +404,16 @@ object RewardedAdManager {
             return
         }
 
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
+        // Hold the load until it has, before isLoading/beginLoad() are claimed, so a wait that
+        // times out leaves nothing stuck; once ready, re-enter so the guards above apply again.
+        if (!MobileAdsGate.isReady()) {
+            MobileAdsGate.runWhenReady(
+                onTimeout = { callback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+            ) { loadRewardedAd(context, callback) }
+            return
+        }
+
         isLoading = true
         val token = beginLoad()
         initializeFirebase(context)
@@ -514,6 +534,21 @@ object RewardedAdManager {
                     )
                 }
             }, timeoutMillis)
+            return
+        }
+
+        // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
+        // Hold the load until it has, before isLoading/beginLoad() are claimed, so a wait that
+        // times out leaves nothing stuck; once ready, re-enter so the guards above apply again.
+        if (!MobileAdsGate.isReady()) {
+            val waitStart = android.os.SystemClock.uptimeMillis()
+            MobileAdsGate.runWhenReady(
+                timeoutMillis = timeoutMillis,
+                onTimeout = { callback.onAdFailedToLoad(MobileAdsGate.timeoutError()) },
+            ) {
+                val remaining = (timeoutMillis - (android.os.SystemClock.uptimeMillis() - waitStart)).coerceAtLeast(0L)
+                loadRewardedAdWithTimeout(context, remaining, callback)
+            }
             return
         }
 

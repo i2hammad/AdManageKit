@@ -19,7 +19,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import com.google.android.libraries.ads.mobile.sdk.MobileAds
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAd
 import com.google.android.libraries.ads.mobile.sdk.appopen.AppOpenAdEventCallback
 import com.google.android.libraries.ads.mobile.sdk.common.AdRequest
@@ -1650,14 +1649,8 @@ class AppOpenManager(private val myApplication: Application, private var adUnitI
         if (useWaterfall && AdProviderConfig.getAppOpenChain().none { it.provider == AdProvider.ADMOB }) {
             return true
         }
-        return try {
-            MobileAds.isInitialized
-        } catch (t: Throwable) {
-            // Defensive: a broken readiness check must never permanently block ads;
-            // worst case is the pre-guard behavior.
-            Log.w(LOG_TAG, "MobileAds readiness check failed, assuming ready: ${t.message}")
-            true
-        }
+        // Shared with every other AdMob load; a check that throws counts as ready.
+        return MobileAdsGate.isReady()
     }
 
     /**
