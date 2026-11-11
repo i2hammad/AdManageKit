@@ -248,8 +248,16 @@ class MyApplication : Application() {
             .build()
 
         // MobileAds.initialize() must run off the main thread or it can ANR.
+        // Debug-only knob for InitRaceTestActivity: simulate a slow (or missing) init.
+        initDelayMs = readInitDelayMs()
         Thread {
+            if (initDelayMs < 0) {
+                android.util.Log.w("InitRaceTest", "MobileAds.initialize() skipped (debug.amk.init_delay_ms=-1)")
+                return@Thread
+            }
+            if (initDelayMs > 0) Thread.sleep(initDelayMs)
             MobileAds.initialize(this, initializationConfig)
+            android.util.Log.i("InitRaceTest", "MobileAds.initialize() finished after ${initDelayMs} ms delay")
 
             // Guard against the ProcessLifecycleOwner race: only construct AppOpenManager
             // once the SDK is ready, so its onStart() can never issue a load that the
@@ -274,9 +282,25 @@ class MyApplication : Application() {
             ?: error("Missing com.google.android.gms.ads.APPLICATION_ID meta-data in AndroidManifest.xml")
     }
 
+    /** Reads `adb shell setprop debug.amk.init_delay_ms <ms>`; debug builds only. */
+    private fun readInitDelayMs(): Long {
+        if (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE == 0) return 0
+        return try {
+            val value = Class.forName("android.os.SystemProperties")
+                .getMethod("get", String::class.java, String::class.java)
+                .invoke(null, "debug.amk.init_delay_ms", "0") as String
+            value.trim().toLongOrNull() ?: 0
+        } catch (t: Throwable) {
+            0
+        }
+    }
+
     companion object {
         lateinit var instance: MyApplication
             private set
+
+        @Volatile
+        var initDelayMs: Long = 0
     }
 
 
