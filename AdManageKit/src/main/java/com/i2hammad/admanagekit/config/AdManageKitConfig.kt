@@ -2,6 +2,7 @@ package com.i2hammad.admanagekit.config
 
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -48,6 +49,18 @@ object AdManageKitConfig {
      * @since 4.4.10
      */
     var mobileAdsInitTimeout: Duration = 10.seconds
+
+    /**
+     * After an ad view's load gives up waiting for MobileAds.initialize(), how long the view
+     * keeps watching for init to finish so it can load the ad then. The view's callback gets
+     * onFailedToLoad(TIMEOUT) first and onAdLoaded() later if the late load succeeds.
+     * Applies to NativeBannerSmall, NativeBannerMedium, NativeLarge, NativeTemplateView and
+     * BannerAdView. Set to [Duration.ZERO] to turn it off (v4.4.10 behaviour).
+     * Default: 2 minutes
+     *
+     * @since 4.4.11
+     */
+    var mobileAdsLateLoadWindow: Duration = 2.minutes
 
     /**
      * Cache expiry time for native ads.
@@ -527,6 +540,7 @@ object AdManageKitConfig {
     fun resetToDefaults() {
         defaultAdTimeout = 15.seconds
         mobileAdsInitTimeout = 10.seconds
+        mobileAdsLateLoadWindow = 2.minutes
         nativeCacheExpiry = 1.hours
         maxCachedAdsPerUnit = 3
         enableCrossAdUnitFallback = false

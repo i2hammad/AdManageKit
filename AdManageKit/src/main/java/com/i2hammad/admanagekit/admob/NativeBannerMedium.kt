@@ -50,6 +50,7 @@ class NativeBannerMedium @JvmOverloads constructor(
 
     // An ad load held until MobileAds.initialize() completes; cancelled by destroy().
     private var pendingInitWait: MobileAdsGate.Wait? = null
+    private val lateInitReload = LateInitReload("NativeBannerMedium")
 
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
@@ -129,7 +130,26 @@ class NativeBannerMedium @JvmOverloads constructor(
         loadAd(activity, adNativeBanner, false, adCallBack, loadingStrategy)
     }
 
+    /**
+     * Every public load funnels through here. Wraps the callback so that a load which fails
+     * because MobileAds.initialize() had not finished is retried once init completes
+     * (see [LateInitReload]).
+     */
     private fun loadAd(
+        context: Context,
+        adUnitId: String,
+        useCachedAd: Boolean,
+        callback: AdLoadCallback?,
+        loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
+    ) {
+        lateInitReload.cancel()
+        val wrapped = lateInitReload.wrap(context, callback) {
+            loadAd(context, adUnitId, useCachedAd, callback, loadingStrategy)
+        }
+        loadAdNow(context, adUnitId, useCachedAd, wrapped, loadingStrategy)
+    }
+
+    private fun loadAdNow(
         context: Context,
         adUnitId: String,
         useCachedAd: Boolean,
@@ -642,6 +662,7 @@ class NativeBannerMedium @JvmOverloads constructor(
      * RecyclerView detach/reattach cycles with its ad intact.
      */
     fun destroy() {
+        lateInitReload.cancel()
         pendingInitWait?.cancel()
         pendingInitWait = null
         val displayedAd = currentNativeAd

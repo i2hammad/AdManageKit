@@ -121,6 +121,7 @@ class NativeTemplateView @JvmOverloads constructor(
     // Bumped by destroy() so a load still waiting for MobileAds.initialize() is dropped.
     @Volatile
     private var initWaitGeneration = 0
+    private val lateInitReload = LateInitReload("NativeTemplateView")
 
     // Waterfall support
     private var nativeWaterfall: NativeWaterfall? = null
@@ -433,7 +434,26 @@ class NativeTemplateView @JvmOverloads constructor(
         loadAd(activity, adUnitId, false, adCallback, loadingStrategy)
     }
 
+    /**
+     * Every public load funnels through here. Wraps the callback so that a load which fails
+     * because MobileAds.initialize() had not finished is retried once init completes
+     * (see [LateInitReload]).
+     */
     private fun loadAd(
+        context: Context,
+        adUnitId: String,
+        useCachedAd: Boolean,
+        callback: AdLoadCallback?,
+        loadingStrategy: com.i2hammad.admanagekit.config.AdLoadingStrategy? = null
+    ) {
+        lateInitReload.cancel()
+        val wrapped = lateInitReload.wrap(context, callback) {
+            loadAd(context, adUnitId, useCachedAd, callback, loadingStrategy)
+        }
+        loadAdNow(context, adUnitId, useCachedAd, wrapped, loadingStrategy)
+    }
+
+    private fun loadAdNow(
         context: Context,
         adUnitId: String,
         useCachedAd: Boolean,
@@ -1129,6 +1149,7 @@ class NativeTemplateView @JvmOverloads constructor(
      * RecyclerView detach/reattach cycles with its ad intact.
      */
     fun destroy() {
+        lateInitReload.cancel()
         initWaitGeneration++
         val displayedAd = currentNativeAd
         currentNativeAd = null

@@ -35,6 +35,7 @@ class AdManageKitConfigTest {
         // Performance
         assertEquals(15.seconds, AdManageKitConfig.defaultAdTimeout)
         assertEquals(10.seconds, AdManageKitConfig.mobileAdsInitTimeout)
+        assertEquals(2.minutes, AdManageKitConfig.mobileAdsLateLoadWindow)
         assertEquals(1.hours, AdManageKitConfig.nativeCacheExpiry)
         assertEquals(3, AdManageKitConfig.maxCachedAdsPerUnit)
         assertFalse(AdManageKitConfig.enableCrossAdUnitFallback)
@@ -109,6 +110,7 @@ class AdManageKitConfigTest {
         AdManageKitConfig.apply {
             defaultAdTimeout = 99.seconds
             mobileAdsInitTimeout = 99.seconds
+            mobileAdsLateLoadWindow = 99.seconds
             nativeCacheExpiry = 9.hours
             maxCachedAdsPerUnit = 7
             enableCrossAdUnitFallback = true
@@ -162,6 +164,7 @@ class AdManageKitConfigTest {
 
         assertEquals(15.seconds, AdManageKitConfig.defaultAdTimeout)
         assertEquals(10.seconds, AdManageKitConfig.mobileAdsInitTimeout)
+        assertEquals(2.minutes, AdManageKitConfig.mobileAdsLateLoadWindow)
         assertEquals(1.hours, AdManageKitConfig.nativeCacheExpiry)
         assertEquals(3, AdManageKitConfig.maxCachedAdsPerUnit)
         assertFalse(AdManageKitConfig.enableCrossAdUnitFallback)

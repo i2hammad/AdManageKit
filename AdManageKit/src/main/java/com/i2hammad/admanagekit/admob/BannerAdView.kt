@@ -79,6 +79,7 @@ class BannerAdView @JvmOverloads constructor(
 
     // A load held until MobileAds.initialize() completes; cancelled by cleanup().
     private var pendingInitWait: MobileAdsGate.Wait? = null
+    private val lateInitReload = LateInitReload("BannerAdView")
     private var loadAttempt = AtomicInteger(0)
     private var refreshHandler: Handler? = null
     private var refreshRunnable: Runnable? = null
@@ -292,7 +293,13 @@ class BannerAdView @JvmOverloads constructor(
             context.lifecycle.addObserver(this)
         }
 
-        loadBannerInternal(adUnitId, collapsible, placement, callback)
+        // A load that fails because MobileAds.initialize() had not finished is retried once
+        // init completes (see LateInitReload).
+        lateInitReload.cancel()
+        val wrapped = lateInitReload.wrap(context, callback) {
+            loadCollapsibleBanner(context, adUnitId, collapsible, placement, callback, adSize)
+        }
+        loadBannerInternal(adUnitId, collapsible, placement, wrapped)
     }
     
     /**
@@ -968,6 +975,7 @@ class BannerAdView @JvmOverloads constructor(
             stopAutoRefresh()
             pendingInitWait?.cancel()
             pendingInitWait = null
+            lateInitReload.cancel()
             adView?.destroy()
 
             // Unregister from the host lifecycle - it holds a strong reference to this

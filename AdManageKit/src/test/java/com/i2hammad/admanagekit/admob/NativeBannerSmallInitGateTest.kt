@@ -6,6 +6,9 @@ import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.i2hammad.admanagekit.config.AdLoadingStrategy
 import com.i2hammad.admanagekit.config.AdManageKitConfig
+import com.i2hammad.admanagekit.core.AppPurchaseProvider
+import com.i2hammad.admanagekit.core.BillingConfig
+import com.i2hammad.admanagekit.core.NoPurchaseProvider
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -52,6 +55,7 @@ class NativeBannerSmallInitGateTest {
     fun tearDown() {
         MobileAdsGate.readinessCheck = { com.google.android.libraries.ads.mobile.sdk.MobileAds.isInitialized }
         AdManageKitConfig.resetToDefaults()
+        BillingConfig.setPurchaseProvider(NoPurchaseProvider())
         unmockkAll()
     }
 
@@ -74,6 +78,46 @@ class NativeBannerSmallInitGateTest {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3_000))
         assertEquals(1, failures)
         assertEquals(LoadAdError.ErrorCode.TIMEOUT, failure?.code)
+    }
+
+    /**
+     * End-to-end wiring of LateInitReload in a real view. The second load is made to stop at the
+     * premium check (switched on after the first failure) so it never reaches the real SDK; that
+     * second, premium failure proves the view loaded again on its own once init completed.
+     */
+    @Test
+    fun `init finishing after the timeout makes the view load again`() {
+        val view = NativeBannerSmall(activity)
+        val errors = mutableListOf<String?>()
+        view.loadNativeBannerAd(activity, "ca-app-pub-3940256099942544/2247696110", object : AdLoadCallback() {
+            override fun onFailedToLoad(error: AdKitError?) { errors += error?.message }
+        }, AdLoadingStrategy.ON_DEMAND)
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3_000))
+        assertEquals(listOf<String?>(MobileAdsGate.TIMEOUT_MESSAGE), errors)
+
+        BillingConfig.setPurchaseProvider(object : AppPurchaseProvider { override fun isPurchased() = true })
+        MobileAdsGate.readinessCheck = { true }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(MobileAdsGate.LATE_CHECK_INTERVAL_MS + 100))
+
+        assertEquals(listOf<String?>(MobileAdsGate.TIMEOUT_MESSAGE, AdManager.PURCHASED_APP_ERROR_MESSAGE), errors)
+    }
+
+    @Test
+    fun `destroy after the timeout cancels the late load`() {
+        val view = NativeBannerSmall(activity)
+        var calls = 0
+        view.loadNativeBannerAd(activity, "ca-app-pub-3940256099942544/2247696110", object : AdLoadCallback() {
+            override fun onFailedToLoad(error: AdKitError?) { calls++ }
+            override fun onAdLoaded() { calls++ }
+        }, AdLoadingStrategy.ON_DEMAND)
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(3_000))
+        assertEquals(1, calls)
+
+        view.destroy()
+        MobileAdsGate.readinessCheck = { true }
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10_000))
+        assertEquals("no late load after destroy", 1, calls)
     }
 
     @Test
