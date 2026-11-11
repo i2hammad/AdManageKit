@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an idea or improvement for AdManageKit
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what makes it hard today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like it to work? API sketches are welcome.
+      render: kotlin
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: module
+    attributes:
+      label: Related module(s)
+      multiple: true
+      options:
+        - AdManageKit (ads / UMP)
+        - admanagekit-core
+        - admanagekit-billing
+        - admanagekit-compose
+        - admanagekit-yandex
+        - Not sure

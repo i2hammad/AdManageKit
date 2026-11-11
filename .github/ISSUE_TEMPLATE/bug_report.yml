@@ -1,0 +1,75 @@
+name: Bug report
+description: Report something in AdManageKit that isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much as you can.
+        **Security issues:** do not file them here — see [SECURITY.md](https://github.com/i2hammad/AdManageKit/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: AdManageKit version
+      placeholder: e.g. 4.4.12
+    validations:
+      required: true
+  - type: dropdown
+    id: module
+    attributes:
+      label: Affected module(s)
+      multiple: true
+      options:
+        - AdManageKit (ads / UMP)
+        - admanagekit-core
+        - admanagekit-billing
+        - admanagekit-compose
+        - admanagekit-yandex
+    validations:
+      required: true
+  - type: dropdown
+    id: ad-format
+    attributes:
+      label: Ad format / feature
+      multiple: true
+      options:
+        - Interstitial
+        - App open
+        - Banner
+        - Native
+        - Rewarded
+        - Waterfall
+        - Billing / purchases
+        - UMP consent
+        - Other
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal code or steps that trigger the problem.
+      render: kotlin
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack trace
+      description: Relevant Logcat output. Remove any production ad unit IDs or personal data.
+      render: shell
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: e.g. Pixel 8, Android 15
+  - type: textarea
+    id: deps
+    attributes:
+      label: Related SDK versions
+      description: play-services-ads, billing, Yandex, Compose BOM, etc.
