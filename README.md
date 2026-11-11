@@ -6,7 +6,7 @@
 
 An Android library that takes the boilerplate out of **Google AdMob** ads, **Google Play Billing** and **UMP consent**, with optional multi-network waterfalls (Yandex) and Jetpack Compose support.
 
-**Latest version: `4.4.11`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.11.md) · [Changelog](CHANGELOG.md)
+**Latest version: `4.4.12`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.12.md) · [Changelog](CHANGELOG.md)
 
 > **Requires Kotlin 2.3+** in your app as of 4.4.8. ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
@@ -65,7 +65,7 @@ It's configured automatically when you work in this repo.
 
 ### Next-Gen GMA SDK
 
-Since **4.2.0**, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, `1.5.0` as of 4.4.8) instead of the legacy `play-services-ads`. Three things differ from the legacy SDK:
+Since **4.2.0**, AdManageKit runs on Google's **Next-Gen Google Mobile Ads SDK** (`com.google.android.libraries.ads.mobile.sdk`, `1.6.0` as of 4.4.12) instead of the legacy `play-services-ads`. Three things differ from the legacy SDK:
 
 - **Initialization is explicit.** The SDK no longer lazy-inits on first use. AdManageKit doesn't call `MobileAds.initialize()` for you, because it doesn't own your consent flow.
 - **Callbacks fire on a background thread.** Every AdManageKit manager, provider and view re-posts its callbacks to the main thread, so this is transparent to you.
@@ -88,15 +88,15 @@ dependencyResolutionManagement {
 Add the modules you need to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.11'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.11'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.11'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.12'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.12'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.12'
 
 // Optional: Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.11'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.12'
 
 // Optional: Yandex Ads waterfall provider
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.11'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.12'
 ```
 
 ## Quick Start

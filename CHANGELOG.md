@@ -5,6 +5,32 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.12] - 2026-11-11
+
+Dependency release. Moves to Google Mobile Ads Next-Gen SDK 1.6.0. No AdManageKit API or behaviour changed. Apps still need **Kotlin 2.3 or newer**.
+
+### Changed
+
+| Dependency | Before | After |
+|---|---|---|
+| Google Mobile Ads Next-Gen SDK (`ads-mobile-sdk`) | 1.5.0 | **1.6.0** |
+| Firebase BOM | 35.0.2 | **35.1.0** |
+| Android Gradle Plugin (build only) | 9.4.1 | **9.5.1** |
+| Dokka (docs only) | 2.2.0 | **2.3.0** |
+| MockK (tests only) | 1.14.11 | **1.14.12** |
+
+Next-Gen SDK 1.6.0 has no breaking changes, deprecations or new minimum requirements. Its fixes that reach AdManageKit apps:
+- A `RuntimeException` crash in `androidx.work.WorkManagerInitializer` with R8 full mode (updated consumer ProGuard rules)
+- Rewarded and rewarded interstitial ads: `onUserEarnedReward()` could fire after `onAdDismissedFullScreenContent()`
+- An `IllegalStateException` crash, fixed by `com.google.android.play:hsdp` 2.2.0
+- Mediated full-screen ads now pass an available `Activity` context to third-party SDKs
+
+Play Billing stays at 9.1.0, UMP at 4.0.0, Yandex Mobile Ads at 8.6.0 and WorkManager pinned at 2.9.1 (see 4.4.6).
+
+### Notes
+
+- Verified: `assembleDebug` for all modules and the sample app, and all 194 unit tests. On a Galaxy A71 5G (SM-A716V, Android 13), the sample app's native, banner and interstitial ads load and show on 1.6.0
+
 ## [4.4.11] - 2026-11-11
 
 Bug-fix release. An ad view no longer stays empty for good when `MobileAds.initialize()` finishes after the v4.4.10 init wait has given up.
