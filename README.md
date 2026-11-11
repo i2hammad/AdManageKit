@@ -6,7 +6,7 @@
 
 An Android library that takes the boilerplate out of **Google AdMob** ads, **Google Play Billing** and **UMP consent**, with optional multi-network waterfalls (Yandex) and Jetpack Compose support.
 
-**Latest version: `4.4.10`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.10.md) · [Changelog](CHANGELOG.md)
+**Latest version: `4.4.11`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.11.md) · [Changelog](CHANGELOG.md)
 
 > **Requires Kotlin 2.3+** in your app as of 4.4.8. ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
@@ -88,15 +88,15 @@ dependencyResolutionManagement {
 Add the modules you need to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.10'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.10'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.10'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.11'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.11'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.11'
 
 // Optional: Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.10'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.11'
 
 // Optional: Yandex Ads waterfall provider
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.10'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.11'
 ```
 
 ## Quick Start

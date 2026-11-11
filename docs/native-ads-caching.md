@@ -18,10 +18,10 @@ AdManageKit combines `NativeAdManager`, `NativeAdIntegrationManager`, and Compos
 ## Installation
 ```groovy
 dependencies {
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.10"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.10"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.10"
-    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.10" // for Compose
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.11"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.11"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.11"
+    implementation "com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.11" // for Compose
 }
 ```
 

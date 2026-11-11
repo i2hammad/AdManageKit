@@ -5,6 +5,26 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.11] - 2026-11-11
+
+Bug-fix release. An ad view no longer stays empty for good when `MobileAds.initialize()` finishes after the v4.4.10 init wait has given up.
+
+### Fixed
+
+- **Native and banner slots stayed empty after a late init.** Since v4.4.10 a load waits up to `mobileAdsInitTimeout` (10 s) for init, then fails with TIMEOUT so the screen isn't stuck on a shimmer. If init finished a moment later, the slot stayed empty until the screen was reopened. `NativeBannerSmall`, `NativeBannerMedium`, `NativeLarge`, `NativeTemplateView` and `BannerAdView` now keep watching for init after a TIMEOUT failure and load their ad once it completes. Your callback gets `onFailedToLoad(TIMEOUT)` first and `onAdLoaded()` when the late load succeeds
+- No second load when init was already done at the failure (a real no-fill), the view was destroyed, its activity is finishing, the user is premium, a new load was started on the view, or the watch window ran out. A waterfall that already filled the slot from another provider (e.g. Yandex) doesn't trigger one either
+
+### Added
+
+- `AdManageKitConfig.mobileAdsLateLoadWindow` (default 2 minutes; `Duration.ZERO` restores v4.4.10 behaviour), covered by `resetToDefaults()`
+- Sample app: `InitRaceTestActivity` reproduces the "MobileAds.initialize must be called" crash and tests late init on a device (`adb shell setprop debug.amk.init_delay_ms <ms>`; see the class doc)
+
+### Notes
+
+- Interstitial, rewarded and app-open loads are unchanged: a timed-out pool preload is dropped, and the next `forceShowInterstitial` loads a fresh ad behind its dialog
+- Verified on a Galaxy A71 5G (SM-A716V, Android 13), cold starts: v4.4.9 crashes with init delayed 6 s; v4.4.11 shows native, banner and interstitial ads with init delayed 6 s and 15 s, and moves on without crashing when init never runs
+- `assembleDebug` and all 194 unit tests pass, including the new `LateInitReloadTest` and two new cases in `NativeBannerSmallInitGateTest`
+
 ## [4.4.10] - 2026-11-10
 
 Bug-fix release. Ad loads no longer crash when they run before the app's `MobileAds.initialize()` has finished.
