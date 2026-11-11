@@ -14,11 +14,10 @@ v4.4.12 is a **dependency release**. It moves to **Google Mobile Ads Next-Gen SD
 |---|---|---|
 | Google Mobile Ads Next-Gen SDK (`ads-mobile-sdk`) | 1.5.0 | **1.6.0** |
 | Firebase BOM | 35.0.2 | **35.1.0** |
-| Android Gradle Plugin (build only) | 9.4.1 | **9.5.1** |
 | Dokka (docs only) | 2.2.0 | **2.3.0** |
 | MockK (tests only) | 1.14.11 | **1.14.12** |
 
-Play Billing stays at 9.1.0, UMP at 4.0.0, Yandex Mobile Ads at 8.6.0 and WorkManager stays pinned at 2.9.1 (see v4.4.6).
+Play Billing stays at 9.1.0, UMP at 4.0.0, Yandex Mobile Ads at 8.6.0 and WorkManager stays pinned at 2.9.1 (see v4.4.6). The Android Gradle Plugin stays at 9.4.1: 9.5.1's new Compose Preview task makes `./gradlew tasks --all` fail, and JitPack relies on that command to find the publishing tasks.
 
 ### What Next-Gen SDK 1.6.0 brings
 

@@ -15,7 +15,6 @@ Dependency release. Moves to Google Mobile Ads Next-Gen SDK 1.6.0. No AdManageKi
 |---|---|---|
 | Google Mobile Ads Next-Gen SDK (`ads-mobile-sdk`) | 1.5.0 | **1.6.0** |
 | Firebase BOM | 35.0.2 | **35.1.0** |
-| Android Gradle Plugin (build only) | 9.4.1 | **9.5.1** |
 | Dokka (docs only) | 2.2.0 | **2.3.0** |
 | MockK (tests only) | 1.14.11 | **1.14.12** |
 
@@ -25,7 +24,7 @@ Next-Gen SDK 1.6.0 has no breaking changes, deprecations or new minimum requirem
 - An `IllegalStateException` crash, fixed by `com.google.android.play:hsdp` 2.2.0
 - Mediated full-screen ads now pass an available `Activity` context to third-party SDKs
 
-Play Billing stays at 9.1.0, UMP at 4.0.0, Yandex Mobile Ads at 8.6.0 and WorkManager pinned at 2.9.1 (see 4.4.6).
+Play Billing stays at 9.1.0, UMP at 4.0.0, Yandex Mobile Ads at 8.6.0 and WorkManager pinned at 2.9.1 (see 4.4.6). The Android Gradle Plugin stays at 9.4.1: 9.5.1's new Compose Preview task makes `./gradlew tasks --all` fail, and JitPack relies on that command to find the publishing tasks.
 
 ### Notes
 
