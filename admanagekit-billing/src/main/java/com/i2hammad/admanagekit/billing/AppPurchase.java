@@ -104,6 +104,15 @@ public class AppPurchase {
     // most recent query of each type. Cleared per product type on each query.
     private final Map<String, UnfetchedProduct> unfetchedProducts = new ConcurrentHashMap<>();
 
+    // Waits before each automatic retry of a failed billing setup or product-details query.
+    // Play answers ERROR ("An internal error occurred.") or SERVICE_UNAVAILABLE often enough
+    // that a single attempt left a real share of installs with no prices for the whole
+    // process, and every purchase then failed with "Billing not initialized".
+    private static final long[] RETRY_DELAYS_MS = {2_000L, 5_000L, 15_000L};
+    // Consecutive failures per product type, and of setup; reset on success and by initBilling.
+    private final Map<String, Integer> productQueryFailures = new ConcurrentHashMap<>();
+    private final AtomicInteger setupFailures = new AtomicInteger(0);
+
     private AppPurchase() {
     }
 
@@ -133,6 +142,8 @@ public class AppPurchase {
             isServiceConnected.set(false);
         }
         initBillingFinishedNotified.set(false);
+        setupFailures.set(0);
+        productQueryFailures.clear();
         Log.d(Tag, "initBilling: building client, debugMode=" + debugMode
                 + " inapp=" + inAppProductIdList.size() + " subs=" + subProductIdList.size());
         billingClient = BillingClient.newBuilder(application)
@@ -879,6 +890,7 @@ public class AppPurchase {
         }
         if (productDetailsMap == null || productDetailsMap.isEmpty()) {
             Log.e(Tag, "Product details not initialized");
+            refreshProductDetails();
             notifyListener("Billing not initialized");
             return "Billing not initialized";
         }
@@ -984,6 +996,7 @@ public class AppPurchase {
         }
         if (subProductDetailsMap == null || subProductDetailsMap.isEmpty()) {
             Log.e(Tag, "Subscription products not initialized");
+            refreshProductDetails();
             notifyListener("Billing not initialized");
             return "Billing not initialized";
         }
@@ -1118,6 +1131,7 @@ public class AppPurchase {
         }
         if (subProductDetailsMap == null || subProductDetailsMap.isEmpty()) {
             Log.e(Tag, "Subscription products not initialized");
+            refreshProductDetails();
             notifyListener("Billing not initialized");
             return "Billing not initialized";
         }
@@ -2712,6 +2726,7 @@ public class AppPurchase {
                             + " debug=" + billingResult.getDebugMessage());
                     if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
                         isServiceConnected.set(true);
+                        setupFailures.set(0);
                         Log.d(Tag, "Billing setup finished. Connected to Google Play.");
                         isBillingAvailable = true;
                         isBillingInitialized = Boolean.TRUE;
@@ -2730,6 +2745,14 @@ public class AppPurchase {
                         isBillingInitialized = Boolean.FALSE;
                         Log.e(Tag, "Billing setup failed: " + billingResult.getDebugMessage());
                         notifyInitBillingFinished(billingResult.getResponseCode());
+                        // Nothing else would ever try again: auto-reconnection only covers a
+                        // client that was set up once and then dropped.
+                        int attempt = setupFailures.getAndIncrement();
+                        if (isRetryable(billingResult.getResponseCode()) && attempt < RETRY_DELAYS_MS.length) {
+                            Log.w(Tag, "Retrying billing setup in " + RETRY_DELAYS_MS[attempt] + "ms");
+                            mainHandler.postDelayed(AppPurchase.this::connectToGooglePlayBilling,
+                                    RETRY_DELAYS_MS[attempt]);
+                        }
                     }
                 }
 
@@ -2749,9 +2772,66 @@ public class AppPurchase {
         }
     }
 
+    /**
+     * Asks Play again for every configured product type that has products without details.
+     *
+     * <p>The library already retries a failed query a few times on its own. Call this when a
+     * paywall opens and {@link #areAllProductDetailsLoaded()} is false, or after the user taps
+     * Buy and gets "Billing not initialized" (the purchase methods also call it on that path).
+     * Results arrive through {@link ProductDetailsListener}. A client whose setup never
+     * finished is reconnected instead; a successful setup queries every type on its own.
+     *
+     * @since 4.4.13
+     */
+    public void refreshProductDetails() {
+        if (billingClient == null) {
+            Log.w(Tag, "refreshProductDetails: initBilling has not run");
+            return;
+        }
+        if (!isServiceConnected.get()) {
+            connectToGooglePlayBilling();
+            return;
+        }
+        productQueryFailures.clear();
+        if (hasMissingDetails(inAppProductIdList)) {
+            queryProductDetails(new ArrayList<>(inAppProductIdList), BillingClient.ProductType.INAPP);
+        }
+        if (hasMissingDetails(subProductIdList)) {
+            queryProductDetails(new ArrayList<>(subProductIdList), BillingClient.ProductType.SUBS);
+        }
+    }
+
+    private boolean hasMissingDetails(List<String> productIds) {
+        for (String id : productIds) {
+            if (!productDetailsMap.containsKey(id)) return true;
+        }
+        return false;
+    }
+
+    /** Transient Play answers worth asking again; the rest will not change by waiting. */
+    private static boolean isRetryable(int responseCode) {
+        return responseCode == BillingClient.BillingResponseCode.ERROR
+                || responseCode == BillingClient.BillingResponseCode.SERVICE_UNAVAILABLE
+                || responseCode == BillingClient.BillingResponseCode.SERVICE_DISCONNECTED
+                || responseCode == BillingClient.BillingResponseCode.NETWORK_ERROR;
+    }
+
+    private void scheduleProductDetailsRetry(List<String> productIds, String productType, int responseCode) {
+        if (!isRetryable(responseCode)) return;
+        Integer previous = productQueryFailures.get(productType);
+        int attempt = previous == null ? 0 : previous;
+        productQueryFailures.put(productType, attempt + 1);
+        if (attempt >= RETRY_DELAYS_MS.length) return;
+        Log.w(Tag, "Retrying " + productType + " product details in " + RETRY_DELAYS_MS[attempt] + "ms");
+        List<String> ids = new ArrayList<>(productIds);
+        mainHandler.postDelayed(() -> queryProductDetails(ids, productType), RETRY_DELAYS_MS[attempt]);
+    }
+
     public void queryProductDetails(List<String> productIds, String productType) {
         if (!isClientReady()) {
-            Log.e(Tag, "Billing client not connected. Cannot query product details.");
+            // A successful setup queries every configured product, so connecting is the query.
+            Log.e(Tag, "Billing client not connected. Connecting before querying product details.");
+            connectToGooglePlayBilling();
             return;
         }
         List<QueryProductDetailsParams.Product> productList = new ArrayList<>();
@@ -2768,6 +2848,7 @@ public class AppPurchase {
             @Override
             public void onProductDetailsResponse(@NonNull BillingResult billingResult, @NonNull QueryProductDetailsResult queryProductDetailsResult) {
                 if (billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK) {
+                    productQueryFailures.remove(productType);
                     List<ProductDetails> productDetailsList = queryProductDetailsResult.getProductDetailsList();
                     if (productType.equals(BillingClient.ProductType.INAPP)) {
                         inAppProductDetailsMap.clear();
@@ -2803,8 +2884,11 @@ public class AppPurchase {
                     notifyUpdateFinished();
                 } else {
                     Log.e(Tag, "Error querying product details (" + productType + "): " + billingResult.getDebugMessage());
-                    notifyListener("Error getting " + productType + " details: " + billingResult.getDebugMessage());
+                    // Reported to ProductDetailsListener only. This used to reach
+                    // PurchaseListener.displayErrorMessage too, so a paywall showed a purchase
+                    // error — and logged one — when nobody had tapped Buy.
                     notifyProductDetailsFailed(productType, billingResult.getResponseCode(), billingResult.getDebugMessage());
+                    scheduleProductDetailsRetry(productIds, productType, billingResult.getResponseCode());
                 }
             }
         });

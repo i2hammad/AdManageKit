@@ -5,6 +5,19 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.13] - 2026-11-20
+
+### Fixed
+- **Billing: prices no longer stay empty after one failed query.** `AppPurchase` asked Play for product details once, at setup, and never again. Play answers that query with `ERROR` ("An internal error occurred.") often enough that, in one production app, failed queries and the "Billing not initialized" taps that followed them were most of all purchase errors: 6 for every purchase that reached Play's sheet. A failed query is now retried after 2, 5 and 15 s for transient codes (`ERROR`, `SERVICE_UNAVAILABLE`, `SERVICE_DISCONNECTED`, `NETWORK_ERROR`).
+- **Billing: a failed first setup is retried** on the same schedule. `enableAutoServiceReconnection()` only covers a client that connected once and then dropped.
+- **Billing: `purchase()`, `subscribe()` and `updateSubscription()` re-query missing details** when they have to answer "Billing not initialized", so the user's next tap can succeed. `queryProductDetails()` on a disconnected client now connects instead of returning silently.
+
+### Added
+- `AppPurchase.refreshProductDetails()`: re-queries every product type with missing details, or reconnects a client whose setup never finished. Call it when a paywall opens and `areAllProductDetailsLoaded()` is false.
+
+### Changed
+- A failed product-details query is reported only to `ProductDetailsListener.onProductDetailsFailed`. It no longer reaches `PurchaseListener.displayErrorMessage` ("Error getting subs details: …"), which made paywalls show and log a purchase error when nobody had tapped Buy. Apps that relied on that message should register a `ProductDetailsListener`.
+
 ## [4.4.12] - 2026-11-11
 
 Dependency release. Moves to Google Mobile Ads Next-Gen SDK 1.6.0. No AdManageKit API or behaviour changed. Apps still need **Kotlin 2.3 or newer**.
