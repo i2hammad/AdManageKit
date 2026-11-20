@@ -61,6 +61,10 @@ dependencies {
     // build real ProductDetails fixtures need a working implementation ahead of
     // the stub on the classpath.
     testImplementation(libs.json)
+    // AppPurchaseRetryTest drives AppPurchase against a mocked BillingClient on
+    // Robolectric's main looper, so the retry delays can be advanced in virtual time.
+    testImplementation(libs.robolectric)
+    testImplementation(libs.mockk)
 }
 
 afterEvaluate {
