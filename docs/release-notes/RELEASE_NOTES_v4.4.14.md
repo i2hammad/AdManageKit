@@ -1,6 +1,6 @@
 # Release Notes — v4.4.14
 
-**Release Date:** unreleased
+**Release Date:** 2026-11-25
 
 ## Overview
 
@@ -57,3 +57,8 @@ InlineBannerAdCompose(
 ## Upgrading
 
 No changes are needed. To use inline banners, request `BannerAdSize.INLINE_ADAPTIVE` or use `InlineBannerAdCompose`. `INLINE_ADAPTIVE` was added after the existing enum values, so XML `bannerAdSize` ordinals are unchanged.
+
+## Verification
+
+- `assembleDebug` for all modules and the sample app, and all 209 unit tests (5 new in `BannerAdViewInlineTest`, 3 new in `BannerAdSizeTest`).
+- On a Galaxy A71 5G (SM-A716V, Android 13), the sample's inline banners load in a list of cards: the Compose banner (max 250dp) opened to 249dp, the View banner (max 150dp) to 150dp, both at the card's inner width and centred.

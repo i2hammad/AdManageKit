@@ -5,7 +5,7 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.4.14] - Unreleased
+## [4.4.14] - 2026-11-25
 
 ### Added
 - **Inline adaptive banners.** `BannerAdSize.INLINE_ADAPTIVE` for `BannerAdView` and a new `InlineBannerAdCompose` composable, for banners inside scrolling content. The ad takes the view's own laid-out width (the load waits for layout) and a variable height that AdMob picks at load time, at most the max height (default 250dp; `setInlineMaxHeight()`, XML `bannerInlineMaxHeight`). The slot takes no space until the ad loads (optional 50dp shimmer via `setInlineShimmerEnabled()` / `showShimmer`), then wraps the ad's height and follows it on refresh (`onInlineAdHeightChanged`). The composable loads once per slot width and animates open.
@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Notes
 - Inline banners are never collapsible: a collapsible request logs a debug warning and loads a plain inline banner. In a waterfall the inline size goes to AdMob providers only.
 - `ADAPTIVE`, `ADAPTIVE_LARGE` and fixed sizes are unchanged.
+- Verified: `assembleDebug` for all modules and the sample app, and all 209 unit tests. On a Galaxy A71 5G (SM-A716V, Android 13), Compose and View inline banners load in the sample's card list at the card width
 
 ## [4.4.13] - 2026-11-20
 
