@@ -14,6 +14,7 @@ package com.i2hammad.admanagekit.config
  * | 300x250    | IAB medium rectangle | Phones and tablets |
  * | 468x60     | IAB full-size banner | Tablets            |
  * | 728x90     | IAB leaderboard      | Tablets            |
+ * | view width x up to max height | Inline adaptive (scrolling content) | Phones and tablets |
  *
  * Example usage:
  * ```kotlin
@@ -53,7 +54,23 @@ enum class BannerAdSize(val widthDp: Int?, val heightDp: Int?) {
     FULL_BANNER(468, 60),
 
     /** IAB leaderboard, 728x90. Tablets. */
-    LEADERBOARD(728, 90);
+    LEADERBOARD(728, 90),
+
+    /**
+     * Inline adaptive banner for scrolling content (lists, feeds, articles).
+     *
+     * Width is the banner view's own laid-out width (not the window), so the load
+     * waits until the view has been measured. Height is variable and only known
+     * once the ad loads: it is at most the configured max height (default 250dp,
+     * see `BannerAdView.setInlineMaxHeight`). The slot reserves no space until then.
+     *
+     * Not collapsible: AdMob serves collapsible banners only for anchored sizes, so
+     * a collapsible request with this size loads a plain inline banner instead.
+     * Declared last so the XML `bannerAdSize` enum values of the other sizes keep
+     * their ordinals.
+     * @since 4.4.14
+     */
+    INLINE_ADAPTIVE(null, null);
 
     /** True for sizes whose dimensions are computed at load time. */
     val isAdaptive: Boolean get() = widthDp == null

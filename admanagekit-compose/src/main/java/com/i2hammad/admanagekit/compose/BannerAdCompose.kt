@@ -79,7 +79,8 @@ private fun loadWhenMeasured(view: View, load: () -> Unit): View.OnLayoutChangeL
  * @param adSize Banner size to request; [BannerAdSize.ADAPTIVE] (default) fills the
  *        available width, [BannerAdSize.ADAPTIVE_LARGE] requests the taller large
  *        anchored adaptive format, fixed sizes (e.g. [BannerAdSize.MEDIUM_RECTANGLE])
- *        reserve their exact height and center horizontally
+ *        reserve their exact height and center horizontally. [BannerAdSize.INLINE_ADAPTIVE]
+ *        behaves as [InlineBannerAdCompose] with its defaults (max height 250dp, no shimmer)
  * @param onAdLoaded Callback when the ad loads successfully
  * @param onAdFailedToLoad Callback when the ad fails to load
  * @param onAdClicked Callback when the ad is clicked
@@ -103,6 +104,25 @@ fun BannerAdCompose(
     onAdClosed: (() -> Unit)? = null,
     onPaidEvent: ((AdValue) -> Unit)? = null
 ) {
+    // Inline adaptive has a variable height known only after load - it can't reserve a
+    // height up front like the sizes below, so it gets its own slot implementation.
+    if (adSize == BannerAdSize.INLINE_ADAPTIVE) {
+        InlineBannerAdComposeImpl(
+            adUnitId = adUnitId,
+            modifier = modifier,
+            maxHeight = BannerAdView.DEFAULT_INLINE_MAX_HEIGHT_DP.dp,
+            showShimmer = false,
+            onAdLoaded = { onAdLoaded?.invoke() },
+            onAdFailedToLoad = { onAdFailedToLoad?.invoke(it) },
+            onAdClicked = onAdClicked,
+            onAdImpression = onAdImpression,
+            onAdOpened = onAdOpened,
+            onAdClosed = onAdClosed,
+            onPaidEvent = onPaidEvent,
+        )
+        return
+    }
+
     val context = LocalContext.current
 
     // Keep the latest callbacks available to long-lived async ad events

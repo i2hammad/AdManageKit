@@ -23,6 +23,7 @@ import com.google.android.libraries.ads.mobile.sdk.banner.AdSize
 import com.google.android.libraries.ads.mobile.sdk.banner.AdView
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAd
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdEventCallback
+import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRefreshCallback
 import com.google.android.libraries.ads.mobile.sdk.banner.BannerAdRequest
 import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
@@ -102,11 +103,34 @@ class BannerAdView @JvmOverloads constructor(
     private var loadStartTime: Long = 0
     private val maxRetryAttempts get() = AdManageKitConfig.maxRetryAttempts
 
+    // Inline adaptive (BannerAdSize.INLINE_ADAPTIVE) configuration and state
+    private var inlineMaxHeightDp: Int = DEFAULT_INLINE_MAX_HEIGHT_DP
+    private var inlineShimmerEnabled: Boolean = false
+    // A load held until this view has a measured width; removed by cleanup()
+    private var pendingInlineLayout: View.OnLayoutChangeListener? = null
+    // Tracks the inline banner's rendered height on the waterfall path, where only a View comes back
+    private var inlineHeightWatcher: Pair<View, View.OnLayoutChangeListener>? = null
+    private var lastReportedInlineHeightDp: Int = 0
+
+    /**
+     * Called on the main thread with the inline adaptive banner's height in dp once it is
+     * known (after load) and again whenever a refresh changes it. Only fires for
+     * [BannerAdSize.INLINE_ADAPTIVE]. The height is never above the configured max height.
+     * @since 4.4.14
+     */
+    var onInlineAdHeightChanged: ((heightDp: Int) -> Unit)? = null
+
+    private val isInline: Boolean get() = currentBannerSize == BannerAdSize.INLINE_ADAPTIVE
+
     init {
         attrs?.let {
             val typedArray = context.obtainStyledAttributes(it, R.styleable.BannerAdView, defStyleAttr, 0)
             val sizeOrdinal = typedArray.getInt(R.styleable.BannerAdView_bannerAdSize, BannerAdSize.ADAPTIVE.ordinal)
             currentBannerSize = BannerAdSize.entries.getOrElse(sizeOrdinal) { BannerAdSize.ADAPTIVE }
+            val maxHeightPx = typedArray.getDimensionPixelSize(R.styleable.BannerAdView_bannerInlineMaxHeight, -1)
+            if (maxHeightPx > 0) {
+                inlineMaxHeightDp = clampInlineMaxHeightDp((maxHeightPx / resources.displayMetrics.density).toInt())
+            }
             typedArray.recycle()
         }
         LayoutInflater.from(context).inflate(R.layout.banner_ad_view, this, true)
@@ -214,6 +238,34 @@ class BannerAdView @JvmOverloads constructor(
         adjustShimmerLayout()
     }
 
+    /**
+     * Sets the maximum height, in dp, of an [BannerAdSize.INLINE_ADAPTIVE] banner (default
+     * [DEFAULT_INLINE_MAX_HEIGHT_DP]). Values below [MIN_INLINE_MAX_HEIGHT_DP] are raised to it.
+     * Applies to the next load. Can also be set from XML via `bannerInlineMaxHeight`.
+     *
+     * @since 4.4.14
+     */
+    fun setInlineMaxHeight(dp: Int) {
+        val clamped = clampInlineMaxHeightDp(dp)
+        if (clamped != dp) {
+            AdDebugUtils.logDebug("BannerAdView", "Inline max height ${dp}dp is below the minimum; using ${clamped}dp")
+        }
+        inlineMaxHeightDp = clamped
+    }
+
+    /**
+     * Shows a small shimmer while an [BannerAdSize.INLINE_ADAPTIVE] banner loads. Off by
+     * default: an inline slot reserves no height until the ad arrives. The shimmer is never
+     * shown to purchased users.
+     *
+     * @since 4.4.14
+     */
+    fun setInlineShimmerEnabled(enabled: Boolean) {
+        if (inlineShimmerEnabled == enabled) return
+        inlineShimmerEnabled = enabled
+        adjustShimmerLayout()
+    }
+
     fun setAdCallback(callback: AdLoadCallback?) {
         this.callback = callback
     }
@@ -270,12 +322,25 @@ class BannerAdView @JvmOverloads constructor(
         // Enhanced memory management
         this.activityRef = WeakReference(context)
         this.currentAdUnitId = adUnitId
-        this.currentCollapsible = collapsible
         this.currentPlacement = placement
         adSize?.let { this.currentBannerSize = it }
         this.callback = callback
+        lastReportedInlineHeightDp = 0
+        // Reflect a size passed here (e.g. INLINE_ADAPTIVE) on the placeholder straight away
+        if (adSize != null) adjustShimmerLayout()
 
-        if (collapsible && !currentBannerSize.isAdaptive) {
+        if (collapsible && isInline) {
+            // AdMob serves collapsible banners only for anchored sizes. Load a plain inline
+            // banner rather than a request AdMob would not honor.
+            AdDebugUtils.logDebug(
+                "BannerAdView",
+                "Collapsible banners are not supported for INLINE_ADAPTIVE; loading a plain inline banner"
+            )
+        }
+        val effectiveCollapsible = collapsible && !isInline
+        this.currentCollapsible = effectiveCollapsible
+
+        if (effectiveCollapsible && !currentBannerSize.isAdaptive) {
             // AdMob only serves collapsible banners for anchored adaptive requests;
             // a fixed size would silently drop the collapsible behavior.
             AdDebugUtils.logDebug(
@@ -299,7 +364,86 @@ class BannerAdView @JvmOverloads constructor(
         val wrapped = lateInitReload.wrap(context, callback) {
             loadCollapsibleBanner(context, adUnitId, collapsible, placement, callback, adSize)
         }
-        loadBannerInternal(adUnitId, collapsible, placement, wrapped)
+        loadBannerInternal(adUnitId, effectiveCollapsible, placement, wrapped)
+    }
+
+    /** Inline banners are sized to this view's own laid-out content width, in px. */
+    private fun inlineContentWidthPx(): Int =
+        if (layBannerAd.width > 0) layBannerAd.width else width - paddingLeft - paddingRight
+
+    /**
+     * Holds [load] until this view has been laid out with a real width. Returns true when the
+     * load was deferred. An inline banner sized from the window would be too wide for a padded
+     * card or list row, so it must not load before the view is measured.
+     */
+    private fun deferInlineLoadUntilLaidOut(load: () -> Unit): Boolean {
+        if (!isInline || inlineContentWidthPx() > 0) return false
+        // Premium users fail fast through the normal purchase-blocked path instead of waiting
+        // for a layout that may never come (and nothing is made visible for them)
+        if (BillingConfig.getPurchaseProvider().isPurchased()) return false
+        pendingInlineLayout?.let { removeOnLayoutChangeListener(it) }
+        val listener = object : View.OnLayoutChangeListener {
+            override fun onLayoutChange(
+                v: View, l: Int, t: Int, r: Int, b: Int, ol: Int, ot: Int, orr: Int, ob: Int
+            ) {
+                if (inlineContentWidthPx() <= 0) return
+                removeOnLayoutChangeListener(this)
+                if (pendingInlineLayout === this) pendingInlineLayout = null
+                load()
+            }
+        }
+        pendingInlineLayout = listener
+        addOnLayoutChangeListener(listener)
+        // A GONE view (e.g. hidden after an earlier failure) is never laid out. The inline
+        // placeholder takes no height (or a small opt-in shimmer), so this shows nothing early.
+        if (visibility == View.GONE) visibility = View.VISIBLE
+        AdDebugUtils.logDebug("BannerAdView", "Inline banner load deferred until the view is laid out")
+        return true
+    }
+
+    /** The inline adaptive size for this view's width and the configured max height. */
+    private fun inlineAdSize(): AdSize {
+        val widthDp = (inlineContentWidthPx() / resources.displayMetrics.density).toInt()
+        return AdSize.getInlineAdaptiveBannerAdSize(widthDp, inlineMaxHeightDp)
+    }
+
+    /** Reports a new inline height (dp, capped at the max height) if it changed. */
+    private fun reportInlineHeight(heightDp: Int) {
+        if (!isInline || heightDp <= 0) return
+        val capped = heightDp.coerceAtMost(inlineMaxHeightDp)
+        if (capped == lastReportedInlineHeightDp) return
+        lastReportedInlineHeightDp = capped
+        AdDebugUtils.logDebug("BannerAdView", "Inline banner height: ${capped}dp (max ${inlineMaxHeightDp}dp)")
+        onInlineAdHeightChanged?.invoke(capped)
+    }
+
+    /** Sizes the loaded AdView to the inline ad's real height (it may change on refresh). */
+    private fun applyInlineAdHeight(heightDp: Int) {
+        val view = adView ?: return
+        val capped = heightDp.coerceAtMost(inlineMaxHeightDp)
+        val params = (view.layoutParams as? FrameLayout.LayoutParams) ?: centeredBannerLayoutParams()
+        params.height = (capped * resources.displayMetrics.density).toInt()
+        params.gravity = Gravity.CENTER_HORIZONTAL
+        view.layoutParams = params
+    }
+
+    /**
+     * Waterfall path: only a View comes back, so follow its laid-out height to learn the
+     * inline ad's height - initially and after every refresh.
+     */
+    private fun watchInlineHeight(bannerView: View) {
+        clearInlineHeightWatcher()
+        if (!isInline) return
+        val listener = View.OnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            if (v.height > 0) reportInlineHeight((v.height / resources.displayMetrics.density).toInt())
+        }
+        bannerView.addOnLayoutChangeListener(listener)
+        inlineHeightWatcher = bannerView to listener
+    }
+
+    private fun clearInlineHeightWatcher() {
+        inlineHeightWatcher?.let { (view, listener) -> view.removeOnLayoutChangeListener(listener) }
+        inlineHeightWatcher = null
     }
     
     /**
@@ -311,6 +455,9 @@ class BannerAdView @JvmOverloads constructor(
         placement: CollapsibleBannerPlacement = CollapsibleBannerPlacement.BOTTOM,
         callback: AdLoadCallback? = null
     ) {
+        // Inline banners are sized to this view's own width, so wait until it is laid out
+        if (deferInlineLoadUntilLaidOut { loadBannerInternal(adUnitId, collapsible, placement, callback) }) return
+
         if (useWaterfall) { loadBannerViaWaterfall(adUnitId, collapsible, placement, callback); return }
 
         // The Next-Gen SDK throws if a request is made before MobileAds.initialize() completes.
@@ -383,8 +530,8 @@ class BannerAdView @JvmOverloads constructor(
             // Build ad request
             val requestBuilder = BannerAdRequest.Builder(adUnitId, calculatedAdSize)
 
-            // Add collapsible extras if needed
-            if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
+            // Add collapsible extras if needed (never for inline - AdMob only collapses anchored banners)
+            if (shouldRequestCollapsible(collapsible, AdManageKitConfig.enableCollapsibleBannersByDefault, isInline)) {
                 val extras = Bundle()
                 extras.putString("collapsible", placement.value)
                 requestBuilder.setGoogleExtrasBundle(extras)
@@ -415,39 +562,56 @@ class BannerAdView @JvmOverloads constructor(
         }
     }
 
-    private fun adjustShimmerLayout() = try {
-        val ctx = activityRef?.get() ?: context
-        val adSize = getAdSize(ctx)
-        val params = shimmerFrameLayout.layoutParams as? FrameLayout.LayoutParams
-            ?: FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            )
+    private fun adjustShimmerLayout() {
+        try {
+            val ctx = activityRef?.get() ?: context
+            val params = shimmerFrameLayout.layoutParams as? FrameLayout.LayoutParams
+                ?: FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                )
 
-        // Use the SDK's own resolved pixel height rather than density * adSize.height:
-        // for an anchored-adaptive banner the nominal dp height under-reports the real
-        // slot, which left the shimmer at ~50dp with empty space below while the taller
-        // ad loaded in. getHeightInPixels() is exactly what the rendered banner occupies.
-        val density = resources.displayMetrics.density
-        params.height = adSize.getHeightInPixels(ctx).takeIf { it > 0 }
-            ?: (density * adSize.height).toInt()
+            if (isInline) {
+                // An inline slot's height is unknown until the ad loads, so it reserves nothing -
+                // or only a small optional shimmer, never for purchased users.
+                val showShimmer = inlineShimmerEnabled &&
+                    (isInEditMode || !BillingConfig.getPurchaseProvider().isPurchased())
+                params.width = FrameLayout.LayoutParams.MATCH_PARENT
+                params.height = if (showShimmer) {
+                    (INLINE_SHIMMER_HEIGHT_DP * resources.displayMetrics.density).toInt()
+                } else 0
+                params.gravity = Gravity.CENTER_HORIZONTAL
+                shimmerFrameLayout.layoutParams = params
+                return
+            }
 
-        if (currentBannerSize.isAdaptive) {
-            // Anchored adaptive spans the full width; let the shimmer fill it too so it
-            // lines up edge-to-edge with the loaded ad.
-            params.width = FrameLayout.LayoutParams.MATCH_PARENT
-        } else {
-            // Fixed sizes (e.g. 300x250) are narrower than the container; center the
-            // placeholder to match the centered ad (see centeredBannerLayoutParams).
-            params.width = adSize.getWidthInPixels(ctx).takeIf { it > 0 }
-                ?: (density * adSize.width).toInt()
+            val adSize = getAdSize(ctx)
+
+            // Use the SDK's own resolved pixel height rather than density * adSize.height:
+            // for an anchored-adaptive banner the nominal dp height under-reports the real
+            // slot, which left the shimmer at ~50dp with empty space below while the taller
+            // ad loaded in. getHeightInPixels() is exactly what the rendered banner occupies.
+            val density = resources.displayMetrics.density
+            params.height = adSize.getHeightInPixels(ctx).takeIf { it > 0 }
+                ?: (density * adSize.height).toInt()
+
+            if (currentBannerSize.isAdaptive) {
+                // Anchored adaptive spans the full width; let the shimmer fill it too so it
+                // lines up edge-to-edge with the loaded ad.
+                params.width = FrameLayout.LayoutParams.MATCH_PARENT
+            } else {
+                // Fixed sizes (e.g. 300x250) are narrower than the container; center the
+                // placeholder to match the centered ad (see centeredBannerLayoutParams).
+                params.width = adSize.getWidthInPixels(ctx).takeIf { it > 0 }
+                    ?: (density * adSize.width).toInt()
+            }
+            params.gravity = Gravity.CENTER_HORIZONTAL
+            shimmerFrameLayout.layoutParams = params
+        } catch (e: Exception) {
+            // Never let placeholder sizing (e.g. an SDK call in the design preview before
+            // MobileAds is initialized) break rendering; the shimmer keeps its XML height.
+            AdDebugUtils.logDebug("BannerAdView", "adjustShimmerLayout skipped: ${e.message}")
         }
-        params.gravity = Gravity.CENTER_HORIZONTAL
-        shimmerFrameLayout.layoutParams = params
-    } catch (e: Exception) {
-        // Never let placeholder sizing (e.g. an SDK call in the design preview before
-        // MobileAds is initialized) break rendering; the shimmer keeps its XML height.
-        AdDebugUtils.logDebug("BannerAdView", "adjustShimmerLayout skipped: ${e.message}")
     }
 
     /**
@@ -514,7 +678,24 @@ class BannerAdView @JvmOverloads constructor(
                     }
                 }
 
-                handleAdLoadSuccess(adUnitId, callback)
+                // Inline adaptive: the real height (<= max height) is only known now, and a
+                // refresh can change it - follow it so the slot always wraps the ad.
+                val inlineHeightDp = if (isInline) bannerAd.getAdSize().height else 0
+                if (isInline) {
+                    bannerAd.bannerAdRefreshCallback = object : BannerAdRefreshCallback {
+                        override fun onAdRefreshed() {
+                            ensureMainThread {
+                                val heightDp = bannerAd.getAdSize().height
+                                AdDebugUtils.logEvent(adUnitId, "onAdRefreshed", "Inline banner refreshed (${heightDp}dp)", true)
+                                applyInlineAdHeight(heightDp)
+                                reportInlineHeight(heightDp)
+                                forceRelayoutAfterAdSwap()
+                            }
+                        }
+                    }
+                }
+
+                handleAdLoadSuccess(adUnitId, callback, inlineHeightDp)
             }
 
             override fun onAdFailedToLoad(adError: LoadAdError) {
@@ -526,14 +707,21 @@ class BannerAdView @JvmOverloads constructor(
     /**
      * Handles successful ad loading with enhanced features.
      */
-    private fun handleAdLoadSuccess(adUnitId: String, callback: AdLoadCallback?) {
+    private fun handleAdLoadSuccess(adUnitId: String, callback: AdLoadCallback?, inlineHeightDp: Int = 0) {
         ensureMainThread {
             // Update UI
+            clearInlineHeightWatcher()
             layBannerAd.removeAllViews()
             adView?.let { adView ->
                 val parent = adView.parent as? ViewGroup
                 parent?.removeView(adView)
                 layBannerAd.addView(adView, centeredBannerLayoutParams())
+            }
+            if (isInline && inlineHeightDp > 0) {
+                // Wrap the ad's real height and report it before onAdLoaded, so a host that
+                // sizes the slot from it (e.g. Compose) already has the height
+                applyInlineAdHeight(inlineHeightDp)
+                reportInlineHeight(inlineHeightDp)
             }
             shimmerFrameLayout.stopShimmer()
             shimmerFrameLayout.visibility = View.GONE
@@ -730,6 +918,9 @@ class BannerAdView @JvmOverloads constructor(
         // Fixed sizes (BANNER, MEDIUM_RECTANGLE, ...) don't depend on the window width
         currentBannerSize.toFixedAdMobAdSize()?.let { return it }
 
+        // Inline adaptive uses this view's own width (loads are deferred until it is laid out)
+        if (isInline) return inlineAdSize()
+
         // Prefer the laid-out container width; before layout (init / design preview)
         // fall back to the window/display width. A plain Context works here, so the
         // adaptive size resolves even without an Activity (no 50dp BANNER fallback).
@@ -809,12 +1000,13 @@ class BannerAdView @JvmOverloads constructor(
         // Configure collapsible and size on AdMob providers before loading
         providers.filterIsInstance<com.i2hammad.admanagekit.admob.provider.AdMobBannerProvider>()
             .forEach {
-                it.collapsible = collapsible
+                it.collapsible = collapsible && !isInline
                 it.collapsiblePlacement = placement
                 // null (ADAPTIVE) lets the provider compute its own standard adaptive
-                // size; ADAPTIVE_LARGE must be resolved here since the provider's
-                // own fallback is the standard variant
-                it.adSize = if (currentBannerSize == BannerAdSize.ADAPTIVE_LARGE) getAdSize()
+                // size; ADAPTIVE_LARGE and INLINE_ADAPTIVE must be resolved here since the
+                // provider's own fallback is the standard variant sized to the window.
+                // Only AdMob providers get the inline size - others keep their own sizing.
+                it.adSize = if (currentBannerSize == BannerAdSize.ADAPTIVE_LARGE || isInline) getAdSize()
                 else currentBannerSize.toFixedAdMobAdSize()
             }
 
@@ -831,6 +1023,8 @@ class BannerAdView @JvmOverloads constructor(
                     val parent = bannerView.parent as? ViewGroup
                     parent?.removeView(bannerView)
                     layBannerAd.addView(bannerView, centeredBannerLayoutParams())
+                    // Inline: follow the rendered height (the provider hands back only a View)
+                    watchInlineHeight(bannerView)
                     shimmerFrameLayout.stopShimmer()
                     shimmerFrameLayout.visibility = View.GONE
                     isAdLoading.set(false)
@@ -976,6 +1170,9 @@ class BannerAdView @JvmOverloads constructor(
             pendingInitWait?.cancel()
             pendingInitWait = null
             lateInitReload.cancel()
+            pendingInlineLayout?.let { removeOnLayoutChangeListener(it) }
+            pendingInlineLayout = null
+            clearInlineHeightWatcher()
             adView?.destroy()
 
             // Unregister from the host lifecycle - it holds a strong reference to this
@@ -1061,5 +1258,16 @@ class BannerAdView @JvmOverloads constructor(
      */
     fun getCurrentAttempt(): Int {
         return loadAttempt.get()
+    }
+
+    companion object {
+        /** Default max height of an [BannerAdSize.INLINE_ADAPTIVE] banner, in dp. @since 4.4.14 */
+        const val DEFAULT_INLINE_MAX_HEIGHT_DP = 250
+
+        /** Smallest inline max height accepted; lower values are raised to it. @since 4.4.14 */
+        const val MIN_INLINE_MAX_HEIGHT_DP = 32
+
+        /** Height of the optional inline loading shimmer, in dp. @since 4.4.14 */
+        const val INLINE_SHIMMER_HEIGHT_DP = 50
     }
 }

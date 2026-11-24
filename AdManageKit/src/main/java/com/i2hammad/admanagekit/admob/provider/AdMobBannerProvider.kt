@@ -18,6 +18,7 @@ import com.google.android.libraries.ads.mobile.sdk.common.AdValue
 import com.google.android.libraries.ads.mobile.sdk.common.LoadAdError
 import com.google.android.libraries.ads.mobile.sdk.common.PrecisionType
 import com.i2hammad.admanagekit.admob.MobileAdsGate
+import com.i2hammad.admanagekit.admob.shouldRequestCollapsible
 import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
@@ -116,7 +117,14 @@ class AdMobBannerProvider(
         pendingViews.add(bannerView)
 
         val requestBuilder = BannerAdRequest.Builder(adUnitId, resolvedAdSize)
-        if (collapsible || AdManageKitConfig.enableCollapsibleBannersByDefault) {
+        // AdMob only serves collapsible banners for anchored sizes - an inline adaptive
+        // request loads as a plain inline banner.
+        if (shouldRequestCollapsible(
+                collapsible,
+                AdManageKitConfig.enableCollapsibleBannersByDefault,
+                resolvedAdSize.isInlineAdaptiveBanner
+            )
+        ) {
             val extras = Bundle()
             extras.putString("collapsible", collapsiblePlacement.value)
             requestBuilder.setGoogleExtrasBundle(extras)

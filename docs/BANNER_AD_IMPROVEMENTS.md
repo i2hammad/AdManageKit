@@ -136,11 +136,13 @@ All standard AdMob banner sizes are supported via the `BannerAdSize` enum
 | Value              | Size (dp)  | Description          | Availability       |
 |--------------------|------------|----------------------|--------------------|
 | `ADAPTIVE`         | full width | Anchored adaptive    | Phones and tablets |
+| `ADAPTIVE_LARGE`   | full width | Large anchored adaptive | Phones and tablets |
 | `BANNER`           | 320x50     | Banner               | Phones and tablets |
 | `LARGE_BANNER`     | 320x100    | Large banner         | Phones and tablets |
 | `MEDIUM_RECTANGLE` | 300x250    | IAB medium rectangle | Phones and tablets |
 | `FULL_BANNER`      | 468x60     | IAB full-size banner | Tablets            |
 | `LEADERBOARD`      | 728x90     | IAB leaderboard      | Tablets            |
+| `INLINE_ADAPTIVE`  | view width x up to max height (default 250) | Inline adaptive, for scrolling content (v4.4.14) | Phones and tablets |
 
 `ADAPTIVE` (the default) keeps the previous full-width adaptive behavior.
 
@@ -169,13 +171,64 @@ BannerAdCompose(
 ```
 
 Notes:
-- Collapsible banners require `ADAPTIVE` (AdMob policy); a fixed size logs a debug warning.
+- Collapsible banners require an anchored adaptive size (`ADAPTIVE` / `ADAPTIVE_LARGE`, AdMob policy); a fixed size logs a debug warning, and `INLINE_ADAPTIVE` loads a plain inline banner.
 - The size is preserved across retries and auto-refresh.
 - In multi-provider waterfalls, fixed sizes are applied to the AdMob providers in the chain.
 - The shimmer placeholder reserves the exact requested size (centered horizontally,
   matching the loaded ad), so tall formats like `MEDIUM_RECTANGLE` don't cause a
   layout jump when the ad arrives.
 - `FULL_BANNER` and `LEADERBOARD` are wider than phone screens — use them on tablets only.
+
+### Inline Adaptive Banners (v4.4.14)
+
+`BannerAdSize.INLINE_ADAPTIVE` is Google's inline adaptive banner, for ads placed inside scrolling content rather than anchored to the screen edge.
+
+**Views**
+
+```kotlin
+// Inline adaptive banner inside scrolling content (a card, a list row, an article body).
+// Width = the view's own laid-out width; height = picked by AdMob, at most the max height.
+bannerAdView.setInlineMaxHeight(250)            // default 250dp
+bannerAdView.setInlineShimmerEnabled(false)     // default: reserve no height until loaded
+bannerAdView.onInlineAdHeightChanged = { heightDp -> Log.d("Ads", "inline height ${heightDp}dp") }
+bannerAdView.loadBanner(activity, "ca-app-pub-xxx/yyy", BannerAdSize.INLINE_ADAPTIVE)
+```
+
+```xml
+<com.i2hammad.admanagekit.admob.BannerAdView
+    android:id="@+id/inlineBanner"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:bannerAdSize="inline_adaptive"
+    app:bannerInlineMaxHeight="250dp" />
+```
+
+**Compose**
+
+```kotlin
+LazyColumn {
+    items(articles) { ArticleCard(it) }
+    item {
+        InlineBannerAdCompose(
+            adUnitId = "ca-app-pub-xxx/yyy",
+            modifier = Modifier.padding(horizontal = 16.dp), // the ad fits the padded width
+            maxHeight = 250.dp,
+            showShimmer = false,
+            onAdLoaded = { heightDp -> /* ad is heightDp tall */ },
+            onAdFailedToLoad = { error -> /* slot takes no space */ },
+        )
+    }
+}
+```
+
+Behaviour:
+
+- **Width** is the slot's own width (padding included), not the window's: the View waits until it has been laid out, and the composable loads once `BoxWithConstraints` has measured the slot.
+- **Height** is only known after the ad loads and is at most the max height (default 250dp, minimum 32dp). Until then the slot takes no space, or a small 50dp shimmer if you opt in. It then opens to the ad's height (Compose animates it) and follows any height change when the ad refreshes.
+- The composable loads once per width. Recomposition never reloads; a real width change (rotation, foldable or tablet resize) loads a new ad for the new width. The AdView is centred and destroyed on dispose.
+- **Not collapsible.** AdMob serves collapsible banners only for anchored sizes. Asking for collapsible with `INLINE_ADAPTIVE` (or having `enableCollapsibleBannersByDefault` on) logs a debug warning and loads a plain inline banner.
+- **Waterfall:** the inline size goes to the AdMob providers in the chain; other providers (e.g. Yandex) keep their own sizing.
+- Premium users get no ad, no shimmer and no space, and the load fails fast with the purchase-blocked error, as for every banner.
 
 ## 📈 **Performance Benefits**
 

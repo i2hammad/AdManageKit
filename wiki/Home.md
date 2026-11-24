@@ -12,6 +12,7 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ## Recent Releases
 
+- **4.4.14**: Inline adaptive banners: `BannerAdSize.INLINE_ADAPTIVE` for `BannerAdView` (`setInlineMaxHeight()`, default 250dp) and the new `InlineBannerAdCompose`. Sized to the slot's own width; no space until the ad loads
 - **4.4.13**: Billing retries a failed setup or product-details query (2, 5, 15 s), so prices no longer stay empty after one Play "internal error". New `AppPurchase.refreshProductDetails()`. Product-details failures now reach only `ProductDetailsListener`
 - **4.4.12**: Google Mobile Ads Next-Gen SDK 1.6.0 (fixes a WorkManager crash under R8 full mode and rewarded callback order) and Firebase BoM 35.1.0. No API changes
 - **4.4.11**: An ad view (native or banner) whose load gave up waiting for `MobileAds.initialize()` now loads its ad once init finishes, instead of leaving the slot empty. New `mobileAdsLateLoadWindow` (2 min; `Duration.ZERO` turns it off)
@@ -80,15 +81,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.13'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.13'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.14'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.14'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.14'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.14'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.14'
 ```
 
 **Step 3:** Ensure your app uses `compileSdk` **37+** (since 4.2.0) and **Kotlin 2.3+** (since 4.4.8).

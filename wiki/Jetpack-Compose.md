@@ -1,18 +1,18 @@
-# Jetpack Compose Integration - AdManageKit v4.4.13
+# Jetpack Compose Integration - AdManageKit v4.4.14
 
 ## Overview
 
 AdManageKit provides first-class Jetpack Compose support with composable functions for all ad types, state management helpers, and programmatic native ad loading.
 
-**Library Version**: v4.4.13
+**Library Version**: v4.4.14
 
 ## Installation
 
 ```groovy
 dependencies {
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.13'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.13'
-    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.13'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.14'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.14'
+    implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.14'
 }
 ```
 
@@ -42,7 +42,29 @@ fun MyScreen() {
 }
 ```
 
-`adSize` accepts any `BannerAdSize` — `ADAPTIVE` (default), `ADAPTIVE_LARGE`, `BANNER`, `LARGE_BANNER`, `MEDIUM_RECTANGLE`, `FULL_BANNER`, `LEADERBOARD`. The composable reserves the height for the requested size while loading, so content below doesn't shift. See [[Banner Ads]].
+`adSize` accepts any `BannerAdSize` — `ADAPTIVE` (default), `ADAPTIVE_LARGE`, `BANNER`, `LARGE_BANNER`, `MEDIUM_RECTANGLE`, `FULL_BANNER`, `LEADERBOARD`, `INLINE_ADAPTIVE`. The composable reserves the height for the requested size while loading, so content below doesn't shift (except `INLINE_ADAPTIVE`, whose height is only known after loading). See [[Banner Ads]].
+
+### Inline Adaptive Banner (v4.4.14+)
+
+For a banner inside a list, feed or article. The ad takes the slot's width (padding included) and a height AdMob picks at load time, never above `maxHeight`. The slot takes no space until the ad loads (or shows a small shimmer with `showShimmer = true`), then animates open; on failure it takes no space.
+
+```kotlin
+LazyColumn {
+    items(articles) { ArticleCard(it) }
+    item {
+        InlineBannerAdCompose(
+            adUnitId = "ca-app-pub-xxx/yyy",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            maxHeight = 250.dp,
+            showShimmer = false,
+            onAdLoaded = { heightDp -> },
+            onAdFailedToLoad = { error -> },
+        )
+    }
+}
+```
+
+It loads once per slot width: recomposition never reloads, and a real width change (rotation, foldable or tablet resize) loads a new ad. Inline banners are never collapsible. `BannerAdCompose(adSize = BannerAdSize.INLINE_ADAPTIVE)` gives the same slot with the defaults.
 
 ## Native Ads
 
@@ -224,6 +246,7 @@ fun MyScreen() {
 | Function | Description |
 |----------|-------------|
 | `BannerAdCompose` | Banner ad composable |
+| `InlineBannerAdCompose` | Inline adaptive banner for scrolling content (v4.4.14+) |
 | `NativeTemplateCompose` | Native with templates |
 | `NativeBannerSmallCompose` | Small native ad |
 | `NativeBannerMediumCompose` | Medium native ad |

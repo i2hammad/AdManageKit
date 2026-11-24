@@ -6,7 +6,7 @@
 
 An Android library that takes the boilerplate out of **Google AdMob** ads, **Google Play Billing** and **UMP consent**, with optional multi-network waterfalls (Yandex) and Jetpack Compose support.
 
-**Latest version: `4.4.13`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.13.md) · [Changelog](CHANGELOG.md)
+**Latest version: `4.4.14`** · [Release notes](docs/release-notes/RELEASE_NOTES_v4.4.14.md) · [Changelog](CHANGELOG.md)
 
 > **Requires Kotlin 2.3+** in your app as of 4.4.8. ⚠️ **Avoid 4.4.3**: its billing regression makes purchases unusable.
 
@@ -88,15 +88,15 @@ dependencyResolutionManagement {
 Add the modules you need to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.13'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.13'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.14'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.14'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.14'
 
 // Optional: Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.14'
 
 // Optional: Yandex Ads waterfall provider
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.14'
 ```
 
 ## Quick Start
@@ -170,11 +170,14 @@ The sample app's [`MyApplication.kt`](app/src/main/java/com/i2hammad/admanagekit
 bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy")
 // Fixed size: BANNER, LARGE_BANNER, MEDIUM_RECTANGLE, FULL_BANNER, LEADERBOARD
 bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy", BannerAdSize.MEDIUM_RECTANGLE)
-// Collapsible banner (adaptive size only)
+// Collapsible banner (anchored adaptive size only)
 bannerAdView.loadCollapsibleBanner(this, "ca-app-pub-xxx/yyy", true)
+// Inline adaptive banner for scrolling content (sized to the view, height up to 250dp)
+bannerAdView.setInlineMaxHeight(250)
+bannerAdView.loadBanner(this, "ca-app-pub-xxx/yyy", BannerAdSize.INLINE_ADAPTIVE)
 ```
 
-`ADAPTIVE` (the default) is Google's full-width anchored adaptive banner; `ADAPTIVE_LARGE` opts into the taller large anchored format. See the [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md).
+`ADAPTIVE` (the default) is Google's full-width anchored adaptive banner; `ADAPTIVE_LARGE` opts into the taller large anchored format. `INLINE_ADAPTIVE` (4.4.14) is for banners inside scrolling content: it takes the view's own width and a variable height, and takes no space until the ad loads. See the [Banner Ad Guide](docs/BANNER_AD_IMPROVEMENTS.md).
 
 ### Native Ads
 
@@ -284,6 +287,9 @@ More: [App Open Ads](docs/app-open-ads.md)
 @Composable
 fun MyScreen() {
     BannerAdCompose(adUnitId = "ca-app-pub-xxx/yyy")
+
+    // Inline adaptive banner for lists and feeds: no space until loaded, then animates open
+    InlineBannerAdCompose(adUnitId = "ca-app-pub-xxx/yyy", maxHeight = 250.dp)
 
     NativeTemplateCompose(
         adUnitId = "ca-app-pub-xxx/yyy",

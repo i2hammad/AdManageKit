@@ -74,7 +74,7 @@ afterEvaluate {
                 from(components["release"])  // Now works correctly
                 groupId = "com.github.i2hammad"
                 artifactId = "ad-manage-kit-billing"
-                version = "4.4.13"
+                version = "4.4.14"
             }
         }
     }

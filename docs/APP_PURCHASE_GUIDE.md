@@ -24,8 +24,8 @@
 ### 1. Add Dependencies
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.13'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.14'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.14'
 ```
 
 ### 2. Initialize in Application Class

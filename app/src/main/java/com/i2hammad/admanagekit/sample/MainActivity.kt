@@ -76,6 +76,11 @@ class MainActivity : AppCompatActivity() {
             startActivity(intent)
         }
 
+        // Setup button to open the inline adaptive banner sample (banner inside a list of cards)
+        findViewById<Button>(R.id.btnOpenInlineBannerTest).setOnClickListener {
+            startActivity(Intent(this, InlineBannerTestActivity::class.java))
+        }
+
         loadAds()
 
 

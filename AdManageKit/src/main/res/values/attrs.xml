@@ -86,7 +86,11 @@
             <enum name="full_banner" value="5" />
             <!-- 728x90 IAB leaderboard, tablets -->
             <enum name="leaderboard" value="6" />
+            <!-- Inline adaptive for scrolling content: view width, variable height up to bannerInlineMaxHeight -->
+            <enum name="inline_adaptive" value="7" />
         </attr>
+        <!-- Max height of an inline_adaptive banner (default 250dp). -->
+        <attr name="bannerInlineMaxHeight" format="dimension" />
     </declare-styleable>
 
 </resources>

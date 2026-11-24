@@ -7,7 +7,7 @@ AdManageKit provides native Jetpack Compose components for all ad types with ful
 ## Installation
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.13'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.14'
 ```
 
 ## Available Components
@@ -16,6 +16,7 @@ implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.13'
 |-----------|-------------|
 | `NativeTemplateCompose` | Unified native ad with 38 templates, or a fully custom layout (NEW in 2.6.0) |
 | `BannerAdCompose` | Banner ad with lifecycle management |
+| `InlineBannerAdCompose` | Inline adaptive banner for lists and feeds (v4.4.14+) |
 | `NativeBannerSmallCompose` | Small native banner (80dp) |
 | `NativeBannerMediumCompose` | Medium native banner (120dp) |
 | `NativeLargeCompose` | Large native ad (300dp) |
@@ -249,6 +250,28 @@ BannerAdCompose(
 Available sizes: `ADAPTIVE` (default), `BANNER` (320x50), `LARGE_BANNER` (320x100),
 `MEDIUM_RECTANGLE` (300x250), `FULL_BANNER` (468x60, tablets), `LEADERBOARD` (728x90, tablets).
 `CollapsibleBannerAdCompose` always uses the adaptive size (AdMob policy).
+
+### Inline Adaptive Banner (v4.4.14+)
+
+For a banner inside a list, feed or article. The ad takes the slot's width (padding included) and a height AdMob picks at load time, never above `maxHeight`. The slot takes no space until the ad loads (or shows a small shimmer with `showShimmer = true`), then animates open; on failure it takes no space.
+
+```kotlin
+LazyColumn {
+    items(articles) { ArticleCard(it) }
+    item {
+        InlineBannerAdCompose(
+            adUnitId = "ca-app-pub-xxx/yyy",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            maxHeight = 250.dp,
+            showShimmer = false,
+            onAdLoaded = { heightDp -> },
+            onAdFailedToLoad = { error -> },
+        )
+    }
+}
+```
+
+It loads once per slot width: recomposition never reloads, and a real width change (rotation, foldable or tablet resize) loads a new ad. Inline banners are never collapsible. `BannerAdCompose(adSize = BannerAdSize.INLINE_ADAPTIVE)` gives the same slot with the defaults.
 
 ---
 
