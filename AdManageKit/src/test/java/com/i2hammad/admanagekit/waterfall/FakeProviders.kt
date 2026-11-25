@@ -176,8 +176,22 @@ class FakeBannerProvider(
     var pauseCount = 0
     var resumeCount = 0
 
+    /** Size of each load: null for [loadBanner], the requested size for [loadInlineBanner]. */
+    val loadSizes = mutableListOf<com.i2hammad.admanagekit.core.ad.InlineBannerSize?>()
+
     override fun loadBanner(context: Context, adUnitId: String, callback: BannerAdProvider.BannerAdCallback) {
         loadCalls += LoadCall(context, adUnitId, callback)
+        loadSizes += null
+    }
+
+    override fun loadInlineBanner(
+        context: Context,
+        adUnitId: String,
+        size: com.i2hammad.admanagekit.core.ad.InlineBannerSize,
+        callback: BannerAdProvider.BannerAdCallback
+    ) {
+        loadCalls += LoadCall(context, adUnitId, callback)
+        loadSizes += size
     }
 
     fun triggerLoadSuccess(bannerView: View, index: Int = loadCalls.lastIndex) {

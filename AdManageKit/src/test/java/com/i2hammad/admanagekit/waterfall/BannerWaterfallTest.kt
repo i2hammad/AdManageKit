@@ -54,6 +54,27 @@ class BannerWaterfallTest {
     private fun idle() = shadowOf(Looper.getMainLooper()).idle()
 
     @Test
+    fun `inline size reaches every provider in the chain, including fallbacks`() {
+        val size = com.i2hammad.admanagekit.core.ad.InlineBannerSize(widthDp = 328, maxHeightDp = 100)
+        val callback = RecordingBannerCallback()
+
+        BannerWaterfall(listOf(providerA, providerB), resolver, false, 5_000L, inlineSize = size)
+            .load(context, callback)
+        providerA.triggerLoadFailure()
+        idle()
+
+        assertEquals(listOf(size), providerA.loadSizes)
+        assertEquals(listOf(size), providerB.loadSizes)
+    }
+
+    @Test
+    fun `without an inline size providers get a plain load`() {
+        waterfall(listOf(providerA)).load(context, RecordingBannerCallback())
+
+        assertEquals(listOf(null), providerA.loadSizes)
+    }
+
+    @Test
     fun `successful load delivers the provider's banner view`() {
         val callback = RecordingBannerCallback()
         val bannerView = View(context)

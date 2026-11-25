@@ -9,6 +9,7 @@ import com.i2hammad.admanagekit.config.AdManageKitConfig
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdKitAdValue
 import com.i2hammad.admanagekit.core.ad.BannerAdProvider
+import com.i2hammad.admanagekit.core.ad.InlineBannerSize
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -28,12 +29,15 @@ import java.util.concurrent.atomic.AtomicInteger
  *        [com.i2hammad.admanagekit.core.ad.AdProviderConfig] are shared and must not
  *        be destroyed by individual waterfalls (default: false).
  * @param attemptTimeoutMillis Watchdog timeout for each provider load attempt
+ * @param inlineSize When set, every provider is asked for an inline adaptive banner of this
+ *        size ([BannerAdProvider.loadInlineBanner]) instead of its default size
  */
 class BannerWaterfall @JvmOverloads constructor(
     private val providers: List<BannerAdProvider>,
     private val adUnitResolver: (com.i2hammad.admanagekit.core.ad.AdProvider) -> String?,
     private val ownsProviders: Boolean = false,
-    private val attemptTimeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds
+    private val attemptTimeoutMillis: Long = AdManageKitConfig.defaultAdTimeout.inWholeMilliseconds,
+    private val inlineSize: InlineBannerSize? = null
 ) {
     @Volatile
     private var loadedProvider: BannerAdProvider? = null
@@ -106,7 +110,7 @@ class BannerWaterfall @JvmOverloads constructor(
         }
         if (attemptTimeoutMillis > 0) handler.postDelayed(watchdog, attemptTimeoutMillis)
 
-        provider.loadBanner(context, adUnitId, object : BannerAdProvider.BannerAdCallback {
+        val providerCallback = object : BannerAdProvider.BannerAdCallback {
             override fun onBannerLoaded(bannerView: View) {
                 if (!settled.compareAndSet(false, true)) {
                     Log.d(TAG, "${provider.provider.displayName} loaded after timeout, ignoring")
@@ -140,7 +144,12 @@ class BannerWaterfall @JvmOverloads constructor(
             override fun onBannerClicked() { callback.onBannerClicked() }
             override fun onBannerImpression() { callback.onBannerImpression() }
             override fun onPaidEvent(adValue: AdKitAdValue) { callback.onPaidEvent(adValue) }
-        })
+        }
+        if (inlineSize != null) {
+            provider.loadInlineBanner(context, adUnitId, inlineSize, providerCallback)
+        } else {
+            provider.loadBanner(context, adUnitId, providerCallback)
+        }
     }
 
     fun pause() { loadedProvider?.pause() }

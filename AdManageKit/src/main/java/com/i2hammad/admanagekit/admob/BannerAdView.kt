@@ -41,6 +41,7 @@ import com.i2hammad.admanagekit.config.BannerAdSize
 import com.i2hammad.admanagekit.config.CollapsibleBannerPlacement
 import com.i2hammad.admanagekit.utils.AdDebugUtils
 import com.i2hammad.admanagekit.waterfall.BannerWaterfall
+import com.i2hammad.admanagekit.core.ad.InlineBannerSize
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -1011,14 +1012,20 @@ class BannerAdView @JvmOverloads constructor(
                 // null (ADAPTIVE) lets the provider compute its own standard adaptive
                 // size; ADAPTIVE_LARGE and INLINE_ADAPTIVE must be resolved here since the
                 // provider's own fallback is the standard variant sized to the window.
-                // Only AdMob providers get the inline size - others keep their own sizing.
+                // Other providers get the inline size per load, through the waterfall below.
                 it.adSize = if (currentBannerSize == BannerAdSize.ADAPTIVE_LARGE || isInline) getAdSize()
                 else currentBannerSize.toFixedAdMobAdSize()
             }
 
         val waterfall = BannerWaterfall(
             providers = providers,
-            adUnitResolver = resolveAdUnit(adUnitId)
+            adUnitResolver = resolveAdUnit(adUnitId),
+            // Inline: every provider (e.g. Yandex) is asked for its adaptive inline size at
+            // this view's laid-out width, capped at the configured max height.
+            inlineSize = if (isInline) InlineBannerSize(
+                widthDp = (inlineContentWidthPx() / resources.displayMetrics.density).toInt(),
+                maxHeightDp = inlineMaxHeightDp
+            ) else null
         )
         bannerWaterfall = waterfall
 

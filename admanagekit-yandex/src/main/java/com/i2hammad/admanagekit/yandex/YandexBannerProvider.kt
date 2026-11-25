@@ -12,6 +12,7 @@ import com.yandex.mobile.ads.common.ImpressionData
 import com.i2hammad.admanagekit.core.ad.AdKitAdError
 import com.i2hammad.admanagekit.core.ad.AdProvider
 import com.i2hammad.admanagekit.core.ad.BannerAdProvider
+import com.i2hammad.admanagekit.core.ad.InlineBannerSize
 import com.i2hammad.admanagekit.yandex.internal.toAdKitError
 import com.i2hammad.admanagekit.yandex.internal.toAdKitValue
 
@@ -19,8 +20,11 @@ import com.i2hammad.admanagekit.yandex.internal.toAdKitValue
  * Yandex Ads implementation of [BannerAdProvider].
  * Wraps Yandex BannerAdView behind the provider interface.
  *
- * @param maxAdWidth Maximum banner width in dp. Used for adaptive inline banners.
- *                   If 0, defaults to screen width.
+ * One instance is shared by every banner view in the global chain, so it never destroys a
+ * banner it has handed out: that view belongs to the consumer that displays it, and another
+ * view's load must not blank it. Only views still loading are destroyed by [destroy].
+ *
+ * @param maxAdWidth Width in dp for sticky (non-inline) banners. If 0, the screen width.
  */
 class YandexBannerProvider(
     private val maxAdWidth: Int = 0
@@ -28,8 +32,8 @@ class YandexBannerProvider(
 
     override val provider: AdProvider = AdProvider.YANDEX
 
-    private var bannerAdView: BannerAdView? = null
-    private var isDestroyed = false
+    /** Views created for in-flight loads, not yet handed out. Main thread only. */
+    private val pendingViews = mutableSetOf<BannerAdView>()
 
     companion object {
         private const val TAG = "YandexBanner"
@@ -40,44 +44,60 @@ class YandexBannerProvider(
         adUnitId: String,
         callback: BannerAdProvider.BannerAdCallback
     ) {
-        // Replace any previous banner so sequential loads don't leak the first view
-        bannerAdView?.destroy()
-        val bannerView = BannerAdView(context).apply {
-            val width = if (maxAdWidth > 0) maxAdWidth else {
-                val displayMetrics = context.resources.displayMetrics
-                (displayMetrics.widthPixels / displayMetrics.density).toInt()
-            }
-            setAdSize(BannerAdSize.sticky(context, width))
-
-            setBannerAdEventListener(object : BannerAdEventListener {
-                override fun onAdLoaded() {
-                    if (isDestroyed) {
-                        Log.d(TAG, "Banner ad loaded after destroy, discarding: $adUnitId")
-                        return
-                    }
-                    Log.d(TAG, "Banner ad loaded: $adUnitId")
-                    callback.onBannerLoaded(this@apply)
-                }
-
-                override fun onAdFailedToLoad(error: AdRequestError) {
-                    if (isDestroyed) return
-                    Log.e(TAG, "Banner ad failed to load: ${error.description}")
-                    callback.onBannerFailedToLoad(error.toAdKitError())
-                }
-
-                override fun onAdClicked() {
-                    callback.onBannerClicked()
-                }
-
-                override fun onImpression(impressionData: ImpressionData?) {
-                    callback.onBannerImpression()
-                    callback.onPaidEvent(impressionData.toAdKitValue())
-                }
-            })
+        val width = if (maxAdWidth > 0) maxAdWidth else {
+            val displayMetrics = context.resources.displayMetrics
+            (displayMetrics.widthPixels / displayMetrics.density).toInt()
         }
+        load(context, adUnitId, BannerAdSize.sticky(context, width), callback)
+    }
 
-        // Track the view from creation so destroy() during an in-flight load destroys it
-        bannerAdView = bannerView
+    /** Yandex's adaptive inline banner: the given width, any height up to the max. */
+    override fun loadInlineBanner(
+        context: Context,
+        adUnitId: String,
+        size: InlineBannerSize,
+        callback: BannerAdProvider.BannerAdCallback
+    ) {
+        load(context, adUnitId, BannerAdSize.inline(context, size.widthDp, size.maxHeightDp), callback)
+    }
+
+    private fun load(
+        context: Context,
+        adUnitId: String,
+        adSize: BannerAdSize,
+        callback: BannerAdProvider.BannerAdCallback
+    ) {
+        val bannerView = BannerAdView(context)
+        pendingViews.add(bannerView)
+        bannerView.setAdSize(adSize)
+        bannerView.setBannerAdEventListener(object : BannerAdEventListener {
+            override fun onAdLoaded() {
+                if (!pendingViews.remove(bannerView)) {
+                    // destroy() already destroyed this in-flight view; do not hand it out.
+                    Log.d(TAG, "Banner ad loaded after destroy, discarding: $adUnitId")
+                    return
+                }
+                Log.d(TAG, "Banner ad loaded: $adUnitId")
+                callback.onBannerLoaded(bannerView)
+            }
+
+            override fun onAdFailedToLoad(error: AdRequestError) {
+                // Never handed out: release it here.
+                if (!pendingViews.remove(bannerView)) return
+                bannerView.destroy()
+                Log.e(TAG, "Banner ad failed to load: ${error.description}")
+                callback.onBannerFailedToLoad(error.toAdKitError())
+            }
+
+            override fun onAdClicked() {
+                callback.onBannerClicked()
+            }
+
+            override fun onImpression(impressionData: ImpressionData?) {
+                callback.onBannerImpression()
+                callback.onPaidEvent(impressionData.toAdKitValue())
+            }
+        })
         bannerView.loadAd(AdRequest.Builder(adUnitId).build())
     }
 
@@ -90,8 +110,8 @@ class YandexBannerProvider(
     }
 
     override fun destroy() {
-        isDestroyed = true
-        bannerAdView?.destroy()
-        bannerAdView = null
+        // Destroy only views that were never handed to a consumer (in-flight loads).
+        pendingViews.forEach { it.destroy() }
+        pendingViews.clear()
     }
 }
