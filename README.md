@@ -88,15 +88,15 @@ dependencyResolutionManagement {
 Add the modules you need to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.15'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.15'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.16'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.16'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.16'
 
 // Optional: Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.16'
 
 // Optional: Yandex Ads waterfall provider
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.16'
 ```
 
 ## Quick Start

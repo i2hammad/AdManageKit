@@ -1,4 +1,4 @@
-# Configuration - AdManageKit v4.4.15
+# Configuration - AdManageKit v4.4.16
 
 ## Overview
 

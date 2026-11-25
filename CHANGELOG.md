@@ -5,6 +5,20 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.16] - 2026-11-25
+
+### Added
+- **Yandex inline adaptive banners.** `BannerAdSize.INLINE_ADAPTIVE` now reaches every provider in the banner chain, not only AdMob. `YandexBannerProvider` loads `BannerAdSize.inline(context, widthDp, maxHeightDp)` at the slot's laid-out width and the configured max height, whether Yandex is the only provider or AdMob's backfill. Before, Yandex always loaded a sticky banner at screen width.
+- `BannerAdProvider.loadInlineBanner(context, adUnitId, InlineBannerSize, callback)`. The default does a plain `loadBanner`, so custom providers keep working. `BannerWaterfall` takes an optional `inlineSize`.
+
+### Fixed
+- **A second Yandex banner blanked the first.** Chain providers are shared by every banner on screen, and `YandexBannerProvider` destroyed its previous banner on each load. With two Yandex banners showing (an anchored one and an inline one, say), each new load destroyed the other's ad. It now destroys only views still loading, like `AdMobBannerProvider`.
+
+### Notes
+- Apps must map their inline banner units to Yandex (`AdUnitMapping.register(unit, mapOf("yandex" to ...))`); an unmapped unit still skips Yandex.
+- New tests in `BannerWaterfallTest`: the inline size reaches a fallback provider; a plain load gets none.
+- Verified: `assembleDebug` for all modules and the sample app, and all 213 unit tests. On a Galaxy A71 5G (SM-A716V, Android 13) in Signature Maker with Yandex forced on, inline slots filled from Yandex at 200dp (max 200) and 100dp (max 100, inset slot width).
+
 ## [4.4.15] - 2026-11-25
 
 ### Fixed

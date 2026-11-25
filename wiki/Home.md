@@ -12,6 +12,7 @@ AdManageKit is a comprehensive Android library designed to simplify the integrat
 
 ## Recent Releases
 
+- **4.4.16**: Yandex serves inline adaptive banners at their inline size (`BannerAdSize.inline`), alone or as AdMob's backfill. A shared Yandex banner provider no longer blanks another view's banner when a second one loads
 - **4.4.15**: Fixes blank screens with inline banners in 4.4.14: a banner refresh left the screen unable to lay out, so tabs or fragments opened afterwards stayed empty. Update from 4.4.14
 - **4.4.14**: Inline adaptive banners: `BannerAdSize.INLINE_ADAPTIVE` for `BannerAdView` (`setInlineMaxHeight()`, default 250dp) and the new `InlineBannerAdCompose`. Sized to the slot's own width; no space until the ad loads
 - **4.4.13**: Billing retries a failed setup or product-details query (2, 5, 15 s), so prices no longer stay empty after one Play "internal error". New `AppPurchase.refreshProductDetails()`. Product-details failures now reach only `ProductDetailsListener`
@@ -82,15 +83,15 @@ dependencyResolutionManagement {
 **Step 2:** Add dependencies to your app's `build.gradle`:
 
 ```groovy
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.15'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.15'
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit:v4.4.16'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-billing:v4.4.16'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-core:v4.4.16'
 
 // For Jetpack Compose support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-compose:v4.4.16'
 
 // For Yandex Ads multi-provider support
-implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.15'
+implementation 'com.github.i2hammad.AdManageKit:ad-manage-kit-yandex:v4.4.16'
 ```
 
 **Step 3:** Ensure your app uses `compileSdk` **37+** (since 4.2.0) and **Kotlin 2.3+** (since 4.4.8).
