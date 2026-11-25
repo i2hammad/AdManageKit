@@ -861,40 +861,46 @@ class BannerAdView @JvmOverloads constructor(
         // Walk up flagging every ancestor, stopping at Compose's interop holder when there
         // is one. forceLayout() makes View.measure() re-run even though the MeasureSpecs
         // are unchanged, which is exactly what a swapped-in child needs.
-        val chain = ArrayList<View>()
-        var current: View? = this
-        var composeHolder: View? = null
-        while (current != null) {
-            chain.add(current)
-            if (current.javaClass.name.startsWith("androidx.compose.ui.viewinterop.")) {
-                composeHolder = current
-                break
+        // The request must be raised from ABOVE the flagged chain. requestLayout() stops
+        // climbing at the first parent that already reports isLayoutRequested, so asking from
+        // inside the chain never reaches ViewRootImpl: with no traversal already pending (an
+        // inline refresh) the flags then stay set, every later requestLayout() in the window
+        // stops at them, and views added afterwards (a new fragment or tab) stay 0x0.
+        // The chain is walked on each call: by the next frame the view may have moved to
+        // another parent (e.g. a list row or a slot reused on another screen).
+        fun flagAndRequest() {
+            val chain = ArrayList<View>()
+            var current: View? = this
+            var composeHolder: View? = null
+            while (current != null) {
+                chain.add(current)
+                if (current.javaClass.name.startsWith("androidx.compose.ui.viewinterop.")) {
+                    composeHolder = current
+                    break
+                }
+                current = current.parent as? View
             }
-            current = current.parent as? View
+            chain.forEach { it.forceLayout() }
+            if (composeHolder != null) {
+                // AndroidViewsHandler.requestLayout() checks `child.isLayoutRequested` (now
+                // true) and requests the node remeasure, which re-measures and re-lays out
+                // the holder and everything under it.
+                (composeHolder.parent as? View)?.requestLayout()
+            } else {
+                // Plain View host: the chain's top is the window's root, whose parent is
+                // ViewRootImpl. Detached, it has no parent and nothing beyond the chain is
+                // touched; attaching it later lays it out.
+                chain.last().requestLayout()
+            }
+            invalidate()
         }
-        chain.forEach { it.forceLayout() }
 
-        if (composeHolder != null) {
-            // Ask from ABOVE the flagged chain: AndroidViewsHandler.requestLayout() checks
-            // `child.isLayoutRequested` (now true) and requests the node remeasure, which
-            // re-measures and re-lays out the holder and everything under it.
-            (composeHolder.parent as? View)?.requestLayout()
-        } else {
-            // Plain View host: normal propagation works once the chain is flagged.
-            requestLayout()
-        }
-        invalidate()
+        flagAndRequest()
 
         // A request raised while a layout pass is already running can still be dropped
         // (ViewRootImpl.requestLayoutDuringLayout); repeat once on the next frame.
         post {
-            chain.forEach { it.forceLayout() }
-            if (composeHolder != null) {
-                (composeHolder.parent as? View)?.requestLayout()
-            } else {
-                requestLayout()
-            }
-            invalidate()
+            flagAndRequest()
             AdDebugUtils.logDebug(
                 "BannerAdView",
                 "post-swap layout: container=${layBannerAd.width}x${layBannerAd.height} " +
