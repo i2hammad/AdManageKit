@@ -5,6 +5,17 @@ All notable changes to AdManageKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.4.15] - 2026-11-25
+
+### Fixed
+- **Blank screens after an inline banner refresh (4.4.14).** After a banner loaded or refreshed, `BannerAdView` marked every parent view for a new layout and then asked for one from the banner itself. Android stops passing a layout request up at the first parent already marked, so the request never reached the window. When no layout was already on its way, the marks stayed. From then on every layout request in that window was dropped, and views added later (a new fragment, a tab, a dialog's content) stayed 0x0. Inline banners hit this on every refresh, about once a minute; in one app every tab opened after the first refresh came up blank. The request is now sent from the top of the view tree, and the parent chain is walked again on the next frame in case the banner moved to another parent.
+- Anchored banners ran the same code after a load since 4.4.5. A layout was usually already on its way then, which is why it rarely showed.
+
+### Notes
+- No API or dependency changes. Apps on 4.4.14 that use `INLINE_ADAPTIVE` should update.
+- New test: `BannerAdViewRelayoutTest` (a view added after the relayout is laid out; a detached banner leaves the window alone).
+- Verified: `assembleDebug` for all modules and the sample app, and all 211 unit tests. On a Galaxy A71 5G (SM-A716V, Android 13) in Signature Maker, tabs opened after two inline banner refreshes lay out normally; with 4.4.14 they came up blank.
+
 ## [4.4.14] - 2026-11-25
 
 ### Added
